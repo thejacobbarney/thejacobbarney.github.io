@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Movie Quote of the Day 🎬</title>
+  <meta name="description" content="Daily movie quote guessing game — 3 guesses to name the film. 166 iconic quotes across 6 genres." />
+  <meta property="og:title" content="Movie Quote of the Day 🎬" />
+  <meta property="og:description" content="Guess the movie from the quote — 3 tries, 166 quotes, 6 genres." />
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { margin: 0; padding: 0; background: #e8edf5; }
+    #root { min-height: 100vh; }
+
+    /* Confetti burst animation */
+    @keyframes confettiBurst {
+      0%   { opacity: 1; transform: translate(0,0) rotate(0deg) scale(1); }
+      100% { opacity: 0; transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(0.4); }
+    }
+    .confetti-piece {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      animation: confettiBurst var(--dur, 1.4s) cubic-bezier(0.25,0.46,0.45,0.94) forwards;
+    }
+
+    /* Streak milestone toast */
+    @keyframes toastSlideDown {
+      from { opacity: 0; transform: translate(-50%, -24px) scale(0.88); }
+      to   { opacity: 1; transform: translate(-50%, 0)     scale(1); }
+    }
+    @keyframes toastShake {
+      0%,100% { transform: translate(-50%, 0) scale(1); }
+      20%     { transform: translate(-50%, 0) scale(1.06) rotate(-1deg); }
+      40%     { transform: translate(-50%, 0) scale(1.06) rotate(1deg); }
+      60%     { transform: translate(-50%, 0) scale(1.04) rotate(-0.5deg); }
+      80%     { transform: translate(-50%, 0) scale(1.04) rotate(0.5deg); }
+    }
+    .streak-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      max-width: calc(100vw - 32px);
+      text-align: center;
+      word-break: break-word;
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.45);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      pointer-events: none;
+      animation: toastSlideDown 0.42s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    .streak-toast-hot {
+      padding: 11px 28px;
+      border-radius: 100px;
+      font-size: 15px;
+      color: #fff;
+      background: linear-gradient(135deg, rgba(255,152,0,0.92), rgba(244,67,54,0.92));
+      box-shadow: 0 6px 28px rgba(255,100,0,0.35), 0 2px 8px rgba(0,0,0,0.12);
+    }
+    .streak-toast-mega {
+      padding: 15px 38px;
+      border-radius: 22px;
+      font-size: 20px;
+      color: #1a1a1a;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, rgba(255,215,0,0.97), rgba(255,152,0,0.97));
+      box-shadow:
+        0 0 0 3px rgba(255,200,0,0.4),
+        0 0 50px rgba(255,180,0,0.5),
+        0 10px 40px rgba(0,0,0,0.18);
+      animation: toastSlideDown 0.42s cubic-bezier(0.22,1,0.36,1) both,
+                 toastShake 0.55s 0.5s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    /* Screen flash for mega milestones */
+    @keyframes screenFlash {
+      0%   { opacity: 0; }
+      15%  { opacity: 0.18; }
+      100% { opacity: 0; }
+    }
+    .screen-flash {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 40%, rgba(255,220,0,1), rgba(255,140,0,0.6) 60%, transparent 100%);
+      pointer-events: none;
+      z-index: 9998;
+      animation: screenFlash 0.7s ease-out forwards;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // =========================================================
+    // QUOTE DATABASE — 166 quotes across 6 genres
+    // =========================================================
+    const quotes = [
+      // ── COMEDY ──────────────────────────────────────────────
+      { id: 1,   genre: "Comedy",          movie: "Elf",                                       year: 2003, quote: "Buddy the Elf, what's your favorite color?",                                                                                                                                                           character: "Buddy / Jovie" },
+      { id: 2,   genre: "Comedy",          movie: "Anchorman",                                 year: 2004, quote: "I'm kind of a big deal.",                                                                                                                                                                              character: "Ron Burgundy" },
+      { id: 3,   genre: "Comedy",          movie: "Superbad",                                  year: 2007, quote: "I am McLovin.",                                                                                                                                                                                        character: "Fogell" },
+      { id: 4,   genre: "Comedy",          movie: "Bridesmaids",                               year: 2011, quote: "Help me, I'm poor.",                                                                                                                                                                                   character: "Annie" },
+      { id: 5,   genre: "Comedy",          movie: "Mean Girls",                                year: 2004, quote: "On Wednesdays we wear pink.",                                                                                                                                                                          character: "Karen" },
+      { id: 6,   genre: "Comedy",          movie: "Mean Girls",                                year: 2004, quote: "That's so fetch.",                                                                                                                                                                                     character: "Gretchen" },
+      { id: 7,   genre: "Comedy",          movie: "Step Brothers",                             year: 2008, quote: "Did we just become best friends?",                                                                                                                                                                     character: "Brennan / Dale" },
+      { id: 8,   genre: "Comedy",          movie: "Talladega Nights",                          year: 2006, quote: "If you ain't first, you're last.",                                                                                                                                                                     character: "Reese Bobby" },
+      { id: 9,   genre: "Comedy",          movie: "Dumb and Dumber",                           year: 1994, quote: "So you're telling me there's a chance!",                                                                                                                                                              character: "Lloyd Christmas" },
+      { id: 10,  genre: "Comedy",          movie: "The Hangover",                              year: 2009, quote: "Tigers love pepper. They hate cinnamon.",                                                                                                                                                              character: "Alan" },
+      { id: 11,  genre: "Comedy",          movie: "School of Rock",                            year: 2003, quote: "You're not hardcore unless you live hardcore.",                                                                                                                                                        character: "Dewey Finn" },
+      { id: 12,  genre: "Comedy",          movie: "Napoleon Dynamite",                         year: 2004, quote: "Vote for Pedro.",                                                                                                                                                                                      character: "Napoleon Dynamite" },
+      { id: 13,  genre: "Comedy",          movie: "Napoleon Dynamite",                         year: 2004, quote: "Gosh!",                                                                                                                                                                                                character: "Napoleon Dynamite" },
+      { id: 86,  genre: "Comedy",          movie: "The 40-Year-Old Virgin",                    year: 2005, quote: "Is it true that if you don't use it, you lose it?",                                                                                                                                                   character: "David" },
+      { id: 87,  genre: "Comedy",          movie: "Blades of Glory",                           year: 2007, quote: "No one can take away what we put in here.",                                                                                                                                                           character: "Chazz Michael Michaels" },
+      { id: 92,  genre: "Comedy",          movie: "Knocked Up",                                year: 2007, quote: "Marriage is like a tense, unfunny version of Everybody Loves Raymond.",                                                                                                                               character: "Ben Stone" },
+      { id: 93,  genre: "Comedy",          movie: "Dodgeball",                                 year: 2004, quote: "If you can dodge a wrench, you can dodge a ball.",                                                                                                                                                    character: "Patches O'Houlihan" },
+      { id: 94,  genre: "Comedy",          movie: "Zoolander",                                 year: 2001, quote: "I'm pretty sure there's a lot more to life than being really, really, ridiculously good looking.",                                                                                                     character: "Derek Zoolander" },
+      { id: 95,  genre: "Comedy",          movie: "The Other Guys",                            year: 2010, quote: "I'm a peacock, you gotta let me fly!",                                                                                                                                                                character: "Allen Gamble" },
+      { id: 96,  genre: "Comedy",          movie: "Game Night",                                year: 2018, quote: "You have to promise me one thing — that you'll never be normal.",                                                                                                                                     character: "Max" },
+      { id: 97,  genre: "Comedy",          movie: "Tropic Thunder",                            year: 2008, quote: "I'm a lead farmer.",                                                                                                                                                                                  character: "Sergeant Osiris" },
+      { id: 98,  genre: "Comedy",          movie: "This Is the End",                           year: 2013, quote: "We're gonna die, and I'd like to die as your friend.",                                                                                                                                                character: "Seth Rogen" },
+      { id: 99,  genre: "Comedy",          movie: "Get Him to the Greek",                      year: 2010, quote: "When the world slips you a Jeffrey, stroke the furry wall.",                                                                                                                                          character: "Aldous Snow" },
+      { id: 100, genre: "Comedy",          movie: "Anchorman 2",                               year: 2013, quote: "I'm not just sure, I'm HIV positive.",                                                                                                                                                                character: "Ron Burgundy" },
+      { id: 101, genre: "Comedy",          movie: "The Nice Guys",                             year: 2016, quote: "You know who else was just following orders? Hitler.",                                                                                                                                                 character: "Holland March" },
+      // NEW COMEDY
+      { id: 142, genre: "Comedy",          movie: "Ferris Bueller's Day Off",                  year: 1986, quote: "Life moves pretty fast. If you don't stop and look around once in a while, you could miss it.",                                                                                                       character: "Ferris Bueller" },
+      { id: 143, genre: "Comedy",          movie: "Clueless",                                  year: 1995, quote: "As if!",                                                                                                                                                                                               character: "Cher Horowitz" },
+      { id: 144, genre: "Comedy",          movie: "Wedding Crashers",                          year: 2005, quote: "Rule 76: No excuses. Play like a champion!",                                                                                                                                                          character: "John Beckwith" },
+      { id: 145, genre: "Comedy",          movie: "Old School",                                year: 2003, quote: "You're my boy, Blue!",                                                                                                                                                                                 character: "Frank Ricard" },
+      { id: 146, genre: "Comedy",          movie: "Mrs. Doubtfire",                            year: 1993, quote: "It was a run-by fruiting!",                                                                                                                                                                            character: "Mrs. Doubtfire" },
+
+      // ── DRAMA ───────────────────────────────────────────────
+      { id: 14,  genre: "Drama",           movie: "Gladiator",                                 year: 2000, quote: "What we do in life echoes in eternity.",                                                                                                                                                               character: "Maximus" },
+      { id: 15,  genre: "Drama",           movie: "The Dark Knight",                           year: 2008, quote: "Why so serious?",                                                                                                                                                                                     character: "The Joker" },
+      { id: 16,  genre: "Drama",           movie: "The Dark Knight",                           year: 2008, quote: "Some men just want to watch the world burn.",                                                                                                                                                         character: "Alfred" },
+      { id: 17,  genre: "Drama",           movie: "Brokeback Mountain",                        year: 2005, quote: "I wish I knew how to quit you.",                                                                                                                                                                      character: "Jack Twist" },
+      { id: 18,  genre: "Drama",           movie: "No Country for Old Men",                    year: 2007, quote: "What's the most you ever lost on a coin toss?",                                                                                                                                                      character: "Anton Chigurh" },
+      { id: 19,  genre: "Drama",           movie: "There Will Be Blood",                       year: 2007, quote: "I drink your milkshake!",                                                                                                                                                                             character: "Daniel Plainview" },
+      { id: 20,  genre: "Drama",           movie: "Whiplash",                                  year: 2014, quote: "Not my tempo.",                                                                                                                                                                                       character: "Fletcher" },
+      { id: 21,  genre: "Drama",           movie: "The Social Network",                        year: 2010, quote: "You're going to go through life thinking that girls don't like you because you're a nerd.",                                                                                                           character: "Erica" },
+      { id: 22,  genre: "Drama",           movie: "Forrest Gump",                              year: 1994, quote: "Life is like a box of chocolates — you never know what you're gonna get.",                                                                                                                            character: "Forrest Gump" },
+      { id: 23,  genre: "Drama",           movie: "Good Will Hunting",                         year: 1997, quote: "It's not your fault.",                                                                                                                                                                                 character: "Sean Maguire" },
+      { id: 24,  genre: "Drama",           movie: "The Pursuit of Happyness",                  year: 2006, quote: "Don't ever let somebody tell you you can't do something.",                                                                                                                                            character: "Chris Gardner" },
+      { id: 25,  genre: "Drama",           movie: "12 Years a Slave",                          year: 2013, quote: "I don't want to survive. I want to live.",                                                                                                                                                            character: "Solomon Northup" },
+      { id: 26,  genre: "Drama",           movie: "Oppenheimer",                               year: 2023, quote: "Now I am become Death, the destroyer of worlds.",                                                                                                                                                     character: "J. Robert Oppenheimer" },
+      { id: 27,  genre: "Drama",           movie: "Parasite",                                  year: 2019, quote: "You know what kind of plan never fails? No plan.",                                                                                                                                                    character: "Ki-woo" },
+      { id: 28,  genre: "Drama",           movie: "The Devil Wears Prada",                     year: 2006, quote: "Details of your incompetence do not interest me.",                                                                                                                                                    character: "Miranda Priestly" },
+      { id: 29,  genre: "Drama",           movie: "The Hunger Games",                          year: 2012, quote: "Hope is the only thing stronger than fear.",                                                                                                                                                          character: "President Snow" },
+      { id: 102, genre: "Drama",           movie: "Catch Me If You Can",                       year: 2002, quote: "Two little mice fell in a bucket of cream. The first mouse quickly gave up and drowned. The second mouse wouldn't quit. He struggled so hard that eventually he churned that cream into butter and crawled out.", character: "Frank Abagnale Sr." },
+      { id: 103, genre: "Drama",           movie: "The Departed",                              year: 2006, quote: "I don't want to be a product of my environment. I want my environment to be a product of me.",                                                                                                        character: "Frank Costello" },
+      { id: 104, genre: "Drama",           movie: "Million Dollar Baby",                       year: 2004, quote: "If there's magic in boxing, it's the magic of fighting battles beyond endurance.",                                                                                                                    character: "Frankie Dunn" },
+      { id: 105, genre: "Drama",           movie: "Moneyball",                                 year: 2011, quote: "The first one through the wall always gets bloody.",                                                                                                                                                   character: "Billy Beane" },
+      { id: 106, genre: "Drama",           movie: "The Wolf of Wall Street",                   year: 2013, quote: "The only thing standing between you and your goal is the story you keep telling yourself.",                                                                                                           character: "Jordan Belfort" },
+      { id: 107, genre: "Drama",           movie: "The Revenant",                              year: 2015, quote: "I ain't afraid to die anymore. I done it already.",                                                                                                                                                   character: "Hugh Glass" },
+      { id: 108, genre: "Drama",           movie: "Spotlight",                                 year: 2015, quote: "We need to focus on the institution, not the individual priests.",                                                                                                                                     character: "Robby Robinson" },
+      { id: 109, genre: "Drama",           movie: "Room",                                      year: 2015, quote: "The whole world is just… so much.",                                                                                                                                                                   character: "Jack" },
+      { id: 110, genre: "Drama",           movie: "1917",                                      year: 2019, quote: "If you fail, it will be a massacre. We need you to go.",                                                                                                                                              character: "General Erinmore" },
+      { id: 111, genre: "Drama",           movie: "Belfast",                                   year: 2021, quote: "Go. Go now. And don't look back.",                                                                                                                                                                    character: "Granny" },
+      // NEW DRAMA
+      { id: 147, genre: "Drama",           movie: "Schindler's List",                          year: 1993, quote: "Whoever saves one life, saves the world entire.",                                                                                                                                                     character: "Itzhak Stern" },
+      { id: 148, genre: "Drama",           movie: "La La Land",                                year: 2016, quote: "Here's to the ones who dream, foolish as they may seem.",                                                                                                                                             character: "Mia Dolan" },
+      { id: 149, genre: "Drama",           movie: "Silver Linings Playbook",                   year: 2012, quote: "The world will break your heart ten ways to Sunday. That's guaranteed.",                                                                                                                              character: "Pat Sr." },
+      { id: 150, genre: "Drama",           movie: "Cast Away",                                 year: 2000, quote: "I have made fire!",                                                                                                                                                                                   character: "Chuck Noland" },
+
+      // ── ACTION / THRILLER ───────────────────────────────────
+      { id: 30,  genre: "Action/Thriller", movie: "The Matrix",                                year: 1999, quote: "There is no spoon.",                                                                                                                                                                                  character: "Spoon Boy" },
+      { id: 31,  genre: "Action/Thriller", movie: "The Matrix",                                year: 1999, quote: "I know kung fu.",                                                                                                                                                                                     character: "Neo" },
+      { id: 32,  genre: "Action/Thriller", movie: "Avengers: Endgame",                         year: 2019, quote: "I am inevitable.",                                                                                                                                                                                   character: "Thanos" },
+      { id: 33,  genre: "Action/Thriller", movie: "Avengers: Endgame",                         year: 2019, quote: "And I... am... Iron Man.",                                                                                                                                                                           character: "Tony Stark" },
+      { id: 34,  genre: "Action/Thriller", movie: "Casino Royale",                             year: 2006, quote: "The name's Bond. James Bond.",                                                                                                                                                                       character: "James Bond" },
+      { id: 35,  genre: "Action/Thriller", movie: "Mission: Impossible",                       year: 1996, quote: "Your mission, should you choose to accept it...",                                                                                                                                                    character: "Jim Phelps" },
+      { id: 36,  genre: "Action/Thriller", movie: "The Dark Knight Rises",                     year: 2012, quote: "A hero can be anyone.",                                                                                                                                                                              character: "Batman" },
+      { id: 37,  genre: "Action/Thriller", movie: "John Wick",                                 year: 2014, quote: "People keep asking if I'm back. Yeah, I'm thinking I'm back.",                                                                                                                                      character: "John Wick" },
+      { id: 38,  genre: "Action/Thriller", movie: "Mad Max: Fury Road",                        year: 2015, quote: "We are not things.",                                                                                                                                                                                  character: "The Wives" },
+      { id: 39,  genre: "Action/Thriller", movie: "Inception",                                 year: 2010, quote: "You mustn't be afraid to dream a little bigger, darling.",                                                                                                                                           character: "Eames" },
+      { id: 40,  genre: "Action/Thriller", movie: "Gladiator",                                 year: 2000, quote: "Are you not entertained?!",                                                                                                                                                                          character: "Maximus" },
+      { id: 41,  genre: "Action/Thriller", movie: "Top Gun: Maverick",                         year: 2022, quote: "It's not the plane, it's the pilot.",                                                                                                                                                                character: "Maverick" },
+      { id: 42,  genre: "Action/Thriller", movie: "Spider-Man",                                year: 2002, quote: "With great power comes great responsibility.",                                                                                                                                                        character: "Uncle Ben" },
+      { id: 88,  genre: "Action/Thriller", movie: "The Bourne Identity",                       year: 2002, quote: "I can tell you the license plate numbers of all six cars outside. I can tell you that our waitress is left-handed.",                                                                                  character: "Jason Bourne" },
+      { id: 112, genre: "Action/Thriller", movie: "Heat",                                      year: 1995, quote: "Don't let yourself get attached to anything you are not willing to walk out on in 30 seconds flat.",                                                                                                  character: "Neil McCauley" },
+      { id: 113, genre: "Action/Thriller", movie: "Training Day",                              year: 2001, quote: "King Kong ain't got nothing on me!",                                                                                                                                                                  character: "Alonzo Harris" },
+      { id: 114, genre: "Action/Thriller", movie: "Collateral",                                year: 2004, quote: "Homicide. Happens every day. Why should I be afraid of that?",                                                                                                                                       character: "Vincent" },
+      { id: 115, genre: "Action/Thriller", movie: "The Town",                                  year: 2010, quote: "I need your help. I can't tell you what it is, you can never ask me about it later, and we're gonna hurt some people.",                                                                               character: "Doug MacRay" },
+      { id: 116, genre: "Action/Thriller", movie: "Sicario",                                   year: 2015, quote: "Nothing will make sense to your American ears, and you will doubt everything that we do, but in the end you will understand.",                                                                        character: "Alejandro" },
+      { id: 117, genre: "Action/Thriller", movie: "Baby Driver",                               year: 2017, quote: "Was it a ringing in your ears? Cause I get that. I got that.",                                                                                                                                      character: "Baby" },
+      { id: 118, genre: "Action/Thriller", movie: "Knives Out",                                year: 2019, quote: "I suspect foul play. I have eliminated no suspects.",                                                                                                                                                 character: "Benoit Blanc" },
+      { id: 119, genre: "Action/Thriller", movie: "Prisoners",                                 year: 2013, quote: "Pray for the best, prepare for the worst.",                                                                                                                                                          character: "Keller Dover" },
+      { id: 120, genre: "Action/Thriller", movie: "Gone Girl",                                 year: 2014, quote: "We're so cute. I wanna punch us in the face.",                                                                                                                                                       character: "Amy Dunne" },
+      { id: 121, genre: "Action/Thriller", movie: "Get Out",                                   year: 2017, quote: "The mind is a terrible thing to waste.",                                                                                                                                                              character: "Dean Armitage" },
+      // NEW ACTION/THRILLER
+      { id: 151, genre: "Action/Thriller", movie: "Die Hard",                                  year: 1988, quote: "Yippee-ki-yay.",                                                                                                                                                                                     character: "John McClane" },
+      { id: 152, genre: "Action/Thriller", movie: "Terminator 2: Judgment Day",                year: 1991, quote: "Hasta la vista, baby.",                                                                                                                                                                              character: "The Terminator" },
+      { id: 153, genre: "Action/Thriller", movie: "The Silence of the Lambs",                  year: 1991, quote: "I do wish we could chat longer, but I'm having an old friend for dinner.",                                                                                                                           character: "Hannibal Lecter" },
+      { id: 154, genre: "Action/Thriller", movie: "The Usual Suspects",                        year: 1995, quote: "The greatest trick the Devil ever pulled was convincing the world he didn't exist.",                                                                                                                  character: "Verbal Kint" },
+      { id: 155, genre: "Action/Thriller", movie: "Speed",                                     year: 1994, quote: "Pop quiz, hotshot. There's a bomb on a bus.",                                                                                                                                                        character: "Howard Payne" },
+
+      // ── SCI-FI / FANTASY ────────────────────────────────────
+      { id: 43,  genre: "Sci-Fi/Fantasy",  movie: "The Lord of the Rings",                     year: 2001, quote: "One does not simply walk into Mordor.",                                                                                                                                                               character: "Boromir" },
+      { id: 44,  genre: "Sci-Fi/Fantasy",  movie: "The Lord of the Rings: The Two Towers",     year: 2002, quote: "My precious.",                                                                                                                                                                                       character: "Gollum" },
+      { id: 45,  genre: "Sci-Fi/Fantasy",  movie: "The Lord of the Rings: Return of the King", year: 2003, quote: "I can't carry it for you, but I can carry you.",                                                                                                                                                     character: "Samwise Gamgee" },
+      { id: 46,  genre: "Sci-Fi/Fantasy",  movie: "Harry Potter and the Chamber of Secrets",   year: 2002, quote: "It is our choices that show what we truly are, far more than our abilities.",                                                                                                                        character: "Dumbledore" },
+      { id: 47,  genre: "Sci-Fi/Fantasy",  movie: "Interstellar",                              year: 2014, quote: "We used to look up at the sky and wonder at our place in the stars.",                                                                                                                                character: "Cooper" },
+      { id: 48,  genre: "Sci-Fi/Fantasy",  movie: "Avatar",                                    year: 2009, quote: "I see you.",                                                                                                                                                                                          character: "Neytiri" },
+      { id: 49,  genre: "Sci-Fi/Fantasy",  movie: "Doctor Strange",                            year: 2016, quote: "Dormammu, I've come to bargain.",                                                                                                                                                                    character: "Doctor Strange" },
+      { id: 50,  genre: "Sci-Fi/Fantasy",  movie: "Guardians of the Galaxy",                   year: 2014, quote: "We are Groot.",                                                                                                                                                                                      character: "Groot" },
+      { id: 51,  genre: "Sci-Fi/Fantasy",  movie: "Thor: Ragnarok",                            year: 2017, quote: "I'm not a witch. I'm just his sister.",                                                                                                                                                              character: "Hela" },
+      { id: 52,  genre: "Sci-Fi/Fantasy",  movie: "Star Wars: The Force Awakens",              year: 2015, quote: "Chewie, we're home.",                                                                                                                                                                                character: "Han Solo" },
+      { id: 53,  genre: "Sci-Fi/Fantasy",  movie: "Arrival",                                   year: 2016, quote: "If you could see your whole life from start to finish, would you change things?",                                                                                                                    character: "Louise Banks" },
+      { id: 54,  genre: "Sci-Fi/Fantasy",  movie: "Everything Everywhere All at Once",         year: 2022, quote: "In another life, I would have really liked just doing laundry and taxes with you.",                                                                                                                   character: "Evelyn Wang" },
+      { id: 55,  genre: "Sci-Fi/Fantasy",  movie: "The Martian",                               year: 2015, quote: "I'm going to have to science the heck out of this.",                                                                                                                                                 character: "Mark Watney" },
+      { id: 56,  genre: "Sci-Fi/Fantasy",  movie: "Dune",                                      year: 2021, quote: "I must not fear. Fear is the mind-killer.",                                                                                                                                                          character: "Paul Atreides" },
+      { id: 89,  genre: "Sci-Fi/Fantasy",  movie: "Iron Man",                                  year: 2008, quote: "Genius, billionaire, playboy, philanthropist.",                                                                                                                                                      character: "Tony Stark" },
+      { id: 90,  genre: "Sci-Fi/Fantasy",  movie: "Harry Potter and the Sorcerer's Stone",     year: 2001, quote: "It does not do to dwell on dreams and forget to live.",                                                                                                                                              character: "Dumbledore" },
+      { id: 122, genre: "Sci-Fi/Fantasy",  movie: "Ex Machina",                                year: 2014, quote: "One day the AIs are going to look back on us the same way we look back on fossil skeletons on the plains of Africa.",                                                                                character: "Nathan" },
+      { id: 123, genre: "Sci-Fi/Fantasy",  movie: "Annihilation",                              year: 2018, quote: "It's not destroying. It's transforming.",                                                                                                                                                             character: "Dr. Ventress" },
+      { id: 124, genre: "Sci-Fi/Fantasy",  movie: "A Quiet Place",                             year: 2018, quote: "Who are we if we can't protect them?",                                                                                                                                                               character: "Lee Abbott" },
+      { id: 125, genre: "Sci-Fi/Fantasy",  movie: "Tenet",                                     year: 2020, quote: "Don't try to understand it. Feel it.",                                                                                                                                                               character: "The Protagonist" },
+      { id: 126, genre: "Sci-Fi/Fantasy",  movie: "Blade Runner 2049",                         year: 2017, quote: "Dying for the right cause. It's the most human thing we can do.",                                                                                                                                   character: "K" },
+      { id: 127, genre: "Sci-Fi/Fantasy",  movie: "The Hobbit",                                year: 2012, quote: "I'm going on an adventure!",                                                                                                                                                                         character: "Bilbo Baggins" },
+      { id: 128, genre: "Sci-Fi/Fantasy",  movie: "Nope",                                      year: 2022, quote: "You want a bad miracle? You'll get it.",                                                                                                                                                             character: "OJ Haywood" },
+      { id: 129, genre: "Sci-Fi/Fantasy",  movie: "Hereditary",                                year: 2018, quote: "I never wanted to be your mother.",                                                                                                                                                                  character: "Annie Graham" },
+      { id: 130, genre: "Sci-Fi/Fantasy",  movie: "Midsommar",                                 year: 2019, quote: "You came here for a reason. Let it happen.",                                                                                                                                                         character: "Pelle" },
+      { id: 131, genre: "Sci-Fi/Fantasy",  movie: "Parasite",                                  year: 2019, quote: "The best plan is no plan.",                                                                                                                                                                          character: "Ki-taek" },
+      // NEW SCI-FI/FANTASY
+      { id: 156, genre: "Sci-Fi/Fantasy",  movie: "Back to the Future",                        year: 1985, quote: "Roads? Where we're going, we don't need roads.",                                                                                                                                                     character: "Dr. Emmett Brown" },
+      { id: 157, genre: "Sci-Fi/Fantasy",  movie: "E.T. the Extra-Terrestrial",                year: 1982, quote: "E.T. phone home.",                                                                                                                                                                                   character: "E.T." },
+      { id: 158, genre: "Sci-Fi/Fantasy",  movie: "Galaxy Quest",                              year: 1999, quote: "Never give up, never surrender.",                                                                                                                                                                    character: "Commander Peter Taggart" },
+
+      // ── ANIMATED ────────────────────────────────────────────
+      { id: 57,  genre: "Animated",        movie: "Toy Story",                                 year: 1995, quote: "To infinity and beyond!",                                                                                                                                                                             character: "Buzz Lightyear" },
+      { id: 58,  genre: "Animated",        movie: "Toy Story",                                 year: 1995, quote: "There's a snake in my boot.",                                                                                                                                                                        character: "Woody" },
+      { id: 59,  genre: "Animated",        movie: "The Lion King",                             year: 1994, quote: "Remember who you are.",                                                                                                                                                                               character: "Mufasa" },
+      { id: 60,  genre: "Animated",        movie: "Shrek",                                     year: 2001, quote: "Ogres are like onions.",                                                                                                                                                                              character: "Shrek" },
+      { id: 61,  genre: "Animated",        movie: "Shrek",                                     year: 2001, quote: "Some of you may die, but it's a sacrifice I am willing to make.",                                                                                                                                    character: "Lord Farquaad" },
+      { id: 62,  genre: "Animated",        movie: "Finding Nemo",                              year: 2003, quote: "Just keep swimming.",                                                                                                                                                                                 character: "Dory" },
+      { id: 63,  genre: "Animated",        movie: "The Incredibles",                           year: 2004, quote: "When everyone's super, no one will be.",                                                                                                                                                              character: "Syndrome" },
+      { id: 64,  genre: "Animated",        movie: "Up",                                        year: 2009, quote: "Adventure is out there!",                                                                                                                                                                             character: "Ellie" },
+      { id: 65,  genre: "Animated",        movie: "WALL-E",                                    year: 2008, quote: "Eve.",                                                                                                                                                                                                character: "WALL-E" },
+      { id: 66,  genre: "Animated",        movie: "Ratatouille",                               year: 2007, quote: "Anyone can cook.",                                                                                                                                                                                   character: "Gusteau" },
+      { id: 67,  genre: "Animated",        movie: "Frozen",                                    year: 2013, quote: "Some people are worth melting for.",                                                                                                                                                                  character: "Olaf" },
+      { id: 68,  genre: "Animated",        movie: "Moana",                                     year: 2016, quote: "The ocean chose you for a reason.",                                                                                                                                                                   character: "Maui" },
+      { id: 69,  genre: "Animated",        movie: "Coco",                                      year: 2017, quote: "Our love for each other will live on forever in every heart that remembers us.",                                                                                                                      character: "Héctor" },
+      { id: 70,  genre: "Animated",        movie: "Inside Out",                                year: 2015, quote: "Do you ever look at someone and wonder, what is going on inside their head?",                                                                                                                        character: "Joy" },
+      { id: 71,  genre: "Animated",        movie: "Encanto",                                   year: 2021, quote: "We don't talk about Bruno.",                                                                                                                                                                          character: "Pepa" },
+      { id: 72,  genre: "Animated",        movie: "Spider-Man: Into the Spider-Verse",         year: 2018, quote: "Anyone can wear the mask.",                                                                                                                                                                           character: "Miles Morales" },
+      { id: 73,  genre: "Animated",        movie: "Kung Fu Panda",                             year: 2008, quote: "There is no secret ingredient.",                                                                                                                                                                     character: "Mr. Ping" },
+      { id: 74,  genre: "Animated",        movie: "Tangled",                                   year: 2010, quote: "I have a dream.",                                                                                                                                                                                     character: "Flynn Rider" },
+      { id: 75,  genre: "Animated",        movie: "Zootopia",                                  year: 2016, quote: "Anyone can be anything.",                                                                                                                                                                             character: "Judy Hopps" },
+      { id: 91,  genre: "Animated",        movie: "The Boss Baby",                             year: 2017, quote: "Cookies are for closers.",                                                                                                                                                                            character: "Boss Baby" },
+      { id: 132, genre: "Animated",        movie: "Monsters Inc.",                             year: 2001, quote: "We scare because we care.",                                                                                                                                                                           character: "Mike Wazowski" },
+      { id: 133, genre: "Animated",        movie: "Wreck-It Ralph",                            year: 2012, quote: "I'm bad, and that's good. I will never be good, and that's not bad.",                                                                                                                                character: "Ralph" },
+      { id: 134, genre: "Animated",        movie: "The Princess and the Frog",                 year: 2009, quote: "My daddy never did get what he wanted. But he had what he needed.",                                                                                                                                  character: "Tiana" },
+      { id: 135, genre: "Animated",        movie: "Brave",                                     year: 2012, quote: "Some say our destiny is tied to the land, as much a part of us as we are of it.",                                                                                                                    character: "Merida" },
+      { id: 136, genre: "Animated",        movie: "Big Hero 6",                                year: 2014, quote: "Hairy baby. Hairy baby.",                                                                                                                                                                            character: "Baymax" },
+      { id: 137, genre: "Animated",        movie: "Soul",                                      year: 2020, quote: "I'm not dying today.",                                                                                                                                                                                character: "Joe Gardner" },
+      { id: 138, genre: "Animated",        movie: "Turning Red",                               year: 2022, quote: "We've all got an inner beast. We've all got a messy, impossible, uncontrollable urge that makes us do stupid things.",                                                                                character: "Mei Lee" },
+      { id: 139, genre: "Animated",        movie: "Puss in Boots: The Last Wish",              year: 2022, quote: "I have lived a great life. But I want to live more.",                                                                                                                                                character: "Puss in Boots" },
+      { id: 140, genre: "Animated",        movie: "The Bad Guys",                              year: 2022, quote: "Being bad never felt so good.",                                                                                                                                                                       character: "Mr. Wolf" },
+      { id: 141, genre: "Animated",        movie: "Wish",                                      year: 2023, quote: "Be careful what you wish for.",                                                                                                                                                                       character: "Magnifico" },
+      // NEW ANIMATED
+      { id: 159, genre: "Animated",        movie: "Lilo & Stitch",                             year: 2002, quote: "Ohana means family. Family means nobody gets left behind or forgotten.",                                                                                                                              character: "Stitch" },
+      { id: 160, genre: "Animated",        movie: "Mulan",                                     year: 1998, quote: "The flower that blooms in adversity is the most rare and beautiful of all.",                                                                                                                          character: "The Emperor" },
+      { id: 161, genre: "Animated",        movie: "Despicable Me",                             year: 2010, quote: "It's so fluffy I'm gonna die!",                                                                                                                                                                      character: "Agnes" },
+      { id: 162, genre: "Animated",        movie: "Aladdin",                                   year: 1992, quote: "Do you trust me?",                                                                                                                                                                                   character: "Aladdin" },
+
+      // ── ICONIC CLASSIC ──────────────────────────────────────
+      { id: 76,  genre: "Iconic Classic",  movie: "The Wizard of Oz",                          year: 1939, quote: "Toto, I've a feeling we're not in Kansas anymore.",                                                                                                                                                   character: "Dorothy" },
+      { id: 77,  genre: "Iconic Classic",  movie: "Jaws",                                      year: 1975, quote: "You're gonna need a bigger boat.",                                                                                                                                                                    character: "Chief Brody" },
+      { id: 78,  genre: "Iconic Classic",  movie: "Star Wars: A New Hope",                     year: 1977, quote: "May the Force be with you.",                                                                                                                                                                         character: "Han Solo" },
+      { id: 79,  genre: "Iconic Classic",  movie: "The Godfather",                             year: 1972, quote: "I'm gonna make him an offer he can't refuse.",                                                                                                                                                       character: "Don Corleone" },
+      { id: 80,  genre: "Iconic Classic",  movie: "Apollo 13",                                 year: 1995, quote: "Houston, we have a problem.",                                                                                                                                                                        character: "Jim Lovell" },
+      { id: 81,  genre: "Iconic Classic",  movie: "Jurassic Park",                             year: 1993, quote: "Life, uh, finds a way.",                                                                                                                                                                             character: "Dr. Ian Malcolm" },
+      { id: 82,  genre: "Iconic Classic",  movie: "Titanic",                                   year: 1997, quote: "I'm the king of the world!",                                                                                                                                                                         character: "Jack Dawson" },
+      { id: 83,  genre: "Iconic Classic",  movie: "Jerry Maguire",                             year: 1996, quote: "Show me the money!",                                                                                                                                                                                 character: "Rod Tidwell" },
+      { id: 84,  genre: "Iconic Classic",  movie: "A Few Good Men",                            year: 1992, quote: "You can't handle the truth!",                                                                                                                                                                        character: "Col. Jessup" },
+      { id: 85,  genre: "Iconic Classic",  movie: "The Shawshank Redemption",                  year: 1994, quote: "Get busy living, or get busy dying.",                                                                                                                                                                character: "Andy Dufresne" },
+      // NEW ICONIC CLASSIC
+      { id: 163, genre: "Iconic Classic",  movie: "Casablanca",                                year: 1942, quote: "Here's looking at you, kid.",                                                                                                                                                                        character: "Rick Blaine" },
+      { id: 164, genre: "Iconic Classic",  movie: "Gone with the Wind",                        year: 1939, quote: "Frankly, my dear, I don't give a damn.",                                                                                                                                                             character: "Rhett Butler" },
+      { id: 165, genre: "Iconic Classic",  movie: "Taxi Driver",                               year: 1976, quote: "You talkin' to me?",                                                                                                                                                                                 character: "Travis Bickle" },
+      { id: 166, genre: "Iconic Classic",  movie: "Network",                                   year: 1976, quote: "I'm mad as hell, and I'm not going to take this anymore!",                                                                                                                                           character: "Howard Beale" },
+    ];
+
+    const TOTAL_QUOTES = quotes.length; // 166
+
+    // =========================================================
+    // GENRE CONFIG
+    // =========================================================
+    const GENRE_CONFIG = {
+      "Comedy":          { orb1: "#FFD700", orb2: "#FF8C00", label: "Comedy" },
+      "Drama":           { orb1: "#4CAF7D", orb2: "#1a6b45", label: "Drama" },
+      "Action/Thriller": { orb1: "#FF6B6B", orb2: "#C0392B", label: "Action / Thriller" },
+      "Sci-Fi/Fantasy":  { orb1: "#60A5FA", orb2: "#3B4FE8", label: "Sci-Fi / Fantasy" },
+      "Animated":        { orb1: "#F472B6", orb2: "#9B59B6", label: "Animated" },
+      "Iconic Classic":  { orb1: "#E2C98A", orb2: "#A0845C", label: "Iconic Classic" },
+    };
+
+    // =========================================================
+    // RANDOM QUOTE LOGIC (no-repeat until pool exhausted)
+    // =========================================================
+    const usedIds = new Set();
+    function getRandomQuote() {
+      const pool = quotes.filter(q => !usedIds.has(q.id));
+      if (!pool.length) { usedIds.clear(); return getRandomQuote(); }
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      usedIds.add(pick.id);
+      return pick;
+    }
+
+    // =========================================================
+    // STYLES
+    // =========================================================
+    const css = `
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500&display=swap');
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      .lg-root {
+        min-height: 100vh;
+        background: #e8edf5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'DM Sans', sans-serif;
+        position: relative;
+        overflow: hidden;
+        padding: 32px 16px;
+      }
+
+      /* ── Ambient orbs ── */
+      .orb {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(90px);
+        opacity: 0.45;
+        pointer-events: none;
+        transition: background 1.8s ease;
+      }
+      .orb-a { width: 520px; height: 520px; top: -140px; left: -100px; }
+      .orb-b { width: 400px; height: 400px; bottom: -100px; right: -80px; }
+      .orb-c { width: 260px; height: 260px; top: 40%; left: 55%; opacity: 0.22; }
+
+      /* ── Glass surfaces ── */
+      .glass-panel {
+        position: relative;
+        background: rgba(255,255,255,0.48);
+        backdrop-filter: blur(32px) saturate(180%);
+        -webkit-backdrop-filter: blur(32px) saturate(180%);
+        border-radius: 28px;
+        border: 1px solid rgba(255,255,255,0.82);
+        box-shadow:
+          0 2px 0 rgba(255,255,255,0.9) inset,
+          0 -1px 0 rgba(0,0,0,0.06) inset,
+          0 20px 60px rgba(0,0,0,0.10),
+          0 4px 16px rgba(0,0,0,0.06);
+      }
+
+      .glass-pill {
+        background: rgba(255,255,255,0.55);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 100px;
+        border: 1px solid rgba(255,255,255,0.85);
+        box-shadow: 0 1px 0 rgba(255,255,255,0.95) inset, 0 4px 12px rgba(0,0,0,0.07);
+      }
+
+      .glass-btn {
+        background: rgba(255,255,255,0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255,255,255,0.88);
+        border-radius: 14px;
+        box-shadow: 0 1px 0 rgba(255,255,255,1) inset, 0 4px 14px rgba(0,0,0,0.08);
+        cursor: pointer;
+        transition: all 0.18s ease;
+        font-family: 'DM Sans', sans-serif;
+        font-weight: 500;
+        color: #1a1a2e;
+        font-size: 14px;
+        padding: 12px 22px;
+      }
+      .glass-btn:hover {
+        background: rgba(255,255,255,0.78);
+        box-shadow: 0 1px 0 rgba(255,255,255,1) inset, 0 6px 20px rgba(0,0,0,0.12);
+        transform: translateY(-1px);
+      }
+      .glass-btn:active { transform: translateY(0); }
+
+      .glass-btn-primary {
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.3);
+        box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 6px 20px rgba(0,0,0,0.18);
+        transition: all 0.18s ease;
+      }
+      .glass-btn-primary:hover {
+        box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 8px 28px rgba(0,0,0,0.22);
+        transform: translateY(-1px);
+        filter: brightness(1.08);
+      }
+
+      .glass-input {
+        background: rgba(255,255,255,0.52);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1.5px solid rgba(255,255,255,0.88);
+        border-radius: 14px;
+        box-shadow: 0 1px 0 rgba(255,255,255,1) inset, 0 2px 8px rgba(0,0,0,0.06);
+        font-family: 'DM Sans', sans-serif;
+        font-size: 15px;
+        color: #1a1a2e;
+        padding: 12px 18px;
+        outline: none;
+        transition: all 0.2s ease;
+        width: 100%;
+      }
+      .glass-input::placeholder { color: rgba(30,30,60,0.38); }
+      .glass-input:focus {
+        background: rgba(255,255,255,0.78);
+        border-color: var(--genre-color, rgba(96,165,250,0.6));
+        box-shadow: 0 1px 0 rgba(255,255,255,1) inset, 0 0 0 3px var(--genre-glow, rgba(96,165,250,0.15)), 0 4px 16px rgba(0,0,0,0.1);
+      }
+
+      /* ── Stat cards ── */
+      .stat-card {
+        background: rgba(255,255,255,0.38);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255,255,255,0.78);
+        border-radius: 18px;
+        box-shadow: 0 1px 0 rgba(255,255,255,0.9) inset, 0 4px 12px rgba(0,0,0,0.06);
+        padding: 14px 22px;
+        text-align: center;
+        flex: 1;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+        cursor: default;
+      }
+      .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 1px 0 rgba(255,255,255,0.9) inset, 0 8px 22px rgba(0,0,0,0.10);
+      }
+
+      .result-glass {
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 18px 22px;
+        margin-top: 20px;
+        box-shadow: 0 1px 0 rgba(255,255,255,0.9) inset, 0 4px 16px rgba(0,0,0,0.07);
+        animation: fadeUp 0.4s cubic-bezier(0.22,1,0.36,1) both;
+      }
+
+      .divider {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(0,0,0,0.08), transparent);
+        margin: 24px 0;
+      }
+
+      .hint-btn {
+        background: rgba(255,255,255,0.4);
+        border: 1px solid rgba(255,255,255,0.7);
+        border-radius: 10px;
+        padding: 5px 14px;
+        font-size: 12px;
+        color: rgba(30,30,60,0.55);
+        cursor: pointer;
+        font-family: 'DM Sans', sans-serif;
+        letter-spacing: 0.3px;
+        transition: all 0.15s;
+      }
+      .hint-btn:hover { background: rgba(255,255,255,0.7); color: rgba(30,30,60,0.85); }
+
+      /* ── Animations ── */
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes quoteSlideIn {
+        from { opacity: 0; transform: translateX(-8px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes guessAppear {
+        from { opacity: 0; transform: translateY(6px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes statPop {
+        0%   { transform: scale(1); }
+        40%  { transform: scale(1.12); }
+        100% { transform: scale(1); }
+      }
+
+      .fade-up   { animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+      .fade-up-2 { animation: fadeUp 0.45s 0.08s cubic-bezier(0.22,1,0.36,1) both; }
+      .fade-up-3 { animation: fadeUp 0.45s 0.16s cubic-bezier(0.22,1,0.36,1) both; }
+
+      .quote-text { animation: quoteSlideIn 0.5s 0.2s cubic-bezier(0.22,1,0.36,1) both; }
+
+      .guess-item {
+        animation: guessAppear 0.32s cubic-bezier(0.22,1,0.36,1) both;
+      }
+      .guess-item:nth-child(1) { animation-delay: 0s; }
+      .guess-item:nth-child(2) { animation-delay: 0.06s; }
+      .guess-item:nth-child(3) { animation-delay: 0.12s; }
+
+      .stat-pop { animation: statPop 0.4s cubic-bezier(0.22,1,0.36,1); }
+
+      /* ── Mobile ── */
+      @media (max-width: 480px) {
+        .lg-root { padding: 20px 12px; }
+        .glass-panel { padding: 24px 18px 20px !important; border-radius: 22px; }
+        .glass-btn { padding: 11px 16px; font-size: 13px; }
+        .glass-input { font-size: 14px; padding: 11px 14px; }
+        .orb-a { width: 300px; height: 300px; }
+        .orb-b { width: 240px; height: 240px; }
+        .streak-toast-mega { font-size: 16px; padding: 13px 24px; letter-spacing: 1px; }
+        /* Stack post-round buttons on small phones */
+        .post-round-btns { flex-direction: column !important; }
+        .post-round-btns .glass-btn { width: 100%; text-align: center; }
+        /* Hint row wraps instead of cramping */
+        .hint-row { flex-wrap: wrap; gap: 8px !important; }
+      }
+
+      /* ── Very small phones (360px and below) ── */
+      @media (max-width: 360px) {
+        .lg-root { padding: 16px 10px; }
+        .glass-panel { padding: 20px 14px 18px !important; border-radius: 18px; }
+        .glass-btn { padding: 10px 12px; font-size: 12px; }
+        .glass-input { font-size: 13px; }
+        .streak-toast-hot  { font-size: 13px; padding: 9px 18px; }
+        .streak-toast-mega { font-size: 14px; padding: 11px 18px; }
+      }
+    `;
+
+    // =========================================================
+    // MATCHING LOGIC
+    // =========================================================
+    const STOP_WORDS = new Set(["the","a","an","of","in","on","at","to","and","or","is","my","i","it","s"]);
+    function normalize(str) { return str.trim().toLowerCase().replace(/[^a-z0-9\s]/g,"").replace(/\s+/g," "); }
+    function stripArticles(str) { return str.replace(/^(the|a|an)\s+/i,"").trim(); }
+    function sigWords(str) { return normalize(str).split(" ").filter(w => w.length > 2 && !STOP_WORDS.has(w)); }
+    function levenshtein(a,b) {
+      const m=a.length,n=b.length;
+      const dp=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i===0?j:j===0?i:0));
+      for(let i=1;i<=m;i++) for(let j=1;j<=n;j++) dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+      return dp[m][n];
+    }
+    function fuzzyWordMatch(gw,mw) {
+      if(gw===mw||gw.includes(mw)||mw.includes(gw)) return true;
+      const maxDist=mw.length>=8?2:mw.length>=5?1:0;
+      return levenshtein(gw,mw)<=maxDist;
+    }
+    function isCorrectGuess(guessStr,movie) {
+      const g=normalize(guessStr),m=normalize(movie);
+      if(g===m) return true;
+      if(stripArticles(g)===stripArticles(m)) return true;
+      if(m.includes(g)&&g.length>=4) return true;
+      const gSig=sigWords(guessStr),mSig=sigWords(movie);
+      if(gSig.length===0) return false;
+      const allMatch=gSig.every(gw=>mSig.some(mw=>fuzzyWordMatch(gw,mw)));
+      const coverage=mSig.filter(mw=>gSig.some(gw=>fuzzyWordMatch(gw,mw))).length;
+      return allMatch&&coverage>=Math.max(1,mSig.length-1);
+    }
+    function getProximityFeedback(guessStr, movie) {
+      const gSig=sigWords(guessStr), mSig=sigWords(movie);
+      const g=normalize(guessStr), m=normalize(movie);
+      if(g===m) return null;
+      const shared=mSig.filter(mw=>gSig.some(gw=>fuzzyWordMatch(gw,mw)));
+      if(shared.length>=2) return { level:"hot",  msg:"🔥 Very close — you've got part of the title!" };
+      if(shared.length===1) return { level:"warm", msg:"🌡️ Warm — you're in the right ballpark." };
+      const franchises=["star wars","harry potter","lord of the rings","avengers","spider-man","toy story","matrix","dark knight","jurassic","hunger games","terminator","back to the future"];
+      const franchise=franchises.find(f=>{ const fw=f.split(" ")[0]; return m.includes(fw)&&g.includes(fw); });
+      if(franchise) return { level:"warm", msg:"🌡️ Warm — right franchise, wrong film!" };
+      return { level:"cold", msg:"❄️ Not quite — keep thinking!" };
+    }
+
+    // =========================================================
+    // CONFETTI BURST
+    // =========================================================
+    function spawnConfettiBatch(cfg, count, distMin, distMax, durBase, delay = 0) {
+      const colors = [cfg.orb1, cfg.orb2, "#FFD700", "#FF6B6B", "#60A5FA", "#A78BFA", "#34D399", "#F9A8D4"];
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement("div");
+        el.className = "confetti-piece";
+        const size = 5 + Math.random() * 10;
+        const angle = (Math.random() * 360) * (Math.PI / 180);
+        const dist = distMin + Math.random() * (distMax - distMin);
+        const dur = durBase + Math.random() * 0.6;
+        el.style.cssText = `
+          left: calc(50% + ${(Math.random()-0.5)*100}px);
+          top: calc(38% + ${(Math.random()-0.5)*80}px);
+          width: ${size}px; height: ${size}px;
+          background: ${colors[Math.floor(Math.random() * colors.length)]};
+          --tx: ${Math.cos(angle)*dist}px;
+          --ty: ${Math.sin(angle)*dist - 60}px;
+          --rot: ${Math.random() * 720}deg;
+          --dur: ${dur}s;
+          animation-delay: ${delay + Math.random() * 0.35}s;
+          border-radius: ${Math.random() > 0.5 ? "50%" : "3px"};
+        `;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), (delay + dur + 0.5) * 1000);
+      }
+    }
+
+    function launchConfetti(cfg, level = "normal") {
+      if (level === "mega") {
+        // Wave 1 — immediate burst
+        spawnConfettiBatch(cfg, 55, 140, 320, 1.3, 0);
+        // Wave 2 — second bloom after 300ms
+        setTimeout(() => spawnConfettiBatch(cfg, 40, 100, 260, 1.1, 0), 320);
+        // Wave 3 — trailing shower
+        setTimeout(() => spawnConfettiBatch(cfg, 25, 80, 200, 1.0, 0), 620);
+        // Screen flash
+        const flash = document.createElement("div");
+        flash.className = "screen-flash";
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 900);
+      } else {
+        spawnConfettiBatch(cfg, 32, 110, 240, 1.2, 0);
+      }
+    }
+
+    // =========================================================
+    // STREAK MILESTONE CHECK
+    // =========================================================
+    function getMilestoneMessage(streak) {
+      if (streak % 10 === 0) {
+        const flames = streak >= 50 ? "🔥🔥🔥🔥🔥" : streak >= 30 ? "🔥🔥🔥🔥" : "🔥🔥🔥";
+        return { text: `${streak} STREAK! ${flames}`, level: "mega" };
+      }
+      if (streak % 5 === 0) {
+        return { text: `${streak} in a row! 🔥`, level: "hot" };
+      }
+      return null;
+    }
+
+    // =========================================================
+    // SUBCOMPONENTS
+    // =========================================================
+    function Stars({ count }) {
+      return (
+        <span style={{ fontSize: 20, letterSpacing: 2 }}>
+          {[1,2,3].map(i => (
+            <span key={i} style={{ opacity: i <= count ? 1 : 0.18, filter: i <= count ? "none" : "grayscale(1)", transition: "all 0.3s" }}>⭐</span>
+          ))}
+        </span>
+      );
+    }
+
+    function StreakToast({ toast }) {
+      if (!toast) return null;
+      return (
+        <div key={toast.key} className={`streak-toast streak-toast-${toast.level}`}>
+          {toast.text}
+        </div>
+      );
+    }
+
+    // =========================================================
+    // MAIN COMPONENT
+    // =========================================================
+    function QuoteDashboard() {
+      const [current, setCurrent]           = useState(() => getRandomQuote());
+      const [guess, setGuess]               = useState("");
+      const [guessHistory, setGuessHistory] = useState([]);
+      const [revealed, setRevealed]         = useState(false);
+      const [won, setWon]                   = useState(false);
+      const [gaveUp, setGaveUp]             = useState(false);
+      const [streak, setStreak]             = useState(0);
+      const [hintUsed, setHintUsed]         = useState(false);
+      const [showCopied, setShowCopied]     = useState(false);
+      const [animKey, setAnimKey]           = useState(0);
+      const [streakToast, setStreakToast]   = useState(null);
+      const inputRef = useRef(null);
+
+      // Set CSS custom property for genre-colored focus ring
+      const cfg = GENRE_CONFIG[current.genre] || GENRE_CONFIG["Drama"];
+      useEffect(() => {
+        document.documentElement.style.setProperty("--genre-color", cfg.orb1 + "99");
+        document.documentElement.style.setProperty("--genre-glow",  cfg.orb1 + "22");
+      }, [cfg.orb1]);
+
+      const MAX_GUESSES = 3;
+      const guessCount  = guessHistory.length;
+      const guessesLeft = MAX_GUESSES - guessCount;
+      const starsEarned = won ? (guessCount === 1 ? 3 : guessCount === 2 ? 2 : 1) : 0;
+
+      function triggerMilestone(newStreak) {
+        const milestone = getMilestoneMessage(newStreak);
+        if (!milestone) return;
+        // Show toast (unique key forces re-mount / re-animation)
+        setStreakToast({ ...milestone, key: Date.now() });
+        const duration = milestone.level === "mega" ? 4200 : 2800;
+        setTimeout(() => setStreakToast(null), duration);
+        // Launch confetti after a short delay so the card has settled
+        setTimeout(() => launchConfetti(cfg, milestone.level), 160);
+      }
+
+      function handleGuess() {
+        if (!guess.trim() || revealed) return;
+        const correct = isCorrectGuess(guess, current.movie);
+
+        if (correct) {
+          const newHistory = [...guessHistory, { text: guess, feedback: null, correct: true }];
+          setGuessHistory(newHistory);
+          setRevealed(true);
+          setWon(true);
+          setGuess("");
+          setStreak(s => {
+            const next = s + 1;
+            triggerMilestone(next);
+            return next;
+          });
+          // First-try confetti (only if not also a milestone — milestones fire their own)
+          if (guessHistory.length === 0 && (streak + 1) % 5 !== 0) {
+            setTimeout(() => launchConfetti(cfg, "normal"), 180);
+          }
+          return;
+        }
+
+        const feedback = getProximityFeedback(guess, current.movie);
+        const newHistory = [...guessHistory, { text: guess, feedback, correct: false }];
+        setGuessHistory(newHistory);
+        setGuess("");
+
+        if (newHistory.length >= MAX_GUESSES) {
+          setRevealed(true);
+          setWon(false);
+          setStreak(0);
+        }
+        setTimeout(() => inputRef.current?.focus(), 50);
+      }
+
+      function handleGiveUp() {
+        setRevealed(true); setWon(false); setGaveUp(true);
+        setStreak(0);
+      }
+
+      function handleNext() {
+        setCurrent(getRandomQuote());
+        setGuess(""); setGuessHistory([]); setRevealed(false);
+        setWon(false); setGaveUp(false); setHintUsed(false);
+        setAnimKey(k => k + 1);
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
+
+      function handleCopy() {
+        const starStr = won ? ["⭐⭐⭐","⭐⭐","⭐"][guessCount - 1] : "💀";
+        const text = `🎬 Movie Quote of the Day ${starStr}\n\n"${current.quote}"\n\nClue: ${current.genre} · ${current.year}\nAnswer: ${current.movie}\n\nPlay at: https://your-username.github.io/movie-quote-of-the-day`;
+        navigator.clipboard.writeText(text);
+        setShowCopied(true);
+        setTimeout(() => setShowCopied(false), 2200);
+      }
+
+      // Guess dot indicators
+      const GuessDots = () => (
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {[0,1,2].map(i => {
+            const h = guessHistory[i];
+            const color = !h ? "rgba(30,30,60,0.12)"
+              : h.correct ? "#48C78E"
+              : i === MAX_GUESSES - 1 || (revealed && !h.correct) ? "#FF6B6B"
+              : h.feedback?.level === "hot"  ? "#FF8C00"
+              : h.feedback?.level === "warm" ? "#F7C948"
+              : "#aab";
+            return (
+              <div key={i} style={{
+                width: 10, height: 10, borderRadius: "50%",
+                background: color,
+                border: "1.5px solid rgba(255,255,255,0.75)",
+                boxShadow: h ? `0 0 7px ${color}99` : "none",
+                transition: "all 0.3s ease",
+              }} />
+            );
+          })}
+        </div>
+      );
+
+      return (
+        <>
+          <style>{css}</style>
+          <StreakToast toast={streakToast} />
+          <div className="lg-root">
+            {/* Ambient orbs */}
+            <div className="orb orb-a" style={{ background: cfg.orb1 }} />
+            <div className="orb orb-b" style={{ background: cfg.orb2 }} />
+            <div className="orb orb-c" style={{ background: cfg.orb1 }} />
+
+            <div style={{ width: "100%", maxWidth: 560, position: "relative", zIndex: 1 }}>
+
+              {/* ── Header ── */}
+              <div style={{ textAlign: "center", marginBottom: 32 }} className="fade-up">
+                <p style={{ fontSize: 11, letterSpacing: 5, textTransform: "uppercase", color: "rgba(30,30,60,0.42)", marginBottom: 6, fontWeight: 500 }}>
+                  🎬 Office Game
+                </p>
+                <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(26px,5vw,38px)", fontWeight: 700, color: "#1a1a2e", letterSpacing: -0.5, lineHeight: 1.1 }}>
+                  Movie Quote of the Day
+                </h1>
+                {streak >= 2 && (
+                  <p style={{ marginTop: 8, fontSize: 13, color: "rgba(30,30,60,0.45)", fontFamily: "'DM Sans', sans-serif" }}>
+                    {streak} in a row {streak >= 10 ? "🔥🔥🔥" : streak >= 5 ? "🔥🔥" : "🔥"}
+                  </p>
+                )}
+              </div>
+
+              {/* ── Main card ── */}
+              <div className="glass-panel fade-up-3" key={animKey} style={{ padding: "32px 32px 28px" }}>
+
+                {/* Genre + year + dots row */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>
+                  <div className="glass-pill" style={{ padding: "5px 14px", display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.orb1, boxShadow: `0 0 7px ${cfg.orb1}` }} />
+                    <span style={{ fontSize: 12, fontWeight: 500, color: "#1a1a2e", letterSpacing: 0.4 }}>{cfg.label}</span>
+                  </div>
+                  <div className="glass-pill" style={{ padding: "5px 14px" }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: "#1a1a2e", letterSpacing: 1, fontFamily: "monospace" }}>{current.year}</span>
+                  </div>
+                  <div style={{ marginLeft: "auto" }}>
+                    <GuessDots />
+                  </div>
+                </div>
+
+                {/* Quote */}
+                <blockquote className="quote-text" style={{
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: "clamp(17px, 2.8vw, 22px)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                  color: "#1a1a2e",
+                  lineHeight: 1.75,
+                  margin: 0,
+                  paddingLeft: 20,
+                  borderLeft: `3px solid ${cfg.orb1}`,
+                }}>
+                  "{current.quote}"
+                </blockquote>
+
+                <div className="divider" />
+
+                {/* Guess history */}
+                {guessHistory.length > 0 && (
+                  <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 7 }}>
+                    {guessHistory.map((g, i) => (
+                      <div key={i} className="guess-item" style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "8px 14px",
+                        borderRadius: 11,
+                        background: g.correct ? "rgba(72,199,142,0.10)" : "rgba(0,0,0,0.04)",
+                        border: `1px solid ${g.correct ? "rgba(72,199,142,0.3)" : "rgba(0,0,0,0.07)"}`,
+                      }}>
+                        <span style={{ fontSize: 13, color: "rgba(30,30,60,0.45)", fontFamily: "monospace", minWidth: 16 }}>{i + 1}.</span>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a2e", flex: 1 }}>{g.text}</span>
+                        {g.correct
+                          ? <span style={{ fontSize: 12, color: "#48C78E", fontWeight: 600 }}>✓ Correct</span>
+                          : g.feedback
+                            ? <span style={{ fontSize: 12, color: "rgba(30,30,60,0.5)" }}>{g.feedback.msg}</span>
+                            : <span style={{ fontSize: 12, color: "#FF6B6B" }}>✗</span>
+                        }
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Hint row */}
+                {!revealed && (
+                  <div className="hint-row" style={{ marginBottom: 14, minHeight: 26, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <div>
+                      {!hintUsed ? (
+                        <button className="hint-btn" onClick={() => setHintUsed(true)}>💡 Reveal character</button>
+                      ) : (
+                        <span style={{ fontSize: 13, color: "rgba(30,30,60,0.55)", fontStyle: "italic", fontFamily: "'Playfair Display', serif" }}>
+                          — {current.character}
+                        </span>
+                      )}
+                    </div>
+                    <button className="hint-btn" onClick={handleNext} style={{ marginLeft: 12, whiteSpace: "nowrap" }}>
+                      🎲 Re-roll
+                    </button>
+                  </div>
+                )}
+
+                {/* Reveal panel */}
+                {revealed && (
+                  <div className="result-glass" style={{
+                    background: won ? "rgba(72,199,142,0.12)" : "rgba(255,100,100,0.09)",
+                    borderColor: won ? "rgba(72,199,142,0.35)" : "rgba(255,100,100,0.28)",
+                    marginBottom: 20,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e" }}>
+                        {gaveUp ? "😔 Better luck next time" : won ? "✓ Got it!" : "✗ Out of guesses"}
+                      </div>
+                      {won && <Stars count={starsEarned} />}
+                    </div>
+                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: "#1a1a2e", fontWeight: 700 }}>
+                      {current.movie}
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(30,30,60,0.5)", marginTop: 3, fontStyle: "italic" }}>
+                      — {current.character}
+                    </div>
+                    {won && (
+                      <div style={{ fontSize: 12, color: "rgba(30,30,60,0.45)", marginTop: 6 }}>
+                        Guessed in {guessCount} {guessCount === 1 ? "try" : "tries"}
+                        {guessCount === 1 && " 🎉"}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Input / post-round row */}
+                {!revealed ? (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <input
+                      ref={inputRef}
+                      className="glass-input"
+                      type="text"
+                      value={guess}
+                      onChange={e => setGuess(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleGuess()}
+                      placeholder={
+                        guessesLeft === 3 ? "Name the movie… (Enter to guess)"
+                        : `${guessesLeft} guess${guessesLeft !== 1 ? "es" : ""} remaining…`
+                      }
+                      autoFocus
+                    />
+                    <button
+                      className="glass-btn glass-btn-primary"
+                      onClick={handleGuess}
+                      style={{ background: `linear-gradient(135deg, ${cfg.orb1}, ${cfg.orb2})`, whiteSpace: "nowrap", flexShrink: 0 }}
+                    >
+                      Guess
+                    </button>
+                  </div>
+                ) : (
+                  <div className="post-round-btns" style={{ display: "flex", gap: 10 }}>
+                    <button className="glass-btn" onClick={handleNext} style={{ flex: 1, fontWeight: 600 }}>
+                      Next Quote →
+                    </button>
+                    <button className="glass-btn" onClick={handleCopy} style={{ flexShrink: 0, minWidth: 100 }}>
+                      {showCopied ? "✓ Copied!" : "📋 Share"}
+                    </button>
+                  </div>
+                )}
+
+                {/* Give up button */}
+                {!revealed && guessHistory.length > 0 && (
+                  <div style={{ textAlign: "center", marginTop: 12 }}>
+                    <button className="hint-btn" onClick={handleGiveUp} style={{ color: "rgba(180,30,30,0.55)", borderColor: "rgba(180,30,30,0.2)" }}>
+                      🏳️ Give up
+                    </button>
+                  </div>
+                )}
+
+              </div>
+
+              {/* ── Footer ── */}
+              <div style={{ textAlign: "center", marginTop: 20 }}>
+                <p style={{ fontSize: 11, color: "rgba(30,30,60,0.32)", letterSpacing: 2, textTransform: "uppercase", margin: 0 }}>
+                  {TOTAL_QUOTES} quotes · 3 guesses · ⭐⭐⭐ for first try
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    // =========================================================
+    // MOUNT
+    // =========================================================
+    ReactDOM.createRoot(document.getElementById("root")).render(<QuoteDashboard />);
+  </script>
+</body>
+</html>
