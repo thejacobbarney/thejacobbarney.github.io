@@ -341,7 +341,7 @@ const DEFAULT_PROFILE = {
   name:"", yearsExp:3, targetRoles:"", skills:[], summary:"",
   currentSalary:"", targetSalary:""
 };
-const DEFAULT_SETTINGS = { openaiKey:"", googleClientId:"" };
+const DEFAULT_SETTINGS = { openaiKey:"", geminiKey:"", googleClientId:"" };
 
 /* ─────────────────────────────────────────────────────────────
    EXTRACTION — JSON-LD (schema.org JobPosting), meta-tag
@@ -689,6 +689,61 @@ async function callOpenAIEvaluate(apiKey, profile, job){
 }
 
 /* ─────────────────────────────────────────────────────────────
+   LIVE SALARY BENCHMARK — Gemini + Google Search grounding.
+   Optional, only runs if the user has supplied their own Gemini
+   key in Settings and the listing has no stated salary. Two
+   calls: extract standardized parameters from the posting, then
+   ground a live compensation search on those parameters. Falls
+   back to the offline/OpenAI comparable estimate on any error.
+───────────────────────────────────────────────────────────── */
+const GEMINI_MODEL = "gemini-2.5-flash";
+
+async function callGemini(apiKey, prompt, useSearch){
+  const body = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: "application/json" }
+  };
+  if (useSearch) body.tools = [{ googleSearch: {} }];
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + encodeURIComponent(apiKey),
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+  );
+  if (!res.ok) throw new Error("Gemini request failed (" + res.status + ")");
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Gemini returned no content");
+  return JSON.parse(text);
+}
+
+async function extractJobParamsWithGemini(apiKey, job){
+  const prompt = `Extract standardized parameters from this job posting. Return ONLY a strict JSON object:
+{"clean_title": string, "industry": string, "experience_level": string, "location": string|null}
+
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location || "unknown"}
+Description:
+${(job.description || "").slice(0, 4000)}`;
+  return callGemini(apiKey, prompt, false);
+}
+
+async function fetchSalaryBenchmark(apiKey, job){
+  const params = await extractJobParamsWithGemini(apiKey, job);
+  const prompt = `Search live market compensation data for a "${params.clean_title}" in the "${params.industry}" industry${params.location ? ` near ${params.location}` : ""}.
+
+Return a strict JSON object with:
+{
+  "min_salary": number,
+  "median_salary": number,
+  "max_salary": number,
+  "confidence_score": "low" | "medium" | "high",
+  "rationale": "short explanation of market sources"
+}`;
+  const result = await callGemini(apiKey, prompt, true);
+  return { ...result, clean_title: params.clean_title, industry: params.industry, experience_level: params.experience_level, location: params.location };
+}
+
+/* ─────────────────────────────────────────────────────────────
    EXPORT — CSV (fully client-side) and Google Sheets (OAuth
    token flow via Google Identity Services, no backend needed)
 ───────────────────────────────────────────────────────────── */
@@ -704,10 +759,10 @@ function triggerDownload(filename, content, mime){
   URL.revokeObjectURL(url);
 }
 function exportCSV(jobs){
-  const headers = ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Comparable Low","Comparable High","Salary Target","URL","Date Added"];
+  const headers = ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Comparable Low","Comparable High","Comparable Source","Comparable Confidence","Salary Target","URL","Date Added"];
   const rows = jobs.map(j => [
     j.title, j.company, j.location, j.workForm, j.status, j.matchScore,
-    j.salaryMin || "", j.salaryMax || "", j.comparableSalaryLow || "", j.comparableSalaryHigh || "", j.salaryTarget || "", j.url || "", j.dateAdded
+    j.salaryMin || "", j.salaryMax || "", j.comparableSalaryLow || "", j.comparableSalaryHigh || "", j.comparableSource || "", j.comparableConfidence || "", j.salaryTarget || "", j.url || "", j.dateAdded
   ]);
   const csv = [headers, ...rows].map(r => r.map(csvEscape).join(",")).join("\n");
   triggerDownload("bark-export.csv", csv, "text/csv");
@@ -741,8 +796,8 @@ async function exportToGoogleSheets(jobs, clientId){
           const sheet = await createRes.json();
           if (!sheet.spreadsheetId) throw new Error("Sheets API did not return a spreadsheet id");
           const values = [
-            ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Comparable Low","Comparable High","Salary Target","URL","Date Added"],
-            ...jobs.map(j => [j.title, j.company, j.location, j.workForm, j.status, j.matchScore, j.salaryMin || "", j.salaryMax || "", j.comparableSalaryLow || "", j.comparableSalaryHigh || "", j.salaryTarget || "", j.url || "", j.dateAdded])
+            ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Comparable Low","Comparable High","Comparable Source","Comparable Confidence","Salary Target","URL","Date Added"],
+            ...jobs.map(j => [j.title, j.company, j.location, j.workForm, j.status, j.matchScore, j.salaryMin || "", j.salaryMax || "", j.comparableSalaryLow || "", j.comparableSalaryHigh || "", j.comparableSource || "", j.comparableConfidence || "", j.salaryTarget || "", j.url || "", j.dateAdded])
           ];
           await fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheet.spreadsheetId + "/values/Sheet1!A1:append?valueInputOption=USER_ENTERED", {
             method:"POST",
@@ -771,6 +826,11 @@ function fmtMoney(n){
   return "$" + Number(n).toLocaleString();
 }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function comparableSourceLabel(source){
+  if (source === "gemini-live") return "live search";
+  if (source === "ai") return "AI estimate";
+  return "offline benchmark";
+}
 
 function ScoreDial({score}){
   return (
@@ -796,7 +856,6 @@ function AddJobTab({profile, settings, onSave}){
   const [fetchError, setFetchError] = useState("");
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [aiNote, setAiNote] = useState("");
 
   async function handleFetch(useProxy){
     if (!url.trim()) return;
@@ -825,7 +884,7 @@ function AddJobTab({profile, settings, onSave}){
 
   async function handleSave(){
     if (!draft || !draft.title){ return; }
-    setSaving(true); setAiNote("");
+    setSaving(true);
     const finalJob = {
       ...draft,
       skills: draft.skillsText.split(",").map(s => s.trim()).filter(Boolean),
@@ -836,6 +895,25 @@ function AddJobTab({profile, settings, onSave}){
 
     const hasStatedSalary = !!(finalJob.salaryMin || finalJob.salaryMax);
     let comparable = hasStatedSalary ? null : estimateComparableSalary(finalJob, profile);
+    const notes = [];
+
+    if (!hasStatedSalary && settings.geminiKey){
+      try {
+        const live = await fetchSalaryBenchmark(settings.geminiKey, finalJob);
+        comparable = {
+          low: live.min_salary,
+          high: live.max_salary,
+          median: live.median_salary || null,
+          family: live.clean_title || comparable.family,
+          level: live.experience_level || comparable.level,
+          confidence: live.confidence_score || null,
+          rationale: live.rationale || null,
+          source: "gemini-live"
+        };
+      } catch(e){
+        notes.push("Live salary benchmark failed (" + e.message + ") — used the offline estimate instead.");
+      }
+    }
 
     let matchResult = computeMatch(profile, finalJob);
     let salaryTarget = computeSalaryTarget(profile, finalJob, matchResult, comparable);
@@ -851,19 +929,24 @@ function AddJobTab({profile, settings, onSave}){
           missing: ai.missingSkills || [],
           requiredYears: matchResult.requiredYears
         };
-        if (!hasStatedSalary && ai.comparableSalaryLow && ai.comparableSalaryHigh){
-          comparable = { low: ai.comparableSalaryLow, high: ai.comparableSalaryHigh, family: ai.comparableContext || "comparable roles", level: "", source: "ai" };
+        if (hasStatedSalary){
+          salaryTarget = {
+            recommendation: ai.salaryTarget,
+            low: ai.salaryRangeLow,
+            high: ai.salaryRangeHigh,
+            note: "Generated by OpenAI (gpt-4o-mini).",
+            source: "listing"
+          };
+        } else {
+          if (comparable.source === "benchmark" && ai.comparableSalaryLow && ai.comparableSalaryHigh){
+            comparable = { low: ai.comparableSalaryLow, high: ai.comparableSalaryHigh, family: ai.comparableContext || comparable.family, level: comparable.level, source: "ai" };
+          }
+          salaryTarget = computeSalaryTarget(profile, finalJob, matchResult, comparable);
         }
-        salaryTarget = {
-          recommendation: ai.salaryTarget,
-          low: ai.salaryRangeLow,
-          high: ai.salaryRangeHigh,
-          note: !hasStatedSalary && ai.comparableContext ? "No salary was listed — benchmarked against " + ai.comparableContext + " (AI estimate)." : "Generated by OpenAI (gpt-4o-mini)."
-        };
-        analysis = ai.analysis;
+        analysis = ai.analysis + (!hasStatedSalary && comparable && comparable.rationale ? " " + comparable.rationale : "");
         engineUsed = "OpenAI (gpt-4o-mini)";
       } catch(e){
-        setAiNote("AI evaluation failed (" + e.message + ") — used the offline heuristic engine instead.");
+        notes.push("AI evaluation failed (" + e.message + ") — used the offline heuristic engine instead.");
       }
     }
 
@@ -877,11 +960,14 @@ function AddJobTab({profile, settings, onSave}){
       salaryTargetHigh: salaryTarget.high,
       comparableSalaryLow: comparable ? comparable.low : null,
       comparableSalaryHigh: comparable ? comparable.high : null,
+      comparableMedian: comparable ? (comparable.median || null) : null,
       comparableFamily: comparable ? comparable.family : null,
+      comparableConfidence: comparable ? (comparable.confidence || null) : null,
+      comparableRationale: comparable ? (comparable.rationale || null) : null,
       comparableSource: comparable ? comparable.source : null,
       careerAnalysis: analysis,
       evalEngine: engineUsed
-    });
+    }, notes.length ? notes.join(" ") : null);
 
     setDraft(null); setUrl(""); setPasteText(""); setSaving(false);
   }
@@ -1005,7 +1091,6 @@ function AddJobTab({profile, settings, onSave}){
           {!profile.skills.length && (
             <Callout type="warn"><span>Your profile has no skills yet — the match score will be rough. Fill out the <strong>Profile</strong> tab first for a real read.</span></Callout>
           )}
-          {aiNote && <Callout type="warn"><span>{aiNote}</span></Callout>}
 
           <button className="nb-btn nb-btn-purple nb-btn-block" disabled={saving || !draft.title} onClick={handleSave}>
             {saving ? "Analyzing…" : (settings.openaiKey ? "Analyze with AI & Save" : "Analyze & Save")}
@@ -1042,8 +1127,10 @@ function JobCard({job, onStatusChange, onDelete}){
             )}
             {!(job.salaryMin || job.salaryMax) && job.comparableSalaryLow && (
               <span className="nb-badge" style={{background:"var(--cream-2)"}}
-                title={"Comparable " + (job.comparableFamily || "roles") + " · " + (job.comparableSource === "ai" ? "AI estimate" : "offline benchmark")}>
-                Market {fmtMoney(job.comparableSalaryLow)}–{fmtMoney(job.comparableSalaryHigh)}
+                title={"Comparable " + (job.comparableFamily || "roles") + " · " + comparableSourceLabel(job.comparableSource) +
+                  (job.comparableConfidence ? " · " + job.comparableConfidence + " confidence" : "") +
+                  (job.comparableRationale ? " — " + job.comparableRationale : "")}>
+                {job.comparableSource === "gemini-live" ? "🔎 " : ""}Market {fmtMoney(job.comparableSalaryLow)}–{fmtMoney(job.comparableSalaryHigh)}
               </span>
             )}
             {job.salaryTarget && <span className="nb-badge" style={{background:"var(--yellow)"}}>Target {fmtMoney(job.salaryTarget)}</span>}
@@ -1324,8 +1411,8 @@ function SettingsTab({settings, onChange}){
       <Callout type="info">
         <span>Everything in this app runs entirely in your browser — jobs, profile, and these keys are stored in
         <code>localStorage</code> on this device only, nothing is sent to any server we control. Keys you add here
-        are sent directly from your browser to OpenAI / Google, which is fine for personal use but not how you'd
-        ship this to other users (see the architecture doc for the production pattern).</span>
+        are sent directly from your browser to OpenAI / Gemini / Google, which is fine for personal use but not how
+        you'd ship this to other users (see the architecture doc for the production pattern).</span>
       </Callout>
 
       <div className="nb-field">
@@ -1333,6 +1420,13 @@ function SettingsTab({settings, onChange}){
         <input className="nb-input" type="password" placeholder="sk-…" value={local.openaiKey}
           onChange={e => setLocal(l => ({...l, openaiKey: e.target.value}))} />
         <span className="nb-hint">When set, "Analyze &amp; Save" calls gpt-4o-mini for the match score, salary target, and career analysis instead of the offline heuristic engine.</span>
+      </div>
+
+      <div className="nb-field">
+        <label className="nb-label">Gemini API key (optional, for live salary benchmarks)</label>
+        <input className="nb-input" type="password" placeholder="AIza…" value={local.geminiKey}
+          onChange={e => setLocal(l => ({...l, geminiKey: e.target.value}))} />
+        <span className="nb-hint">When set and a listing has no posted salary, calls gemini-2.5-flash with Google Search grounding to pull a live comparable-role range (min/median/max + confidence) instead of the hardcoded benchmark table. Get a key at Google AI Studio.</span>
       </div>
 
       <div className="nb-field">
@@ -1356,12 +1450,20 @@ function App(){
   const [profile, setProfile] = useState(() => loadLS(LS_KEYS.profile, DEFAULT_PROFILE));
   const [settings, setSettings] = useState(() => loadLS(LS_KEYS.settings, DEFAULT_SETTINGS));
 
+  const [toast, setToast] = useState(null);
+
   useEffect(() => saveLS(LS_KEYS.jobs, jobs), [jobs]);
   useEffect(() => saveLS(LS_KEYS.profile, profile), [profile]);
   useEffect(() => saveLS(LS_KEYS.settings, settings), [settings]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
-  function addJob(job){
+  function addJob(job, note){
     setJobs(list => [job, ...list]);
+    setToast(note || null);
     setTab("dashboard");
   }
   function updateStatus(id, status){
@@ -1399,6 +1501,13 @@ function App(){
           </div>
           <div className="nb-badge" style={{background:"var(--ink)", color:"#fff", borderColor:"#fff"}}>Neo-Brutalist Lab Build</div>
         </div>
+
+        {toast && (
+          <div className="nb-callout nb-callout-warn" style={{marginTop:"1.25rem", justifyContent:"space-between", alignItems:"center"}}>
+            <span>{toast}</span>
+            <button className="nb-btn nb-btn-sm" onClick={() => setToast(null)}>Dismiss</button>
+          </div>
+        )}
 
         <div className="nb-tabs">
           {tabs.map(t => (

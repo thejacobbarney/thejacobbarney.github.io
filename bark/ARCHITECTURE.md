@@ -171,23 +171,48 @@ function pickStrategy(url: string): 'json-ld' | 'playwright' | 'scrapingbee' {
 
 ### 3.4 Comparable compensation search (brief's §1.E.i)
 
-Stated salary is often absent. The prototype already does something useful here client-side:
-when a listing has no salary, `estimateComparableSalary` (`index.html`) matches the title against
-a hardcoded table of ~16 role families (Software Engineering, Finance & Accounting, Product,
-Sales, etc.), applies a seniority multiplier read off title keywords ("Senior", "Director", "Staff")
-or the profile's years of experience, and returns a market low/high — surfaced on the job card as
-a `Market $X–$Y` badge and folded into the career analysis as a call-anchoring number ("use
-$X–$Y as your anchor on an intro call, with $Y as your opening ask"). When an OpenAI key is set,
-the same offline estimate is passed to the model as a prior and the model can refine it
-(`comparableSalaryLow/High/Context` in the AI schema, §4.2) using broader knowledge of the specific
-title/industry/location — still an LLM estimate, not a live quote, and the UI/analysis text says so.
+Stated salary is often absent. The prototype layers three tiers, cheapest/always-available first,
+each one upgrading the estimate when its prerequisite is configured:
 
-That's a reasonable stand-in, but it's not real market data. The production upgrade is to replace
-the hardcoded table with an actual compensation data source — query a source keyed on normalized
-job title + location (Levels.fyi has no public API; realistic options are the **BLS OEWS API** for
-occupational wage percentiles by metro area, or a paid source like **Payscale's API**) and store the
-result on `jobs.comparable_salary_low/high`. Run this as a second queue job alongside the AI
-evaluation, not inline — it's a network call with its own latency/failure mode.
+1. **Offline benchmark table** (always on). `estimateComparableSalary` (`index.html`) matches the
+   title against a hardcoded table of ~16 role families (Software Engineering, Finance &
+   Accounting, Product, Sales, etc.), applies a seniority multiplier read off title keywords
+   ("Senior", "Director", "Staff") or the profile's years of experience, and returns a market
+   low/high. Zero network calls, zero keys required.
+2. **OpenAI static-knowledge estimate** (if an OpenAI key is set and no better source ran). The
+   offline estimate is passed to the model as a prior in `buildAiPrompt`, and the model can refine
+   it using broader training-data knowledge of the specific title/industry/location
+   (`comparableSalaryLow/High/Context` in the AI schema, §4.2). Still not a live quote.
+3. **Gemini + Google Search grounding** (if a Gemini key is set) — `fetchSalaryBenchmark` in
+   `index.html`. This is a genuine live web search, not a knowledge-cutoff guess, and takes
+   priority over both tiers above when it succeeds:
+   - **Extraction call** — `gemini-2.5-flash`, no tools, `responseMimeType: "application/json"` —
+     normalizes the scraped posting into `{clean_title, industry, experience_level, location}`.
+   - **Live benchmark call** — same model, `tools: [{ googleSearch: {} }]` — searches current
+     compensation data for those normalized parameters and returns
+     `{min_salary, median_salary, max_salary, confidence_score, rationale}`.
+   - Both calls go through the REST endpoint directly (`fetch` to
+     `generativelanguage.googleapis.com/v1beta/models/...:generateContent?key=...`) rather than the
+     `@google/genai` Node SDK, since this is a no-build static page — same bring-your-own-key
+     pattern as the OpenAI tier, with the same client-side-key caveat (§7).
+   - On any failure (bad key, rate limit, network), it falls back to whatever tier 1/2 already
+     produced and surfaces a dismissible toast explaining what happened — it never silently
+     degrades without telling the user, and it never blocks the save.
+
+Whichever tier wins, the range is surfaced as a `Market $X–$Y` badge (🔎 prefix when it's the live
+Gemini result) and folded into the career analysis as a call-anchoring number: "use $X–$Y as your
+anchor on an intro call, with $Y as your opening ask." The Gemini tier's `rationale` — a sentence
+naming the sources behind the number — gets appended directly to that analysis text, since that's
+exactly the kind of color worth having in hand for a recruiter conversation.
+
+This is a reasonable production pattern already — live search grounding is a real market-data
+source, not a hardcoded table — but it still inherits the browser-side-key caveat from §7: for a
+multi-user product, the Gemini calls move server-side (same reasoning as the OpenAI evaluation
+call) so the key isn't exposed per-client. The alternative production path — a dedicated
+compensation data API like **BLS OEWS** (occupational wage percentiles by metro area) or
+**Payscale's API** — is still worth considering as a more structured, purpose-built data source if
+Gemini's search grounding proves inconsistent in practice; either way, this becomes a queue job
+alongside the AI evaluation once there's a backend, not an inline call.
 
 ### 3.5 Legal/ethical note
 
@@ -345,8 +370,8 @@ export function JobCard({ job, onStatusChange }: { job: Job; onStatusChange: (id
 | Multi-user auth + RLS | Single browser, `localStorage` |
 | Server-side scraping queue | Direct `fetch` + optional public CORS proxy, manual paste fallback |
 | LinkedIn/Indeed anti-bot handling | Not attempted — routes to manual paste |
-| Server-held OpenAI key | User-supplied key, stored in `localStorage`, called from the browser |
-| Comparable-salary market data | Hardcoded role-family benchmark table + optional AI refinement — not a real wage data source (see §3.4) |
+| Server-held OpenAI / Gemini keys | User-supplied keys, stored in `localStorage`, called from the browser |
+| Comparable-salary market data | Three-tier fallback (offline table → OpenAI estimate → live Gemini + Google Search) — the Gemini tier is genuinely live, but still called client-side with a user-supplied key (see §3.4) |
 | Evaluation history / score drift | Only the latest evaluation per job is kept |
 
 Everything else — extraction logic, scoring math, salary targeting, the career-analysis prompt,
