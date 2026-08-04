@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Job Tracker // AI Evaluator</title>
+<title>Bark — Job Tracker &amp; AI Evaluator</title>
 <meta name="description" content="Paste a job listing, get an instant AI match score, salary target, and career-move read — then track the whole pipeline in one dashboard." />
-<meta property="og:title" content="Job Tracker // AI Evaluator" />
+<meta property="og:title" content="Bark — Job Tracker & AI Evaluator" />
 <meta property="og:description" content="Scrape job listings, score your fit, and track your pipeline — Neo-Brutalist job search dashboard." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -616,7 +616,7 @@ function exportCSV(jobs){
     j.salaryMin || "", j.salaryMax || "", j.salaryTarget || "", j.url || "", j.dateAdded
   ]);
   const csv = [headers, ...rows].map(r => r.map(csvEscape).join(",")).join("\n");
-  triggerDownload("job-tracker-export.csv", csv, "text/csv");
+  triggerDownload("bark-export.csv", csv, "text/csv");
 }
 
 function ensureGoogleIdentity(){
@@ -642,7 +642,7 @@ async function exportToGoogleSheets(jobs, clientId){
           const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
             method:"POST",
             headers:{ Authorization:"Bearer " + token, "Content-Type":"application/json" },
-            body: JSON.stringify({ properties:{ title:"Job Tracker Export " + new Date().toLocaleDateString() } })
+            body: JSON.stringify({ properties:{ title:"Bark Export " + new Date().toLocaleDateString() } })
           });
           const sheet = await createRes.json();
           if (!sheet.spreadsheetId) throw new Error("Sheets API did not return a spreadsheet id");
@@ -1274,8 +1274,8 @@ function App(){
       <div className="nb-topbar">
         <div className="nb-topbar-inner">
           <div className="nb-logo">
-            <span className="nb-logo-mark">JT</span>
-            <span>JOB TRACKER <span style={{color:"var(--purple)"}}>//</span> AI EVALUATOR</span>
+            <span className="nb-logo-mark">🐾</span>
+            <span>BARK <span style={{color:"var(--purple)"}}>//</span> JOB TRACKER &amp; AI EVALUATOR</span>
           </div>
           <a className="nb-back" href="https://thejacobbarney.com/#personal">← thejacobbarney.com</a>
         </div>

@@ -1,4 +1,4 @@
-# Job Application Tracker & AI Evaluator — Architecture
+# Bark — Job Application Tracker & AI Evaluator — Architecture
 
 `index.html` in this folder is a working, client-only prototype (React 18 + Babel Standalone,
 zero build step, deployed as a static page — same pattern as `/movie-spork`). It proves out the
