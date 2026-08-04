@@ -342,7 +342,7 @@ const DEFAULT_PROFILE = {
   name:"", yearsExp:3, targetRoles:"", skills:[], summary:"",
   currentSalary:"", targetSalary:""
 };
-const DEFAULT_SETTINGS = { openaiKey:"", geminiKey:"", googleClientId:"" };
+const DEFAULT_SETTINGS = { grokKey:"", perplexityKey:"", googleClientId:"" };
 
 /* ─────────────────────────────────────────────────────────────
    EXTRACTION — JSON-LD (schema.org JobPosting), meta-tag
@@ -509,7 +509,8 @@ function computeMatch(profile, job){
    disclose salary, estimate a market range for similar roles in
    the same family so there's still a defensible number to open
    with on an intro/welcome call. Always available offline;
-   refined by the AI tier below when an OpenAI key is configured.
+   refined by the AI tiers below when a Grok or Perplexity key is
+   configured.
 ───────────────────────────────────────────────────────────── */
 const SALARY_BENCHMARKS = [
   { id:"software", label:"Software Engineering", match:/software engineer|\bswe\b|back.?end|front.?end|full.?stack|developer|programmer|site reliability|devops|mobile engineer|ios engineer|android engineer/i, low:105000, high:150000 },
@@ -593,7 +594,7 @@ function computeSalaryTarget(profile, job, matchResult, comparable){
       recommendation: target,
       low: comparable.low,
       high: comparable.high,
-      note: "No salary was listed — benchmarked against comparable " + comparable.family + " (" + comparable.level + ") roles" + (comparable.source === "ai" ? ", refined by AI." : "."),
+      note: "No salary was listed — benchmarked against comparable " + comparable.family + " (" + comparable.level + ") roles" + (comparable.source === "grok" ? ", refined by Grok." : "."),
       source
     };
   }
@@ -628,11 +629,16 @@ function generateCareerAnalysis(profile, job, matchResult, salaryTarget){
 }
 
 /* ─────────────────────────────────────────────────────────────
-   AI-ENHANCED EVALUATION — optional, only runs if the user has
-   supplied their own OpenAI key in Settings. Falls back to the
-   offline heuristic above on any error.
+   AI-ENHANCED EVALUATION — Grok (xAI). Optional, only runs if the
+   user has supplied their own Grok key in Settings. Falls back to
+   the offline heuristic above on any error. xAI's chat completions
+   endpoint is OpenAI-compatible, so this is the same request/
+   response shape as the match-scoring calls in the architecture
+   doc's production plan — just a different base URL and model.
 ───────────────────────────────────────────────────────────── */
-const AI_SYSTEM_PROMPT = "You are a career-matching engine inside a personal job application tracker. " +
+const GROK_MODEL = "grok-4-fast";
+
+const MATCH_SYSTEM_PROMPT = "You are a career-matching engine inside a personal job application tracker. " +
   "Given a candidate's background and a single job posting, evaluate fit with rigor and honesty — do not " +
   "inflate scores to be encouraging, and call out real gaps. Score matchScore on a 1-10 integer scale where " +
   "10 is a perfect match and 1 is a poor match — never use a 0-100 scale. When the posting does not disclose " +
@@ -645,7 +651,7 @@ const AI_SYSTEM_PROMPT = "You are a career-matching engine inside a personal job
   '"comparableContext": string|null (short phrase, e.g. "mid-level Product Manager roles in tech"), ' +
   '"analysis": string (2-3 sentences), "matchedSkills": string[], "missingSkills": string[]}';
 
-function buildAiPrompt(profile, job){
+function buildMatchPrompt(profile, job){
   const lines = [
     "CANDIDATE BACKGROUND",
     "Years of experience: " + (profile.yearsExp || "n/a"),
@@ -671,78 +677,89 @@ function buildAiPrompt(profile, job){
   return lines.join("\n");
 }
 
-async function callOpenAIEvaluate(apiKey, profile, job){
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+async function callGrokEvaluate(apiKey, profile, job){
+  const res = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type":"application/json", "Authorization":"Bearer " + apiKey },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: GROK_MODEL,
       response_format: { type: "json_object" },
       temperature: 0.4,
       messages: [
-        { role:"system", content: AI_SYSTEM_PROMPT },
-        { role:"user", content: buildAiPrompt(profile, job) }
+        { role:"system", content: MATCH_SYSTEM_PROMPT },
+        { role:"user", content: buildMatchPrompt(profile, job) }
       ]
     })
   });
-  if (!res.ok) throw new Error("OpenAI request failed (" + res.status + ")");
+  if (!res.ok) throw new Error("Grok request failed (" + res.status + ")");
   const data = await res.json();
   return JSON.parse(data.choices[0].message.content);
 }
 
 /* ─────────────────────────────────────────────────────────────
-   LIVE SALARY BENCHMARK — Gemini + Google Search grounding.
-   Optional, only runs if the user has supplied their own Gemini
-   key in Settings and the listing has no stated salary. Two
-   calls: extract standardized parameters from the posting, then
-   ground a live compensation search on those parameters. Falls
-   back to the offline/OpenAI comparable estimate on any error.
+   LIVE SALARY BENCHMARK — Perplexity (Sonar), which has web search
+   grounding built into the model rather than bolted on as a tool.
+   Optional, only runs if the user has supplied their own
+   Perplexity key in Settings and the listing has no stated salary.
+   One call: Sonar reasons over live search results directly, so
+   there's no separate extraction pass first. Falls back to the
+   offline/Grok comparable estimate on any error. Returns real
+   source citations, which get surfaced in the UI — actual links
+   beat a vague "estimated" sentence when you're prepping for a
+   call.
 ───────────────────────────────────────────────────────────── */
-const GEMINI_MODEL = "gemini-2.5-flash";
+const PERPLEXITY_MODEL = "sonar";
 
-async function callGemini(apiKey, prompt, useSearch){
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { responseMimeType: "application/json" }
-  };
-  if (useSearch) body.tools = [{ googleSearch: {} }];
-  const res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + encodeURIComponent(apiKey),
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
-  );
-  if (!res.ok) throw new Error("Gemini request failed (" + res.status + ")");
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Gemini returned no content");
-  return JSON.parse(text);
+function extractJsonObject(text){
+  try { return JSON.parse(text); } catch(e){}
+  const match = text.match(/\{[\s\S]*\}/);
+  if (match){
+    try { return JSON.parse(match[0]); } catch(e){}
+  }
+  throw new Error("Could not parse JSON from response");
 }
 
-async function extractJobParamsWithGemini(apiKey, job){
-  const prompt = `Extract standardized parameters from this job posting. Return ONLY a strict JSON object:
-{"clean_title": string, "industry": string, "experience_level": string, "location": string|null}
+async function callPerplexity(apiKey, prompt){
+  const res = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+    body: JSON.stringify({
+      model: PERPLEXITY_MODEL,
+      messages: [
+        { role: "system", content: "Respond with ONLY a single strict JSON object — no prose, no markdown code fences, nothing outside the JSON." },
+        { role: "user", content: prompt }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error("Perplexity request failed (" + res.status + ")");
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error("Perplexity returned no content");
+  const citations = data.citations || (data.search_results || []).map(r => r.url).filter(Boolean);
+  return { ...extractJsonObject(text), citations };
+}
 
+async function fetchSalaryBenchmark(apiKey, job){
+  const prompt = `Research current market compensation for this job posting. Identify the standardized role (title, industry, seniority level, location), search for live compensation data on comparable roles, then return ONLY a strict JSON object with this exact shape:
+{
+  "clean_title": string,
+  "industry": string,
+  "experience_level": string,
+  "location": string | null,
+  "min_salary": number,
+  "median_salary": number,
+  "max_salary": number,
+  "confidence_score": "low" | "medium" | "high",
+  "rationale": "short explanation of the market data found"
+}
+
+JOB POSTING
 Title: ${job.title}
 Company: ${job.company}
 Location: ${job.location || "unknown"}
 Description:
 ${(job.description || "").slice(0, 4000)}`;
-  return callGemini(apiKey, prompt, false);
-}
-
-async function fetchSalaryBenchmark(apiKey, job){
-  const params = await extractJobParamsWithGemini(apiKey, job);
-  const prompt = `Search live market compensation data for a "${params.clean_title}" in the "${params.industry}" industry${params.location ? ` near ${params.location}` : ""}.
-
-Return a strict JSON object with:
-{
-  "min_salary": number,
-  "median_salary": number,
-  "max_salary": number,
-  "confidence_score": "low" | "medium" | "high",
-  "rationale": "short explanation of market sources"
-}`;
-  const result = await callGemini(apiKey, prompt, true);
-  return { ...result, clean_title: params.clean_title, industry: params.industry, experience_level: params.experience_level, location: params.location };
+  return callPerplexity(apiKey, prompt);
 }
 
 function isUsableLiveBenchmark(live){
@@ -836,9 +853,13 @@ function fmtMoney(n){
 }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function comparableSourceLabel(source){
-  if (source === "gemini-live") return "live search";
-  if (source === "ai") return "AI estimate";
+  if (source === "perplexity-live") return "Perplexity live search";
+  if (source === "grok") return "Grok estimate";
   return "offline benchmark";
+}
+function hostnameOf(url){
+  try { return new URL(url).hostname.replace(/^www\./, ""); }
+  catch(e){ return url; }
 }
 
 function ScoreDial({score}){
@@ -906,11 +927,11 @@ function AddJobTab({profile, settings, onSave}){
     let comparable = hasStatedSalary ? null : estimateComparableSalary(finalJob, profile);
     const notes = [];
 
-    if (!hasStatedSalary && settings.geminiKey){
+    if (!hasStatedSalary && settings.perplexityKey){
       try {
-        const live = await fetchSalaryBenchmark(settings.geminiKey, finalJob);
+        const live = await fetchSalaryBenchmark(settings.perplexityKey, finalJob);
         if (!isUsableLiveBenchmark(live)){
-          console.warn("Gemini salary benchmark skipped (low confidence or unusable numbers) — using the offline estimate instead.", live);
+          console.warn("Perplexity salary benchmark skipped (low confidence or unusable numbers) — using the offline estimate instead.", live);
         } else {
           comparable = {
             low: live.min_salary,
@@ -920,11 +941,12 @@ function AddJobTab({profile, settings, onSave}){
             level: live.experience_level || comparable.level,
             confidence: live.confidence_score || null,
             rationale: live.rationale || null,
-            source: "gemini-live"
+            citations: live.citations || [],
+            source: "perplexity-live"
           };
         }
       } catch(e){
-        console.warn("Gemini salary benchmark failed — using the offline estimate instead.", e);
+        console.warn("Perplexity salary benchmark failed — using the offline estimate instead.", e);
       }
     }
 
@@ -933,9 +955,9 @@ function AddJobTab({profile, settings, onSave}){
     let analysis = generateCareerAnalysis(profile, finalJob, matchResult, salaryTarget);
     let engineUsed = "Offline heuristic engine";
 
-    if (settings.openaiKey){
+    if (settings.grokKey){
       try {
-        const ai = await callOpenAIEvaluate(settings.openaiKey, profile, finalJob);
+        const ai = await callGrokEvaluate(settings.grokKey, profile, finalJob);
         matchResult = {
           score: ai.matchScore,
           matched: ai.matchedSkills || [],
@@ -947,17 +969,17 @@ function AddJobTab({profile, settings, onSave}){
             recommendation: ai.salaryTarget,
             low: ai.salaryRangeLow,
             high: ai.salaryRangeHigh,
-            note: "Generated by OpenAI (gpt-4o-mini).",
+            note: "Generated by Grok (" + GROK_MODEL + ").",
             source: "listing"
           };
         } else {
           if (comparable.source === "benchmark" && ai.comparableSalaryLow && ai.comparableSalaryHigh){
-            comparable = { low: ai.comparableSalaryLow, high: ai.comparableSalaryHigh, family: ai.comparableContext || comparable.family, level: comparable.level, source: "ai" };
+            comparable = { low: ai.comparableSalaryLow, high: ai.comparableSalaryHigh, family: ai.comparableContext || comparable.family, level: comparable.level, source: "grok" };
           }
           salaryTarget = computeSalaryTarget(profile, finalJob, matchResult, comparable);
         }
         analysis = ai.analysis + (!hasStatedSalary && comparable && comparable.rationale ? " " + comparable.rationale : "");
-        engineUsed = "OpenAI (gpt-4o-mini)";
+        engineUsed = "Grok (" + GROK_MODEL + ")";
       } catch(e){
         notes.push("AI evaluation failed (" + e.message + ") — used the offline heuristic engine instead.");
       }
@@ -977,6 +999,7 @@ function AddJobTab({profile, settings, onSave}){
       comparableFamily: comparable ? comparable.family : null,
       comparableConfidence: comparable ? (comparable.confidence || null) : null,
       comparableRationale: comparable ? (comparable.rationale || null) : null,
+      comparableCitations: comparable ? (comparable.citations || []) : [],
       comparableSource: comparable ? comparable.source : null,
       careerAnalysis: analysis,
       evalEngine: engineUsed
@@ -1106,7 +1129,7 @@ function AddJobTab({profile, settings, onSave}){
           )}
 
           <button className="nb-btn nb-btn-purple nb-btn-block" disabled={saving || !draft.title} onClick={handleSave}>
-            {saving ? "Analyzing…" : (settings.openaiKey ? "Analyze with AI & Save" : "Analyze & Save")}
+            {saving ? "Analyzing…" : (settings.grokKey ? "Analyze with AI & Save" : "Analyze & Save")}
           </button>
         </div>
       )}
@@ -1143,7 +1166,7 @@ function JobCard({job, onStatusChange, onDelete}){
                 title={"Comparable " + (job.comparableFamily || "roles") + " · " + comparableSourceLabel(job.comparableSource) +
                   (job.comparableConfidence ? " · " + job.comparableConfidence + " confidence" : "") +
                   (job.comparableRationale ? " — " + job.comparableRationale : "")}>
-                {job.comparableSource === "gemini-live" ? "🔎 " : ""}Market {fmtMoney(job.comparableSalaryLow)}–{fmtMoney(job.comparableSalaryHigh)}
+                {job.comparableSource === "perplexity-live" ? "🔎 " : ""}Market {fmtMoney(job.comparableSalaryLow)}–{fmtMoney(job.comparableSalaryHigh)}
               </span>
             )}
             {job.salaryTarget && <span className="nb-badge" style={{background:"var(--yellow)"}}>Target {fmtMoney(job.salaryTarget)}</span>}
@@ -1166,6 +1189,17 @@ function JobCard({job, onStatusChange, onDelete}){
           <div className="job-analysis">
             <div className="job-analysis-label">Career move analysis · {job.evalEngine}</div>
             {job.careerAnalysis}
+            {job.comparableCitations && job.comparableCitations.length > 0 && (
+              <div style={{marginTop:"0.6rem", fontSize:"0.76rem"}}>
+                <strong>Sources: </strong>
+                {job.comparableCitations.slice(0, 4).map((url, i) => (
+                  <React.Fragment key={url}>
+                    {i > 0 && ", "}
+                    <a href={url} target="_blank" rel="noopener" style={{color:"var(--purple-dark)", textDecoration:"underline"}}>{hostnameOf(url)}</a>
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
           </div>
           {(job.matchedSkills?.length || job.missingSkills?.length) ? (
             <div style={{marginTop:"0.75rem", display:"flex", flexWrap:"wrap", gap:"0.4rem"}}>
@@ -1424,22 +1458,22 @@ function SettingsTab({settings, onChange}){
       <Callout type="info">
         <span>Everything in this app runs entirely in your browser — jobs, profile, and these keys are stored in
         <code>localStorage</code> on this device only, nothing is sent to any server we control. Keys you add here
-        are sent directly from your browser to OpenAI / Gemini / Google, which is fine for personal use but not how
-        you'd ship this to other users (see the architecture doc for the production pattern).</span>
+        are sent directly from your browser to Grok / Perplexity / Google, which is fine for personal use but not
+        how you'd ship this to other users (see the architecture doc for the production pattern).</span>
       </Callout>
 
       <div className="nb-field">
-        <label className="nb-label">OpenAI API key (optional)</label>
-        <input className="nb-input" type="password" placeholder="sk-…" value={local.openaiKey}
-          onChange={e => setLocal(l => ({...l, openaiKey: e.target.value}))} />
-        <span className="nb-hint">When set, "Analyze &amp; Save" calls gpt-4o-mini for the match score, salary target, and career analysis instead of the offline heuristic engine.</span>
+        <label className="nb-label">Grok API key (optional)</label>
+        <input className="nb-input" type="password" placeholder="xai-…" value={local.grokKey}
+          onChange={e => setLocal(l => ({...l, grokKey: e.target.value}))} />
+        <span className="nb-hint">When set, "Analyze &amp; Save" calls grok-4-fast (xAI) for the match score, salary target, and career analysis instead of the offline heuristic engine. Get a key at console.x.ai.</span>
       </div>
 
       <div className="nb-field">
-        <label className="nb-label">Gemini API key (optional, for live salary benchmarks)</label>
-        <input className="nb-input" type="password" placeholder="AIza…" value={local.geminiKey}
-          onChange={e => setLocal(l => ({...l, geminiKey: e.target.value}))} />
-        <span className="nb-hint">When set and a listing has no posted salary, calls gemini-2.5-flash with Google Search grounding to pull a live comparable-role range (min/median/max + confidence) instead of the hardcoded benchmark table. Get a key at Google AI Studio.</span>
+        <label className="nb-label">Perplexity API key (optional, for live salary benchmarks)</label>
+        <input className="nb-input" type="password" placeholder="pplx-…" value={local.perplexityKey}
+          onChange={e => setLocal(l => ({...l, perplexityKey: e.target.value}))} />
+        <span className="nb-hint">When set and a listing has no posted salary, calls Perplexity's sonar model — web search is built into the model, so this pulls a live comparable-role range (min/median/max + confidence) with real source citations instead of the hardcoded benchmark table. Get a key at perplexity.ai/settings/api.</span>
       </div>
 
       <div className="nb-field">
