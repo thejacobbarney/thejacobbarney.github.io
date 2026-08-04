@@ -743,6 +743,13 @@ Return a strict JSON object with:
   return { ...result, clean_title: params.clean_title, industry: params.industry, experience_level: params.experience_level, location: params.location };
 }
 
+function isUsableLiveBenchmark(live){
+  if (!live || live.confidence_score === "low") return false;
+  const { min_salary, max_salary } = live;
+  return typeof min_salary === "number" && typeof max_salary === "number" &&
+    min_salary > 0 && max_salary >= min_salary;
+}
+
 /* ─────────────────────────────────────────────────────────────
    EXPORT — CSV (fully client-side) and Google Sheets (OAuth
    token flow via Google Identity Services, no backend needed)
@@ -900,18 +907,22 @@ function AddJobTab({profile, settings, onSave}){
     if (!hasStatedSalary && settings.geminiKey){
       try {
         const live = await fetchSalaryBenchmark(settings.geminiKey, finalJob);
-        comparable = {
-          low: live.min_salary,
-          high: live.max_salary,
-          median: live.median_salary || null,
-          family: live.clean_title || comparable.family,
-          level: live.experience_level || comparable.level,
-          confidence: live.confidence_score || null,
-          rationale: live.rationale || null,
-          source: "gemini-live"
-        };
+        if (!isUsableLiveBenchmark(live)){
+          console.warn("Gemini salary benchmark skipped (low confidence or unusable numbers) — using the offline estimate instead.", live);
+        } else {
+          comparable = {
+            low: live.min_salary,
+            high: live.max_salary,
+            median: live.median_salary || null,
+            family: live.clean_title || comparable.family,
+            level: live.experience_level || comparable.level,
+            confidence: live.confidence_score || null,
+            rationale: live.rationale || null,
+            source: "gemini-live"
+          };
+        }
       } catch(e){
-        notes.push("Live salary benchmark failed (" + e.message + ") — used the offline estimate instead.");
+        console.warn("Gemini salary benchmark failed — using the offline estimate instead.", e);
       }
     }
 
