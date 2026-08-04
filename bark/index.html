@@ -1068,16 +1068,74 @@ async function extractPdfText(file){
   for (let i = 1; i <= doc.numPages; i++){
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
-    text += content.items.map(it => it.str).join(" ") + "\n";
+    // Reconstruct line breaks from each item's vertical position — PDF.js's raw
+    // item order has no concept of lines, and a naive join(" ") collapses a
+    // LinkedIn export's one-skill-per-line sidebar into a single unsplittable
+    // blob. Comparing the Y coordinate (transform[5]) between consecutive
+    // items is the standard way to tell "same line" from "new line".
+    let lastY = null;
+    content.items.forEach(item => {
+      const y = item.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 1){
+        text += "\n";
+      } else if (text && !/[\n ]$/.test(text)){
+        text += " ";
+      }
+      text += item.str;
+      lastY = y;
+    });
+    text += "\n\n";
   }
   return text;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Section-aware parsing for the offline heuristic. LinkedIn's
+   "Save to PDF" export (and most resumes) use a small fixed set
+   of section headers, each on its own line — reading those
+   directly beats blind skill-dictionary matching against the
+   whole document, and matters most for two things dictionary
+   matching can't do at all: catching self-reported skills that
+   aren't in a ~100-word dictionary ("Earned Value Management
+   (EVM)", "Organization Skills"), and not letting Education dates
+   pollute a years-of-experience estimate meant to only cover
+   Experience.
+───────────────────────────────────────────────────────────── */
+const RESUME_SECTION_HEADERS = [
+  "Summary", "About", "Experience", "Work Experience", "Education", "Top Skills", "Skills",
+  "Certifications", "Licenses & Certifications", "Languages", "Honors-Awards", "Honors & Awards",
+  "Publications", "Volunteering", "Volunteer Experience", "Projects", "Courses", "Organizations",
+  "Patents", "Contact"
+];
+
+function sliceResumeSection(text, name){
+  const lines = text.split("\n").map(l => l.trim());
+  const startIdx = lines.findIndex(l => l === name);
+  if (startIdx === -1) return "";
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++){
+    if (lines[i] !== name && RESUME_SECTION_HEADERS.includes(lines[i])){ endIdx = i; break; }
+  }
+  return lines.slice(startIdx + 1, endIdx).filter(Boolean).join("\n");
+}
+
+function findResumeSection(text, candidateNames){
+  for (const name of candidateNames){
+    const section = sliceResumeSection(text, name);
+    if (section) return section;
+  }
+  return "";
+}
+
 function estimateYearsFromResumeText(text){
+  const experienceText = findResumeSection(text, ["Experience", "Work Experience"]) || text;
   const now = new Date().getFullYear();
-  const rangeRe = /((?:19|20)\d{2})\s*(?:-|–|—|to)\s*((?:19|20)\d{2}|present|current)/gi;
+  // "September 2025 - Present", "November 2024 - September 2025", or bare "2016 - 2019" —
+  // LinkedIn/resumes almost always name the month on both ends of a range, not just the year,
+  // so the end side needs an optional month word before the year/present/current token.
+  const rangeRe = /((?:19|20)\d{2})\s*(?:-|–|—|to)\s*(?:[A-Za-z]+\.?\s+)?((?:19|20)\d{2}|present|current)/gi;
   let earliest = null, latest = null, m;
-  while ((m = rangeRe.exec(text))){
+  while ((m = rangeRe.exec(experienceText))){
     const start = parseInt(m[1], 10);
     const end = /present|current/i.test(m[2]) ? now : parseInt(m[2], 10);
     if (earliest === null || start < earliest) earliest = start;
@@ -1087,23 +1145,49 @@ function estimateYearsFromResumeText(text){
   return Math.max(0, Math.min(now - earliest, 45));
 }
 
+function splitSkillEntries(sectionText){
+  // LinkedIn lists one skill per line; plain resumes often cram a whole
+  // "Skills: A, B, C" list onto one line instead — split on both so either
+  // format ends up as clean individual entries rather than one opaque blob.
+  return sectionText.split("\n")
+    .flatMap(line => line.split(/,|;|•/))
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 function parseResumeTextOffline(text){
+  const topSkills = splitSkillEntries(findResumeSection(text, ["Top Skills", "Skills"]));
+  const certSkills = splitSkillEntries(findResumeSection(text, ["Certifications", "Licenses & Certifications"]));
+  const merged = [...topSkills, ...certSkills];
+  extractSkillsFromText(text).forEach(s => {
+    if (!merged.some(m => m.toLowerCase() === s.toLowerCase())) merged.push(s);
+  });
+
+  const rawSummary = findResumeSection(text, ["Summary", "About"]).replace(/\s*\n\s*/g, " ").trim();
+  const summary = rawSummary.length > 500 ? rawSummary.slice(0, 500).trim() + "…" : rawSummary;
+
   return {
-    skills: extractSkillsFromText(text),
+    skills: merged,
     yearsExp: estimateYearsFromResumeText(text),
     targetRoles: "",
-    summary: "",
+    summary,
     source: "offline-heuristic"
   };
 }
 
 const RESUME_SYSTEM_PROMPT = "You are extracting a structured professional profile from a resume or LinkedIn " +
-  "profile export, for use in a job-search matching tool. Read the full text and respond with ONLY a JSON " +
-  "object matching this exact schema, no prose outside it: " +
-  '{"skills": string[] (10-25 concise skill/tool/technology names, not full sentences), ' +
-  '"yearsExp": number (estimate total years of professional experience from the work history dates), ' +
+  "profile export, for use in a job-search matching tool. The text was extracted from a PDF and may include a " +
+  "sidebar section listing self-reported skills/certifications/languages (e.g. a \"Top Skills\" or " +
+  "\"Certifications\" section) separately from the prose — treat entries in those sections as real skills even " +
+  "if they don't appear elsewhere in the document. Read the full text and respond with ONLY a JSON object " +
+  "matching this exact schema, no prose outside it: " +
+  '{"skills": string[] (10-25 concise skill/tool/technology names, not full sentences — include self-reported ' +
+  'skills/certifications verbatim, not just ones inferred from job descriptions), ' +
+  '"yearsExp": number (total years of professional experience computed ONLY from Experience/work-history date ' +
+  'ranges — do not count years spent in Education), ' +
   '"targetRoles": string (a short comma-separated guess at 2-3 logical next job titles based on their career trajectory), ' +
-  '"summary": string (a 2-3 sentence first-person professional summary suitable for a job search profile)}';
+  '"summary": string (a 2-3 sentence first-person professional summary suitable for a job search profile — ' +
+  'if the document already has a Summary/About section, base it on that rather than writing a generic one)}';
 
 async function callGrokParseResume(apiKey, resumeText){
   const res = await fetch("https://api.x.ai/v1/chat/completions", {

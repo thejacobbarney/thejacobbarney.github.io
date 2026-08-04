@@ -343,24 +343,41 @@ Manually typing skills, years of experience, and a summary into the Profile tab 
 people already have that information sitting in a resume or a LinkedIn "Save to PDF" export. The
 prototype can read either directly:
 
-1. **PDF text extraction** — [PDF.js](https://mozilla.github.io/pdf.js/) loaded from CDN
-   (`unpkg.com/pdfjs-dist@3.11.174`), same "load a script tag, no build step" pattern as
-   React/Babel. `extractPdfText` walks every page and concatenates the text content; PDF.js exposes
-   a classic UMD global (`window.pdfjsLib`) at this pinned version, which matters because newer
-   `pdfjs-dist` releases dropped the non-module build from the default `build/` path — worth
-   re-checking if this version is bumped later.
-2. **Offline heuristic pass** (always runs): `extractSkillsFromText` — the same skill-dictionary
-   matcher used on scraped job postings — runs against the resume text, and
-   `estimateYearsFromResumeText` regex-matches work-history date ranges (`"2019 - Present"`,
-   `"2016 - 2019"`) to estimate total years from the earliest start year to the latest end year
-   (or the current year for "Present"/"Current"). Free, instant, no key required — the same
-   always-available floor as the rest of the app's AI-adjacent features.
-3. **Grok refinement** (if a key is set): `callGrokParseResume` sends the extracted text to
-   `grok-4-fast` with a schema asking for `skills`, `yearsExp`, `targetRoles`, and a first-person
-   `summary` — resumes are unstructured prose, so an LLM reading the whole document in context
-   does meaningfully better than keyword matching alone, especially for `targetRoles` and
-   `summary`, which the offline pass can't produce at all (LinkedIn/resumes don't spell out "the
-   user's next target job title" — that has to be inferred from career trajectory).
+1. **PDF text extraction with line reconstruction** — [PDF.js](https://mozilla.github.io/pdf.js/)
+   loaded from CDN (`unpkg.com/pdfjs-dist@3.11.174`), same "load a script tag, no build step"
+   pattern as React/Babel. PDF.js exposes a classic UMD global (`window.pdfjsLib`) at this pinned
+   version, which matters because newer `pdfjs-dist` releases dropped the non-module build from
+   the default `build/` path — worth re-checking if this version is bumped later. The important
+   detail is *how* `extractPdfText` reads the page: PDF.js's raw text items have no concept of
+   lines, so a naive `.join(" ")` collapses a LinkedIn export's one-skill-per-line sidebar into a
+   single unsplittable blob. `extractPdfText` instead compares each item's Y coordinate
+   (`item.transform[5]`) against the previous one and inserts a real line break whenever it jumps —
+   the standard technique for recovering line structure from PDF.js, and the difference between
+   "Top Skills" coming back as three distinct entries versus one unusable string.
+2. **Section-aware offline pass** (always runs): rather than blindly keyword-matching the whole
+   document against `extractSkillsFromText`'s ~100-word dictionary, `parseResumeTextOffline` first
+   looks for LinkedIn/resume section headers on their own line (`Top Skills`, `Certifications`,
+   `Summary`, `Experience`, `Education`, …) via `sliceResumeSection`, and treats their contents as
+   authoritative: self-reported skills and certifications go straight into the profile verbatim
+   (catching things no fixed dictionary would, like "Earned Value Management (EVM)" or
+   "Organization Skills"), the `Summary`/`About` section becomes the profile summary directly, and
+   `estimateYearsFromResumeText` only scans date ranges *inside* the `Experience` section — not
+   `Education` — so a degree's start year doesn't inflate years-of-experience. The dictionary match
+   still runs across the whole document and merges in on top, catching skills mentioned in bullet
+   prose that never made it into a self-reported list. Free, instant, no key required.
+
+   One real bug this replaced: the original date-range regex only matched bare `"2019 - 2023"` or
+   `"2019 - Present"`. Real resumes/LinkedIn exports almost always name the month on *both* ends
+   (`"November 2024 - September 2025"`), which that regex didn't handle at all — it silently
+   skipped every range except whichever one ended in "Present", understating years of experience
+   by years on a real multi-job history. The pattern now tolerates an optional month word before
+   the closing year/present token.
+3. **Grok refinement** (if a key is set): `callGrokParseResume` sends the line-reconstructed text
+   to `grok-4-fast` with a schema asking for `skills`, `yearsExp`, `targetRoles`, and a first-person
+   `summary`, explicitly instructed to treat sidebar-style skill/certification sections as real
+   skills and to compute years only from Experience, not Education. Still meaningfully better than
+   the offline pass for `targetRoles`, which requires inferring a logical next job title from
+   career trajectory — not something either the dictionary or section-slicing can do.
 
 Extracted results are shown in an editable review panel before anything touches the saved profile
 — same "extract → review → confirm" pattern as adding a job — with one deliberate asymmetry in
