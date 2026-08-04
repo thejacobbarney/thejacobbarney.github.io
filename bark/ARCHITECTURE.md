@@ -17,7 +17,7 @@ contract, and the export pipeline — everything needed to lift the prototype in
 
 | Layer | Choice | Why |
 |---|---|---|
-| Frontend | **Next.js 14 (App Router) + React + Tailwind CSS** | Server components for the dashboard/analytics reads, client components for the interactive add-job flow; Tailwind maps cleanly onto the Neo-Brutalist token system (hard borders, flat shadows, no radius). |
+| Frontend | **Next.js 14 (App Router) + React + Tailwind CSS** | Server components for the dashboard/analytics reads, client components for the interactive add-job flow; Tailwind maps cleanly onto the bold, high-contrast token system (hard borders, flat shadows, no radius). |
 | Auth + DB | **Supabase (Postgres + Auth + Row-Level Security)** | One provider for auth, relational storage, and realtime subscriptions (pipeline status updates across tabs/devices) without standing up separate services. |
 | Scraping | **Playwright** on a **queue-backed worker** (see §3), fronted by **ScrapingBee or Browserless** for the JS-heavy / anti-bot sources (LinkedIn, Indeed) | Playwright handles the general case (JS-rendered career pages) cheaply; a managed scraping API absorbs residential-proxy and headless-detection costs for the two hardest sources instead of building that infrastructure in-house. |
 | AI (match scoring) | **xAI Grok API (`grok-4-fast` default)**, called **server-side only** | OpenAI-compatible request/response shape, so the same `response_format: json_object` pattern applies; keeps the key off the client and lets you cache/rate-limit per user (see §4.3). |
@@ -408,7 +408,7 @@ merging two skill lists does — the review step is what keeps this safe, not th
 
 ---
 
-## 6. Frontend Components (Next.js / Tailwind, Neo-Brutalist)
+## 6. Frontend Components (Next.js / Tailwind)
 
 The prototype's component split (`AddJobTab`, `DashboardTab`, `JobCard`, `ProfileTab`,
 `AnalyticsTab`, `SettingsTab`) maps directly onto Next.js — each becomes a client component under
@@ -432,7 +432,7 @@ theme: {
       'brutal-sm': '2px 2px 0 #111111',
       'brutal-lg': '7px 7px 0 #111111',
     },
-    borderRadius: { none: '0px' }, // Neo-Brutalism: no rounded corners
+    borderRadius: { none: '0px' }, // hard edges: no rounded corners
   }
 }
 ```
