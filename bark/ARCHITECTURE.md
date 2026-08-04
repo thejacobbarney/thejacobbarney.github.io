@@ -171,11 +171,23 @@ function pickStrategy(url: string): 'json-ld' | 'playwright' | 'scrapingbee' {
 
 ### 3.4 Comparable compensation search (brief's §1.E.i)
 
-Stated salary is often absent. To estimate a market range: query a compensation data source
-(Levels.fyi has no public API; realistic options are the **BLS OEWS API** for occupational wage
-percentiles by metro area, or a paid source like **Payscale's API**) keyed on normalized job title
-+ location, and store the result on `jobs.comparable_salary_low/high`. This runs as a second queue
-job alongside the AI evaluation, not inline — it's a network call with its own latency/failure mode.
+Stated salary is often absent. The prototype already does something useful here client-side:
+when a listing has no salary, `estimateComparableSalary` (`index.html`) matches the title against
+a hardcoded table of ~16 role families (Software Engineering, Finance & Accounting, Product,
+Sales, etc.), applies a seniority multiplier read off title keywords ("Senior", "Director", "Staff")
+or the profile's years of experience, and returns a market low/high — surfaced on the job card as
+a `Market $X–$Y` badge and folded into the career analysis as a call-anchoring number ("use
+$X–$Y as your anchor on an intro call, with $Y as your opening ask"). When an OpenAI key is set,
+the same offline estimate is passed to the model as a prior and the model can refine it
+(`comparableSalaryLow/High/Context` in the AI schema, §4.2) using broader knowledge of the specific
+title/industry/location — still an LLM estimate, not a live quote, and the UI/analysis text says so.
+
+That's a reasonable stand-in, but it's not real market data. The production upgrade is to replace
+the hardcoded table with an actual compensation data source — query a source keyed on normalized
+job title + location (Levels.fyi has no public API; realistic options are the **BLS OEWS API** for
+occupational wage percentiles by metro area, or a paid source like **Payscale's API**) and store the
+result on `jobs.comparable_salary_low/high`. Run this as a second queue job alongside the AI
+evaluation, not inline — it's a network call with its own latency/failure mode.
 
 ### 3.5 Legal/ethical note
 
@@ -334,7 +346,7 @@ export function JobCard({ job, onStatusChange }: { job: Job; onStatusChange: (id
 | Server-side scraping queue | Direct `fetch` + optional public CORS proxy, manual paste fallback |
 | LinkedIn/Indeed anti-bot handling | Not attempted — routes to manual paste |
 | Server-held OpenAI key | User-supplied key, stored in `localStorage`, called from the browser |
-| Comparable-salary market data | Not implemented — salary target derives from listing + profile only |
+| Comparable-salary market data | Hardcoded role-family benchmark table + optional AI refinement — not a real wage data source (see §3.4) |
 | Evaluation history / score drift | Only the latest evaluation per job is kept |
 
 Everything else — extraction logic, scoring math, salary targeting, the career-analysis prompt,
