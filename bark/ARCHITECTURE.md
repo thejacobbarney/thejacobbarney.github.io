@@ -247,7 +247,7 @@ background and a job posting, evaluate fit with rigor and honesty — do not inf
 to be encouraging, and call out real gaps. Respond with ONLY a JSON object matching this
 exact schema, no prose outside it:
 {
-  "matchScore": number 0-100,
+  "matchScore": number 1-10 (integer, 10 = perfect match),
   "salaryTarget": number | null,
   "salaryRangeLow": number | null,
   "salaryRangeHigh": number | null,
