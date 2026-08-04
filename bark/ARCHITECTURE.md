@@ -17,7 +17,7 @@ contract, and the export pipeline — everything needed to lift the prototype in
 
 | Layer | Choice | Why |
 |---|---|---|
-| Frontend | **Next.js 14 (App Router) + React + Tailwind CSS** | Server components for the dashboard/analytics reads, client components for the interactive add-job flow; Tailwind maps cleanly onto the Neo-Brutalist token system (hard borders, flat shadows, no radius). |
+| Frontend | **Next.js 14 (App Router) + React + Tailwind CSS** | Server components for the dashboard/analytics reads, client components for the interactive add-job flow; Tailwind maps cleanly onto the bold, high-contrast token system (hard borders, flat shadows, no radius). |
 | Auth + DB | **Supabase (Postgres + Auth + Row-Level Security)** | One provider for auth, relational storage, and realtime subscriptions (pipeline status updates across tabs/devices) without standing up separate services. |
 | Scraping | **Playwright** on a **queue-backed worker** (see §3), fronted by **ScrapingBee or Browserless** for the JS-heavy / anti-bot sources (LinkedIn, Indeed) | Playwright handles the general case (JS-rendered career pages) cheaply; a managed scraping API absorbs residential-proxy and headless-detection costs for the two hardest sources instead of building that infrastructure in-house. |
 | AI (match scoring) | **xAI Grok API (`grok-4-fast` default)**, called **server-side only** | OpenAI-compatible request/response shape, so the same `response_format: json_object` pattern applies; keeps the key off the client and lets you cache/rate-limit per user (see §4.3). |
@@ -251,13 +251,32 @@ The prototype ships both tiers so it works with zero configuration:
 - **Tier 2 — LLM evaluation (Grok)**: richer, handles nuance (adjacent skills, seniority framing,
   culture/scope signals in the description) that keyword overlap can't.
 
+**Stretch vs. mismatch narrative.** The numeric score alone can't tell a user *why* a role landed
+below "strong match" — a role can score mid/low because it's a genuine reach toward the next
+career level (core skills line up, but it asks for more years/scope than the candidate has yet),
+or because the candidate is actually missing skills the role requires. Those call for opposite
+advice, so `generateCareerAnalysis` (and the equivalent instruction baked into
+`MATCH_SYSTEM_PROMPT` for the Grok tier) classifies which situation applies — using
+`matchResult.missing` as a share of total required skills plus the years-required-vs-years-held
+gap already computed by `computeMatch` — and writes the analysis accordingly: "healthy stretch
+toward the next level" when the shortfall is mostly seniority/scope, or a direct "real
+mismatch"/"gaps in core requirements" framing when the shortfall is mostly missing skills. This
+only changes the wording of the analysis text; `matchResult.score` and its red/yellow/green
+color coding are computed exactly as before and are never adjusted for this distinction.
+
 ### 4.2 Prompt template (production, server-side)
 
 ```
 SYSTEM:
 You are a career-matching engine inside a job application tracker. Given a candidate's
 background and a job posting, evaluate fit with rigor and honesty — do not inflate scores
-to be encouraging, and call out real gaps. Respond with ONLY a JSON object matching this
+to be encouraging, and call out real gaps. A role doesn't have to be a near-perfect match
+to be worth pursuing: when the score is below 8, look at WHERE the gap actually is. If core
+skills line up well and the shortfall is mainly seniority/years/scope, say so explicitly and
+frame it as a legitimate stretch toward the next level — not a warning sign. If the gap is
+concentrated in core skills the role requires, say so explicitly too and be direct that it's
+a real mismatch rather than a seniority reach. This distinction only affects the analysis
+text, never the numeric score. Respond with ONLY a JSON object matching this
 exact schema, no prose outside it:
 {
   "matchScore": number 1-10 (integer, 10 = perfect match),
@@ -343,24 +362,41 @@ Manually typing skills, years of experience, and a summary into the Profile tab 
 people already have that information sitting in a resume or a LinkedIn "Save to PDF" export. The
 prototype can read either directly:
 
-1. **PDF text extraction** — [PDF.js](https://mozilla.github.io/pdf.js/) loaded from CDN
-   (`unpkg.com/pdfjs-dist@3.11.174`), same "load a script tag, no build step" pattern as
-   React/Babel. `extractPdfText` walks every page and concatenates the text content; PDF.js exposes
-   a classic UMD global (`window.pdfjsLib`) at this pinned version, which matters because newer
-   `pdfjs-dist` releases dropped the non-module build from the default `build/` path — worth
-   re-checking if this version is bumped later.
-2. **Offline heuristic pass** (always runs): `extractSkillsFromText` — the same skill-dictionary
-   matcher used on scraped job postings — runs against the resume text, and
-   `estimateYearsFromResumeText` regex-matches work-history date ranges (`"2019 - Present"`,
-   `"2016 - 2019"`) to estimate total years from the earliest start year to the latest end year
-   (or the current year for "Present"/"Current"). Free, instant, no key required — the same
-   always-available floor as the rest of the app's AI-adjacent features.
-3. **Grok refinement** (if a key is set): `callGrokParseResume` sends the extracted text to
-   `grok-4-fast` with a schema asking for `skills`, `yearsExp`, `targetRoles`, and a first-person
-   `summary` — resumes are unstructured prose, so an LLM reading the whole document in context
-   does meaningfully better than keyword matching alone, especially for `targetRoles` and
-   `summary`, which the offline pass can't produce at all (LinkedIn/resumes don't spell out "the
-   user's next target job title" — that has to be inferred from career trajectory).
+1. **PDF text extraction with line reconstruction** — [PDF.js](https://mozilla.github.io/pdf.js/)
+   loaded from CDN (`unpkg.com/pdfjs-dist@3.11.174`), same "load a script tag, no build step"
+   pattern as React/Babel. PDF.js exposes a classic UMD global (`window.pdfjsLib`) at this pinned
+   version, which matters because newer `pdfjs-dist` releases dropped the non-module build from
+   the default `build/` path — worth re-checking if this version is bumped later. The important
+   detail is *how* `extractPdfText` reads the page: PDF.js's raw text items have no concept of
+   lines, so a naive `.join(" ")` collapses a LinkedIn export's one-skill-per-line sidebar into a
+   single unsplittable blob. `extractPdfText` instead compares each item's Y coordinate
+   (`item.transform[5]`) against the previous one and inserts a real line break whenever it jumps —
+   the standard technique for recovering line structure from PDF.js, and the difference between
+   "Top Skills" coming back as three distinct entries versus one unusable string.
+2. **Section-aware offline pass** (always runs): rather than blindly keyword-matching the whole
+   document against `extractSkillsFromText`'s ~100-word dictionary, `parseResumeTextOffline` first
+   looks for LinkedIn/resume section headers on their own line (`Top Skills`, `Certifications`,
+   `Summary`, `Experience`, `Education`, …) via `sliceResumeSection`, and treats their contents as
+   authoritative: self-reported skills and certifications go straight into the profile verbatim
+   (catching things no fixed dictionary would, like "Earned Value Management (EVM)" or
+   "Organization Skills"), the `Summary`/`About` section becomes the profile summary directly, and
+   `estimateYearsFromResumeText` only scans date ranges *inside* the `Experience` section — not
+   `Education` — so a degree's start year doesn't inflate years-of-experience. The dictionary match
+   still runs across the whole document and merges in on top, catching skills mentioned in bullet
+   prose that never made it into a self-reported list. Free, instant, no key required.
+
+   One real bug this replaced: the original date-range regex only matched bare `"2019 - 2023"` or
+   `"2019 - Present"`. Real resumes/LinkedIn exports almost always name the month on *both* ends
+   (`"November 2024 - September 2025"`), which that regex didn't handle at all — it silently
+   skipped every range except whichever one ended in "Present", understating years of experience
+   by years on a real multi-job history. The pattern now tolerates an optional month word before
+   the closing year/present token.
+3. **Grok refinement** (if a key is set): `callGrokParseResume` sends the line-reconstructed text
+   to `grok-4-fast` with a schema asking for `skills`, `yearsExp`, `targetRoles`, and a first-person
+   `summary`, explicitly instructed to treat sidebar-style skill/certification sections as real
+   skills and to compute years only from Experience, not Education. Still meaningfully better than
+   the offline pass for `targetRoles`, which requires inferring a logical next job title from
+   career trajectory — not something either the dictionary or section-slicing can do.
 
 Extracted results are shown in an editable review panel before anything touches the saved profile
 — same "extract → review → confirm" pattern as adding a job — with one deliberate asymmetry in
@@ -372,7 +408,7 @@ merging two skill lists does — the review step is what keeps this safe, not th
 
 ---
 
-## 6. Frontend Components (Next.js / Tailwind, Neo-Brutalist)
+## 6. Frontend Components (Next.js / Tailwind)
 
 The prototype's component split (`AddJobTab`, `DashboardTab`, `JobCard`, `ProfileTab`,
 `AnalyticsTab`, `SettingsTab`) maps directly onto Next.js — each becomes a client component under
@@ -396,7 +432,7 @@ theme: {
       'brutal-sm': '2px 2px 0 #111111',
       'brutal-lg': '7px 7px 0 #111111',
     },
-    borderRadius: { none: '0px' }, // Neo-Brutalism: no rounded corners
+    borderRadius: { none: '0px' }, // hard edges: no rounded corners
   }
 }
 ```

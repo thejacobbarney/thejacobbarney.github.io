@@ -6,7 +6,7 @@
 <title>Bark — Job Tracker &amp; AI Evaluator</title>
 <meta name="description" content="Paste a job listing, get an instant AI match score, salary target, and career-move read — then track the whole pipeline in one dashboard." />
 <meta property="og:title" content="Bark — Job Tracker & AI Evaluator" />
-<meta property="og:description" content="Scrape job listings, score your fit, and track your pipeline — Neo-Brutalist job search dashboard." />
+<meta property="og:description" content="Scrape job listings, score your fit, and track your pipeline — a bold, high-contrast job search dashboard." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -716,12 +716,35 @@ function computeSalaryTarget(profile, job, matchResult, comparable){
 function generateCareerAnalysis(profile, job, matchResult, salaryTarget){
   const strengths = matchResult.matched.slice(0,3).join(", ");
   const gaps = matchResult.missing.slice(0,3).join(", ");
-  const verdict = matchResult.score >= 8 ? "a strong alignment with your background"
-    : matchResult.score >= 4 ? "a reasonable stretch from your current experience"
-    : "a significant reach given what's listed";
+
+  // Distinguish *why* a role scores below "strong" — a seniority/scope gap on
+  // top of solid skill overlap is a legitimate reach worth pursuing, while a
+  // gap concentrated in core skills is a real mismatch. This only changes the
+  // narrative below; matchResult.score itself is never touched.
+  const totalSkills = matchResult.matched.length + matchResult.missing.length;
+  const missingRatio = totalSkills ? matchResult.missing.length / totalSkills : 0;
+  const yearsGap = matchResult.requiredYears != null ? matchResult.requiredYears - (Number(profile.yearsExp) || 0) : 0;
+  const isSeniorityStretch = matchResult.score < 8 && missingRatio <= 0.35 && yearsGap > 0;
+  const isCoreSkillGap = matchResult.score < 8 && missingRatio > 0.35;
+
+  let verdict, s2;
+  if (matchResult.score >= 8){
+    verdict = "a strong alignment with your background";
+    s2 = gaps ? "The clearest gap is " + gaps + " — minor, and worth addressing directly in a cover letter or interview." : "Your listed skills cover the stated requirements well.";
+  } else if (isSeniorityStretch){
+    verdict = "a healthy stretch toward the next level — your core skills line up well, and the gap is mostly seniority or scope rather than ability";
+    s2 = gaps
+      ? "The gap on paper (" + gaps + ") reads more like experience depth than a missing skill — worth reaching for, and worth naming directly as growth-in-progress in a cover letter or interview."
+      : "Your core skills line up well; the main gap is years of experience or scope, not ability.";
+  } else if (isCoreSkillGap){
+    verdict = matchResult.score >= 4 ? "a real stretch, with gaps in core requirements rather than just seniority" : "a significant reach, with real gaps in core requirements";
+    s2 = gaps ? "The clearest gaps are " + gaps + " — these are foundational to the role, so treat this as a genuine skills mismatch rather than a seniority reach." : "Your listed skills cover the stated requirements well.";
+  } else {
+    verdict = matchResult.score >= 4 ? "a reasonable stretch from your current experience" : "a significant reach given what's listed";
+    s2 = gaps ? "The clearest gap is " + gaps + " — worth addressing directly in a cover letter or interview." : "Your listed skills cover the stated requirements well.";
+  }
 
   const s1 = "This role looks like " + verdict + (strengths ? ", particularly given your experience with " + strengths + "." : ".");
-  const s2 = gaps ? "The clearest gap is " + gaps + " — worth addressing directly in a cover letter or interview." : "Your listed skills cover the stated requirements well.";
   let s3;
   if (salaryTarget.recommendation && salaryTarget.source === "comparable"){
     s3 = "Salary wasn't posted, so use $" + salaryTarget.low.toLocaleString() + "–$" + salaryTarget.high.toLocaleString() +
@@ -747,7 +770,14 @@ const GROK_MODEL = "grok-4-fast";
 const MATCH_SYSTEM_PROMPT = "You are a career-matching engine inside a personal job application tracker. " +
   "Given a candidate's background and a single job posting, evaluate fit with rigor and honesty — do not " +
   "inflate scores to be encouraging, and call out real gaps. Score matchScore on a 1-10 integer scale where " +
-  "10 is a perfect match and 1 is a poor match — never use a 0-100 scale. When the posting does not disclose " +
+  "10 is a perfect match and 1 is a poor match — never use a 0-100 scale. A role does not have to be a near-" +
+  "perfect match to be worth pursuing: when the score is below 8, look at WHERE the gap actually is. If the " +
+  "candidate's core skills line up well and the shortfall is mainly seniority, years of experience, or scope " +
+  "(a role reaching toward their next career level), say so explicitly in the analysis and frame it as a " +
+  "legitimate, worthwhile stretch — not a warning sign. If instead the gap is concentrated in core skills the " +
+  "role actually requires, say so explicitly too and be direct that it's a real mismatch rather than a " +
+  "seniority reach. Do not change the numeric score based on this distinction — it only affects how you " +
+  "describe the gap in the analysis text. When the posting does not disclose " +
   "a salary, estimate a realistic market compensation range for comparable roles (same title/family, similar " +
   "seniority, industry, and location) from your general knowledge — this is an estimate for the candidate to " +
   "use as an anchor in an intro or welcome call, not a live quote, so say so plainly in the analysis and give " +
@@ -1068,16 +1098,74 @@ async function extractPdfText(file){
   for (let i = 1; i <= doc.numPages; i++){
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
-    text += content.items.map(it => it.str).join(" ") + "\n";
+    // Reconstruct line breaks from each item's vertical position — PDF.js's raw
+    // item order has no concept of lines, and a naive join(" ") collapses a
+    // LinkedIn export's one-skill-per-line sidebar into a single unsplittable
+    // blob. Comparing the Y coordinate (transform[5]) between consecutive
+    // items is the standard way to tell "same line" from "new line".
+    let lastY = null;
+    content.items.forEach(item => {
+      const y = item.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 1){
+        text += "\n";
+      } else if (text && !/[\n ]$/.test(text)){
+        text += " ";
+      }
+      text += item.str;
+      lastY = y;
+    });
+    text += "\n\n";
   }
   return text;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Section-aware parsing for the offline heuristic. LinkedIn's
+   "Save to PDF" export (and most resumes) use a small fixed set
+   of section headers, each on its own line — reading those
+   directly beats blind skill-dictionary matching against the
+   whole document, and matters most for two things dictionary
+   matching can't do at all: catching self-reported skills that
+   aren't in a ~100-word dictionary ("Earned Value Management
+   (EVM)", "Organization Skills"), and not letting Education dates
+   pollute a years-of-experience estimate meant to only cover
+   Experience.
+───────────────────────────────────────────────────────────── */
+const RESUME_SECTION_HEADERS = [
+  "Summary", "About", "Experience", "Work Experience", "Education", "Top Skills", "Skills",
+  "Certifications", "Licenses & Certifications", "Languages", "Honors-Awards", "Honors & Awards",
+  "Publications", "Volunteering", "Volunteer Experience", "Projects", "Courses", "Organizations",
+  "Patents", "Contact"
+];
+
+function sliceResumeSection(text, name){
+  const lines = text.split("\n").map(l => l.trim());
+  const startIdx = lines.findIndex(l => l === name);
+  if (startIdx === -1) return "";
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++){
+    if (lines[i] !== name && RESUME_SECTION_HEADERS.includes(lines[i])){ endIdx = i; break; }
+  }
+  return lines.slice(startIdx + 1, endIdx).filter(Boolean).join("\n");
+}
+
+function findResumeSection(text, candidateNames){
+  for (const name of candidateNames){
+    const section = sliceResumeSection(text, name);
+    if (section) return section;
+  }
+  return "";
+}
+
 function estimateYearsFromResumeText(text){
+  const experienceText = findResumeSection(text, ["Experience", "Work Experience"]) || text;
   const now = new Date().getFullYear();
-  const rangeRe = /((?:19|20)\d{2})\s*(?:-|–|—|to)\s*((?:19|20)\d{2}|present|current)/gi;
+  // "September 2025 - Present", "November 2024 - September 2025", or bare "2016 - 2019" —
+  // LinkedIn/resumes almost always name the month on both ends of a range, not just the year,
+  // so the end side needs an optional month word before the year/present/current token.
+  const rangeRe = /((?:19|20)\d{2})\s*(?:-|–|—|to)\s*(?:[A-Za-z]+\.?\s+)?((?:19|20)\d{2}|present|current)/gi;
   let earliest = null, latest = null, m;
-  while ((m = rangeRe.exec(text))){
+  while ((m = rangeRe.exec(experienceText))){
     const start = parseInt(m[1], 10);
     const end = /present|current/i.test(m[2]) ? now : parseInt(m[2], 10);
     if (earliest === null || start < earliest) earliest = start;
@@ -1087,23 +1175,49 @@ function estimateYearsFromResumeText(text){
   return Math.max(0, Math.min(now - earliest, 45));
 }
 
+function splitSkillEntries(sectionText){
+  // LinkedIn lists one skill per line; plain resumes often cram a whole
+  // "Skills: A, B, C" list onto one line instead — split on both so either
+  // format ends up as clean individual entries rather than one opaque blob.
+  return sectionText.split("\n")
+    .flatMap(line => line.split(/,|;|•/))
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 function parseResumeTextOffline(text){
+  const topSkills = splitSkillEntries(findResumeSection(text, ["Top Skills", "Skills"]));
+  const certSkills = splitSkillEntries(findResumeSection(text, ["Certifications", "Licenses & Certifications"]));
+  const merged = [...topSkills, ...certSkills];
+  extractSkillsFromText(text).forEach(s => {
+    if (!merged.some(m => m.toLowerCase() === s.toLowerCase())) merged.push(s);
+  });
+
+  const rawSummary = findResumeSection(text, ["Summary", "About"]).replace(/\s*\n\s*/g, " ").trim();
+  const summary = rawSummary.length > 500 ? rawSummary.slice(0, 500).trim() + "…" : rawSummary;
+
   return {
-    skills: extractSkillsFromText(text),
+    skills: merged,
     yearsExp: estimateYearsFromResumeText(text),
     targetRoles: "",
-    summary: "",
+    summary,
     source: "offline-heuristic"
   };
 }
 
 const RESUME_SYSTEM_PROMPT = "You are extracting a structured professional profile from a resume or LinkedIn " +
-  "profile export, for use in a job-search matching tool. Read the full text and respond with ONLY a JSON " +
-  "object matching this exact schema, no prose outside it: " +
-  '{"skills": string[] (10-25 concise skill/tool/technology names, not full sentences), ' +
-  '"yearsExp": number (estimate total years of professional experience from the work history dates), ' +
+  "profile export, for use in a job-search matching tool. The text was extracted from a PDF and may include a " +
+  "sidebar section listing self-reported skills/certifications/languages (e.g. a \"Top Skills\" or " +
+  "\"Certifications\" section) separately from the prose — treat entries in those sections as real skills even " +
+  "if they don't appear elsewhere in the document. Read the full text and respond with ONLY a JSON object " +
+  "matching this exact schema, no prose outside it: " +
+  '{"skills": string[] (10-25 concise skill/tool/technology names, not full sentences — include self-reported ' +
+  'skills/certifications verbatim, not just ones inferred from job descriptions), ' +
+  '"yearsExp": number (total years of professional experience computed ONLY from Experience/work-history date ' +
+  'ranges — do not count years spent in Education), ' +
   '"targetRoles": string (a short comma-separated guess at 2-3 logical next job titles based on their career trajectory), ' +
-  '"summary": string (a 2-3 sentence first-person professional summary suitable for a job search profile)}';
+  '"summary": string (a 2-3 sentence first-person professional summary suitable for a job search profile — ' +
+  'if the document already has a Summary/About section, base it on that rather than writing a generic one)}';
 
 async function callGrokParseResume(apiKey, resumeText){
   const res = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -1404,12 +1518,12 @@ function JobCard({job, onStatusChange, onDelete, onRefresh, refreshing}){
               value={job.status} onChange={e => onStatusChange(job.id, e.target.value)}>
               {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-            <button className="nb-btn nb-btn-sm" onClick={copyRaw}>Copy Raw</button>
             <button className="nb-btn nb-btn-sm" onClick={onRefresh} disabled={refreshing} title="Re-run the match score and salary target against your current profile">
               {refreshing ? "Refreshing…" : "Refresh"}
             </button>
-            <button className="nb-btn nb-btn-sm" onClick={() => setOpen(o => !o)}>{open ? "Hide Details" : "View Details"}</button>
+            <button className="nb-btn nb-btn-sm" onClick={() => setOpen(o => !o)}>{open ? "Hide Role Evaluation" : "View Role Evaluation"}</button>
             {job.url && <a className="nb-btn nb-btn-sm" href={job.url} target="_blank" rel="noopener">Open Listing ↗</a>}
+            <button className="nb-btn nb-btn-sm" onClick={copyRaw}>Copy Job Details</button>
             <button className="nb-btn nb-btn-sm nb-btn-pink" onClick={() => onDelete(job.id)}>Delete</button>
           </div>
         </div>
@@ -1907,7 +2021,7 @@ function App(){
             <h1>Paste a listing. Get a verdict.</h1>
             <p>Match score, salary target, and a straight-talk read on whether it's worth your time — <span className="accent">then track the whole pipeline</span> in one place.</p>
           </div>
-          <div className="nb-badge" style={{background:"var(--ink)", color:"#fff", borderColor:"#fff"}}>Neo-Brutalist Lab Build</div>
+          <div className="nb-badge" style={{background:"var(--ink)", color:"#fff", borderColor:"#fff"}}>Lab Build</div>
         </div>
 
         {toast && (
