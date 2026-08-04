@@ -478,6 +478,22 @@ function parseFreeText(text){
     }
   }
 
+  // Some postings never show title/company as their own header line at all —
+  // only the copied job-description body came through, and the role only
+  // appears inline in the opening pitch ("As an FP&A Analyst at Array, you
+  // will..."). That sentence is usually well over 100 chars, so it never
+  // reaches the title-scoring pass below; catch it here first instead.
+  if (!title){
+    for (const line of header.slice(0, 8)){
+      const m = line.match(/\bas (?:an?|our new|the new|our)\s+(.{3,70}?)\s+at\s+(.{2,60}?)[,.\n]/i);
+      if (m && JOB_TITLE_WORDS.test(m[1]) && !JOB_TITLE_WORDS.test(m[2])){
+        title = m[1].trim();
+        company = m[2].trim();
+        break;
+      }
+    }
+  }
+
   const labeledCompany = header.find(l => /^(company|employer|organization)\s*[:\-]/i.test(l));
   if (labeledCompany) company = labeledCompany.replace(/^(company|employer|organization)\s*[:\-]\s*/i, "").trim();
 
