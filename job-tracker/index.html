@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Job Tracker // AI Evaluator</title>
+<meta name="description" content="Paste a job listing, get an instant AI match score, salary target, and career-move read — then track the whole pipeline in one dashboard." />
+<meta property="og:title" content="Job Tracker // AI Evaluator" />
+<meta property="og:description" content="Scrape job listings, score your fit, and track your pipeline — Neo-Brutalist job search dashboard." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{
+    --ink:#111111;
+    --cream:#FBF3E3;
+    --cream-2:#F2E9D4;
+    --paper:#FFFDF8;
+    --turq:#00D9C0;
+    --turq-dark:#00A895;
+    --purple:#6C2BD9;
+    --purple-dark:#4C1D95;
+    --yellow:#FFCE3D;
+    --pink:#FF5C8A;
+    --green:#00C853;
+    --gray:#8A8A82;
+    --shadow: 4px 4px 0 var(--ink);
+    --shadow-sm: 2px 2px 0 var(--ink);
+    --shadow-lg: 7px 7px 0 var(--ink);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{-webkit-font-smoothing:antialiased;}
+  body{
+    background:var(--cream);
+    background-image:
+      linear-gradient(var(--cream-2) 1px, transparent 1px),
+      linear-gradient(90deg, var(--cream-2) 1px, transparent 1px);
+    background-size: 28px 28px;
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+    line-height:1.5;
+  }
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  a{color:inherit;}
+  button{font-family:inherit;}
+  ::selection{background:var(--yellow);color:var(--ink);}
+
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* ── layout shells ─────────────────────────── */
+  .nb-shell{max-width:1180px;margin:0 auto;padding:0 1.5rem 4rem;}
+  .nb-topbar{
+    border-bottom:3px solid var(--ink);
+    background:var(--paper);
+    position:sticky; top:0; z-index:50;
+  }
+  .nb-topbar-inner{
+    max-width:1180px;margin:0 auto;padding:0 1.5rem;
+    display:flex;align-items:center;justify-content:space-between;
+    height:64px; gap:1rem; flex-wrap:wrap;
+  }
+  .nb-logo{
+    display:flex;align-items:center;gap:0.6rem;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.05rem;
+    letter-spacing:-0.01em;
+    text-decoration:none;
+  }
+  .nb-logo-mark{
+    width:30px;height:30px;background:var(--ink);color:var(--turq);
+    display:flex;align-items:center;justify-content:center;
+    font-size:1rem;font-weight:800;flex-shrink:0;
+  }
+  .nb-back{
+    font-size:0.72rem;font-weight:700;letter-spacing:0.04em;
+    color:var(--gray); text-decoration:none;
+  }
+  .nb-back:hover{color:var(--ink);}
+
+  /* ── buttons ────────────────────────────────── */
+  .nb-btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:0.5rem;
+    border:3px solid var(--ink);
+    background:var(--paper);
+    color:var(--ink);
+    font-weight:700;
+    font-size:0.82rem;
+    letter-spacing:0.01em;
+    padding:0.6rem 1.1rem;
+    box-shadow:var(--shadow-sm);
+    cursor:pointer;
+    transition:transform 0.1s, box-shadow 0.1s;
+    white-space:nowrap;
+  }
+  .nb-btn:hover{transform:translate(-2px,-2px);box-shadow:var(--shadow);}
+  .nb-btn:active{transform:translate(0,0);box-shadow:0 0 0 var(--ink);}
+  .nb-btn:disabled{opacity:0.45;cursor:not-allowed;transform:none;box-shadow:var(--shadow-sm);}
+  .nb-btn-primary{background:var(--turq);}
+  .nb-btn-purple{background:var(--purple);color:#fff;}
+  .nb-btn-yellow{background:var(--yellow);}
+  .nb-btn-pink{background:var(--pink);color:#fff;}
+  .nb-btn-sm{padding:0.4rem 0.7rem;font-size:0.72rem;box-shadow:2px 2px 0 var(--ink);}
+  .nb-btn-sm:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink);}
+  .nb-btn-block{width:100%;}
+
+  /* ── tabs ───────────────────────────────────── */
+  .nb-tabs{display:flex;gap:0.5rem;flex-wrap:wrap;padding:1.5rem 0 0;}
+  .nb-tab{
+    border:3px solid var(--ink);
+    background:var(--paper);
+    padding:0.55rem 1rem;
+    font-weight:700;font-size:0.78rem;letter-spacing:0.02em;
+    cursor:pointer;
+    box-shadow:var(--shadow-sm);
+  }
+  .nb-tab.active{background:var(--ink);color:var(--cream);}
+  .nb-tab .count{
+    display:inline-block;margin-left:0.4rem;
+    background:var(--yellow);color:var(--ink);
+    border:2px solid var(--ink);
+    padding:0 0.35rem;font-size:0.68rem;
+  }
+  .nb-tab.active .count{background:var(--turq);}
+
+  /* ── generic panel/card ─────────────────────── */
+  .nb-panel{
+    border:3px solid var(--ink);
+    background:var(--paper);
+    box-shadow:var(--shadow-lg);
+    padding:1.75rem;
+    margin-top:1.75rem;
+  }
+  .nb-panel-head{
+    display:flex;align-items:baseline;justify-content:space-between;
+    gap:1rem;flex-wrap:wrap;
+    margin-bottom:1.25rem;
+    padding-bottom:1rem;
+    border-bottom:3px solid var(--ink);
+  }
+  .nb-eyebrow{
+    font-size:0.68rem;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;
+    color:var(--purple-dark);
+  }
+  .nb-title{font-size:1.5rem;font-weight:700;letter-spacing:-0.01em;}
+  .nb-sub{font-size:0.85rem;color:#4a4a44;max-width:640px;}
+
+  /* ── form elements ──────────────────────────── */
+  .nb-field{display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1.1rem;}
+  .nb-label{font-size:0.72rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;}
+  .nb-hint{font-size:0.74rem;color:var(--gray);}
+  .nb-input, .nb-textarea, .nb-select{
+    border:3px solid var(--ink);
+    background:var(--paper);
+    padding:0.65rem 0.8rem;
+    font-family:inherit;font-size:0.9rem;color:var(--ink);
+    width:100%;
+  }
+  .nb-input:focus, .nb-textarea:focus, .nb-select:focus{
+    outline:none; box-shadow:var(--shadow-sm);
+  }
+  .nb-textarea{resize:vertical;min-height:100px;line-height:1.6;}
+  .nb-row{display:flex;gap:1rem;flex-wrap:wrap;}
+  .nb-row > .nb-field{flex:1;min-width:180px;}
+  .nb-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;}
+  .nb-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;}
+
+  /* ── badges / pills ─────────────────────────── */
+  .nb-badge{
+    display:inline-flex;align-items:center;gap:0.3rem;
+    border:2.5px solid var(--ink);
+    padding:0.18rem 0.55rem;
+    font-size:0.68rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;
+    background:var(--paper);
+  }
+  .nb-skill-pill{
+    display:inline-flex;
+    border:2px solid var(--ink);
+    background:var(--cream-2);
+    padding:0.15rem 0.5rem;
+    font-size:0.72rem;font-weight:600;
+  }
+  .nb-skill-pill.missing{background:#FFE1E8;}
+  .nb-skill-pill.matched{background:#D6FBF3;}
+
+  /* ── score dial ─────────────────────────────── */
+  .nb-score{
+    width:74px;height:74px;flex-shrink:0;
+    border:3px solid var(--ink);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:'Space Grotesk',sans-serif;
+    box-shadow:var(--shadow-sm);
+  }
+  .nb-score .num{font-size:1.4rem;font-weight:700;line-height:1;}
+  .nb-score .lbl{font-size:0.55rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;}
+  .score-high{background:var(--turq);}
+  .score-mid{background:var(--yellow);}
+  .score-low{background:#FFB9B9;}
+
+  /* ── job cards ──────────────────────────────── */
+  .job-list{display:flex;flex-direction:column;gap:1.1rem;}
+  .job-card{
+    border:3px solid var(--ink);
+    background:var(--paper);
+    box-shadow:var(--shadow);
+    padding:1.4rem 1.5rem;
+  }
+  .job-card-top{display:flex;gap:1.1rem;align-items:flex-start;}
+  .job-card-main{flex:1;min-width:0;}
+  .job-title{font-size:1.1rem;font-weight:700;margin-bottom:0.2rem;}
+  .job-company{
+    font-size:0.85rem;font-weight:700;color:var(--purple-dark);
+    margin-bottom:0.5rem;
+  }
+  .job-meta{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;}
+  .job-actions{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:1rem;align-items:center;}
+  .job-desc-toggle{
+    margin-top:0.9rem;padding-top:0.9rem;border-top:2px dashed var(--ink);
+    font-size:0.85rem;color:#3a3a35;line-height:1.75;white-space:pre-wrap;
+    max-height:220px;overflow-y:auto;
+  }
+  .job-analysis{
+    margin-top:0.9rem;padding:0.9rem 1rem;
+    background:var(--cream-2);
+    border:2.5px solid var(--ink);
+    font-size:0.85rem;line-height:1.7;
+  }
+  .job-analysis-label{font-size:0.65rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--purple-dark);margin-bottom:0.35rem;}
+
+  .status-select{border-width:2.5px; font-weight:700; font-size:0.75rem; padding:0.4rem 0.5rem; width:auto;}
+  .status-In\ Progress{background:#FFF3C4;}
+  .status-Applied{background:#D6FBF3;}
+  .status-Interviewing{background:#E7DBFF;}
+  .status-Offer{background:#D2FFD6;}
+  .status-Dead\ End{background:#FFD9D9;}
+
+  /* ── empty state ─────────────────────────────── */
+  .nb-empty{
+    text-align:center;padding:3.5rem 1.5rem;
+    border:3px dashed var(--ink);
+  }
+  .nb-empty-emoji{font-size:2.4rem;margin-bottom:0.75rem;}
+
+  /* ── analytics ──────────────────────────────── */
+  .stat-tile{
+    border:3px solid var(--ink);background:var(--paper);
+    padding:1.1rem 1.2rem;box-shadow:var(--shadow-sm);
+  }
+  .stat-tile .n{font-family:'Space Grotesk',sans-serif;font-size:1.9rem;font-weight:700;line-height:1;}
+  .stat-tile .l{font-size:0.7rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--gray);margin-top:0.35rem;}
+  .bar-row{display:flex;align-items:center;gap:0.7rem;margin-bottom:0.6rem;}
+  .bar-label{width:150px;flex-shrink:0;font-size:0.78rem;font-weight:700;}
+  .bar-track{flex:1;height:20px;border:2.5px solid var(--ink);background:var(--cream-2);position:relative;}
+  .bar-fill{height:100%;background:var(--turq);border-right:2.5px solid var(--ink);}
+  .bar-count{width:34px;text-align:right;font-size:0.78rem;font-weight:700;flex-shrink:0;}
+
+  /* ── banners / callouts ─────────────────────── */
+  .nb-callout{
+    border:2.5px solid var(--ink);
+    padding:0.85rem 1rem;
+    font-size:0.8rem;line-height:1.6;
+    display:flex;gap:0.6rem;align-items:flex-start;
+    margin-bottom:1.1rem;
+  }
+  .nb-callout-info{background:#E7F3FF;}
+  .nb-callout-warn{background:#FFF3C4;}
+  .nb-callout-ok{background:#D2FFD6;}
+  .nb-callout code{background:rgba(0,0,0,0.08);padding:0.05rem 0.3rem;font-size:0.78rem;}
+
+  /* hero */
+  .hero-strip{
+    border:3px solid var(--ink);
+    background:var(--purple);
+    color:#fff;
+    padding:2rem 1.75rem;
+    margin-top:1.75rem;
+    display:flex;justify-content:space-between;align-items:center;gap:1.5rem;flex-wrap:wrap;
+    box-shadow:var(--shadow-lg);
+  }
+  .hero-strip h1{font-size:1.7rem;font-weight:700;margin-bottom:0.4rem;}
+  .hero-strip p{font-size:0.88rem;opacity:0.85;max-width:480px;}
+  .hero-strip .accent{color:var(--yellow);}
+
+  select.nb-select{appearance:none;background-image:linear-gradient(45deg,transparent 50%, var(--ink) 50%),linear-gradient(135deg, var(--ink) 50%,transparent 50%);background-position:calc(100% - 18px) calc(1.1em),calc(100% - 13px) calc(1.1em);background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:2rem;}
+
+  @media (max-width:720px){
+    .nb-grid-2,.nb-grid-3{grid-template-columns:1fr;}
+    .job-card-top{flex-direction:column;}
+    .hero-strip{flex-direction:column;align-items:flex-start;}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/plain" id="app-source">
+const { useState, useEffect, useMemo, useRef } = React;
+
+/* ─────────────────────────────────────────────────────────────
+   SKILL DICTIONARY — used both to extract skills from postings
+   and to score overlap against the user's profile.
+───────────────────────────────────────────────────────────── */
+const SKILL_DICTIONARY = [
+  "JavaScript","TypeScript","Python","Java","C++","C#","Go","Rust","Ruby","PHP","Swift","Kotlin",
+  "SQL","NoSQL","React","Angular","Vue","Node.js","Next.js","Django","Flask","Spring",".NET",
+  "AWS","Azure","GCP","Docker","Kubernetes","Terraform","CI/CD","Git","Linux","REST API","GraphQL",
+  "Microservices","Machine Learning","Deep Learning","NLP","Data Analysis","Data Engineering","ETL",
+  "Pandas","NumPy","TensorFlow","PyTorch","Excel","VBA","Tableau","Power BI","Salesforce","HubSpot",
+  "SEO","SEM","Google Analytics","Content Marketing","Email Marketing","Social Media Marketing",
+  "Copywriting","Project Management","Agile","Scrum","Product Management","Product Strategy",
+  "UX Design","UI Design","Figma","Adobe Creative Suite","Financial Modeling","FP&A","Accounting",
+  "Bookkeeping","GAAP","Forecasting","Budgeting","Variance Analysis","Risk Management","Compliance",
+  "EVMS","Supply Chain","Logistics","Procurement","Inventory Management","Customer Success",
+  "Account Management","Sales","B2B Sales","B2C Sales","Negotiation","Leadership",
+  "Cross-functional Collaboration","Stakeholder Management","Communication","Public Speaking",
+  "Spanish","French","Mandarin","HR","Recruiting","Talent Acquisition","Onboarding",
+  "Employee Relations","Legal","Contract Management","Healthcare","Clinical Research","Nursing",
+  "Teaching","Curriculum Development","Research","Statistics","R","MATLAB","Cybersecurity",
+  "Network Administration","DevOps","QA Testing","Mobile Development","iOS","Android","Blockchain"
+];
+
+const STATUS_OPTIONS = ["In Progress","Applied","Interviewing","Dead End","Offer"];
+
+/* ─────────────────────────────────────────────────────────────
+   PERSISTENCE
+───────────────────────────────────────────────────────────── */
+const LS_KEYS = { jobs:"jt_jobs_v1", profile:"jt_profile_v1", settings:"jt_settings_v1" };
+
+function loadLS(key, fallback){
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch(e){ return fallback; }
+}
+function saveLS(key, value){
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){}
+}
+
+const DEFAULT_PROFILE = {
+  name:"", yearsExp:3, targetRoles:"", skills:[], summary:"",
+  currentSalary:"", targetSalary:""
+};
+const DEFAULT_SETTINGS = { openaiKey:"", googleClientId:"" };
+
+/* ─────────────────────────────────────────────────────────────
+   EXTRACTION — JSON-LD (schema.org JobPosting), meta-tag
+   fallback, and free-text heuristics for the manual-paste path.
+───────────────────────────────────────────────────────────── */
+function stripHtml(html){
+  const d = document.createElement("div");
+  d.innerHTML = html || "";
+  return (d.textContent || d.innerText || "").replace(/\n{3,}/g,"\n\n").trim();
+}
+
+function extractSkillsFromText(text){
+  const lower = " " + (text || "").toLowerCase() + " ";
+  return SKILL_DICTIONARY.filter(skill => {
+    const esc = skill.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp("(?:^|[^a-z0-9+#.])" + esc + "(?:$|[^a-z0-9+#.])", "i");
+    return re.test(lower);
+  });
+}
+
+function mapJsonLdJobPosting(jp){
+  const title = jp.title || "";
+  const company = (jp.hiringOrganization && jp.hiringOrganization.name) || "";
+  const description = stripHtml(jp.description || "");
+  let location = "";
+  const loc = jp.jobLocation;
+  if (loc){
+    const single = Array.isArray(loc) ? loc[0] : loc;
+    const addr = single && single.address;
+    if (addr) location = [addr.addressLocality, addr.addressRegion, addr.addressCountry].filter(Boolean).join(", ");
+  }
+  let workForm = "Onsite";
+  if (jp.jobLocationType === "TELECOMMUTE") workForm = "Remote";
+  else if (/hybrid/i.test(description)) workForm = "Hybrid";
+
+  let salaryMin = null, salaryMax = null, salaryCurrency = "";
+  const base = jp.baseSalary && jp.baseSalary.value;
+  if (base){
+    salaryCurrency = jp.baseSalary.currency || "";
+    salaryMin = base.minValue != null ? base.minValue : (base.value != null ? base.value : null);
+    salaryMax = base.maxValue != null ? base.maxValue : (base.value != null ? base.value : null);
+  }
+  return {
+    title, company, description, location, workForm,
+    salaryMin, salaryMax, salaryCurrency,
+    skills: extractSkillsFromText(description + " " + title),
+    source: "json-ld"
+  };
+}
+
+function extractFromHTML(html){
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const ldScripts = Array.from(doc.querySelectorAll('script[type="application/ld+json"]'));
+  for (const script of ldScripts){
+    try {
+      const data = JSON.parse(script.textContent);
+      const candidates = Array.isArray(data) ? data : (data["@graph"] || [data]);
+      const jp = candidates.find(d => d && (d["@type"] === "JobPosting" ||
+        (Array.isArray(d["@type"]) && d["@type"].includes("JobPosting"))));
+      if (jp) return mapJsonLdJobPosting(jp);
+    } catch(e){ /* not valid JSON-LD, keep looking */ }
+  }
+  const metaTitle = doc.querySelector('meta[property="og:title"]');
+  const metaDesc = doc.querySelector('meta[name="description"]') || doc.querySelector('meta[property="og:description"]');
+  const metaSite = doc.querySelector('meta[property="og:site_name"]');
+  const title = (metaTitle && metaTitle.content) || (doc.querySelector("title") && doc.querySelector("title").textContent) || "";
+  const description = (metaDesc && metaDesc.content) || (doc.body ? doc.body.innerText.slice(0,4000) : "");
+  const company = (metaSite && metaSite.content) || "";
+  return {
+    title: title.trim(), company: company.trim(), description: description.trim(),
+    location:"", workForm:"", salaryMin:null, salaryMax:null, salaryCurrency:"",
+    skills: extractSkillsFromText(description + " " + title),
+    source: "meta-fallback"
+  };
+}
+
+function parseSalaryToken(numStr, hasK){
+  let n = parseFloat(String(numStr).replace(/,/g, ""));
+  if (isNaN(n)) return null;
+  if (hasK || n < 1000) n *= 1000;
+  return Math.round(n);
+}
+
+function parseFreeText(text){
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+  const title = (lines[0] || "").slice(0, 120);
+
+  let company = "";
+  const labeled = lines.slice(0, 8).find(l => /^(company|employer)\s*[:\-]/i.test(l));
+  if (labeled) company = labeled.replace(/^(company|employer)\s*[:\-]\s*/i, "");
+  else if (lines[1] && lines[1].length < 60 && !/[.:]$/.test(lines[1])) company = lines[1];
+
+  let salaryMin = null, salaryMax = null;
+  const rangeMatch = text.match(/\$\s?([\d,]{2,7})(k)?\s*(?:-|to|–|—)\s*\$?\s?([\d,]{2,7})(k)?/i);
+  if (rangeMatch){
+    salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
+    salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
+  } else {
+    const singleMatch = text.match(/\$\s?([\d,]{2,7})(k)?/i);
+    if (singleMatch){
+      const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
+      salaryMin = v; salaryMax = v;
+    }
+  }
+
+  let workForm = "Onsite";
+  if (/\bremote\b/i.test(text)) workForm = "Remote";
+  if (/\bhybrid\b/i.test(text)) workForm = "Hybrid";
+
+  const locMatch = text.match(/([A-Z][a-zA-Z.]+(?:\s[A-Z][a-zA-Z.]+)?),\s?([A-Z]{2})\b/);
+  const location = locMatch ? (locMatch[1] + ", " + locMatch[2]) : (workForm === "Remote" ? "Remote" : "");
+
+  return {
+    title, company, description: text, location, workForm,
+    salaryMin, salaryMax, salaryCurrency: salaryMin ? "USD" : "",
+    skills: extractSkillsFromText(text),
+    source: "manual-paste"
+  };
+}
+
+async function fetchViaProxy(url){
+  const target = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+  const res = await fetch(target);
+  if (!res.ok) throw new Error("Proxy fetch failed (" + res.status + ")");
+  return await res.text();
+}
+async function fetchDirect(url){
+  const res = await fetch(url, { mode:"cors" });
+  if (!res.ok) throw new Error("Fetch failed (" + res.status + ")");
+  return await res.text();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MATCH ENGINE — offline heuristic scorer (always available)
+───────────────────────────────────────────────────────────── */
+function computeMatch(profile, job){
+  const profileSkills = (profile.skills || []).map(s => s.toLowerCase().trim()).filter(Boolean);
+  const jobSkills = (job.skills || []).map(s => s.toLowerCase().trim());
+  const matched = jobSkills.filter(s => profileSkills.some(p => p === s || p.includes(s) || s.includes(p)));
+  const missing = jobSkills.filter(s => !matched.includes(s));
+  const skillScore = jobSkills.length ? matched.length / jobSkills.length : 0.55;
+
+  const reqText = ((job.description || "") + " " + (job.title || "")).toLowerCase();
+  const yearsMatch = reqText.match(/(\d{1,2})\+?\s*(?:-\s*\d{1,2}\s*)?years?/);
+  const requiredYears = yearsMatch ? parseInt(yearsMatch[1], 10) : null;
+
+  let seniorityScore = 0.8;
+  if (requiredYears != null){
+    const diff = (Number(profile.yearsExp) || 0) - requiredYears;
+    seniorityScore = diff >= 0 ? 1 : Math.max(0.15, 1 + diff / Math.max(requiredYears, 1));
+  }
+
+  const score = Math.round(Math.min(100, Math.max(4, skillScore * 68 + seniorityScore * 32)));
+  return {
+    score,
+    matched: [...new Set(matched)],
+    missing: [...new Set(missing)],
+    requiredYears
+  };
+}
+
+function computeSalaryTarget(profile, job, matchResult){
+  const profileTarget = Number(profile.targetSalary) || (Number(profile.currentSalary) ? Number(profile.currentSalary) * 1.15 : null);
+  let base = null;
+  if (job.salaryMin && job.salaryMax) base = (Number(job.salaryMin) + Number(job.salaryMax)) / 2;
+  else if (job.salaryMax) base = Number(job.salaryMax);
+  else if (job.salaryMin) base = Number(job.salaryMin);
+  else base = profileTarget;
+
+  if (!base){
+    return { recommendation:null, low:null, high:null, note:"No salary was listed and no target salary is set on your profile — add one for a recommendation." };
+  }
+  const matchMultiplier = 0.9 + (matchResult.score / 100) * 0.2;
+  let target = Math.round((base * matchMultiplier) / 500) * 500;
+  if (profileTarget && target < profileTarget * 0.9) target = Math.round((profileTarget * 0.95) / 500) * 500;
+  return {
+    recommendation: target,
+    low: Math.round((target * 0.93) / 500) * 500,
+    high: Math.round((target * 1.08) / 500) * 500,
+    note: job.salaryMin || job.salaryMax ? "Based on the posted range, adjusted for your fit score." : "Posting had no salary listed — estimated from your profile target."
+  };
+}
+
+function generateCareerAnalysis(profile, job, matchResult, salaryTarget){
+  const strengths = matchResult.matched.slice(0,3).join(", ");
+  const gaps = matchResult.missing.slice(0,3).join(", ");
+  const verdict = matchResult.score >= 75 ? "a strong alignment with your background"
+    : matchResult.score >= 50 ? "a reasonable stretch from your current experience"
+    : "a significant reach given what's listed";
+
+  const s1 = "This role looks like " + verdict + (strengths ? ", particularly given your experience with " + strengths + "." : ".");
+  const s2 = gaps ? "The clearest gap is " + gaps + " — worth addressing directly in a cover letter or interview." : "Your listed skills cover the stated requirements well.";
+  const s3 = salaryTarget.recommendation
+    ? "Target roughly $" + salaryTarget.recommendation.toLocaleString() + " in negotiations — " + salaryTarget.note.toLowerCase()
+    : salaryTarget.note;
+  return s1 + " " + s2 + " " + s3;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   AI-ENHANCED EVALUATION — optional, only runs if the user has
+   supplied their own OpenAI key in Settings. Falls back to the
+   offline heuristic above on any error.
+───────────────────────────────────────────────────────────── */
+const AI_SYSTEM_PROMPT = "You are a career-matching engine inside a personal job application tracker. " +
+  "Given a candidate's background and a single job posting, evaluate fit with rigor and honesty — do not " +
+  "inflate scores to be encouraging, and call out real gaps. Respond with ONLY a JSON object matching this " +
+  "exact schema, no prose outside it: " +
+  '{"matchScore": number 0-100, "salaryTarget": number|null, "salaryRangeLow": number|null, ' +
+  '"salaryRangeHigh": number|null, "analysis": string (2-3 sentences), "matchedSkills": string[], "missingSkills": string[]}';
+
+function buildAiPrompt(profile, job){
+  return [
+    "CANDIDATE BACKGROUND",
+    "Years of experience: " + (profile.yearsExp || "n/a"),
+    "Skills: " + ((profile.skills || []).join(", ") || "n/a"),
+    "Target roles: " + (profile.targetRoles || "n/a"),
+    "Current salary: " + (profile.currentSalary || "not specified"),
+    "Target salary: " + (profile.targetSalary || "not specified"),
+    "Summary: " + (profile.summary || "n/a"),
+    "",
+    "JOB POSTING",
+    "Title: " + job.title,
+    "Company: " + job.company,
+    "Location: " + (job.location || "n/a"),
+    "Work form: " + (job.workForm || "n/a"),
+    "Stated salary: " + ((job.salaryMin || job.salaryMax) ? (job.salaryMin || "?") + " - " + (job.salaryMax || "?") + " " + (job.salaryCurrency || "") : "not disclosed"),
+    "Description:",
+    (job.description || "").slice(0, 6000),
+    "",
+    "Evaluate the match and return the JSON object only."
+  ].join("\n");
+}
+
+async function callOpenAIEvaluate(apiKey, profile, job){
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type":"application/json", "Authorization":"Bearer " + apiKey },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      temperature: 0.4,
+      messages: [
+        { role:"system", content: AI_SYSTEM_PROMPT },
+        { role:"user", content: buildAiPrompt(profile, job) }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error("OpenAI request failed (" + res.status + ")");
+  const data = await res.json();
+  return JSON.parse(data.choices[0].message.content);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   EXPORT — CSV (fully client-side) and Google Sheets (OAuth
+   token flow via Google Identity Services, no backend needed)
+───────────────────────────────────────────────────────────── */
+function csvEscape(v){
+  const s = String(v == null ? "" : v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function triggerDownload(filename, content, mime){
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+function exportCSV(jobs){
+  const headers = ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Salary Target","URL","Date Added"];
+  const rows = jobs.map(j => [
+    j.title, j.company, j.location, j.workForm, j.status, j.matchScore,
+    j.salaryMin || "", j.salaryMax || "", j.salaryTarget || "", j.url || "", j.dateAdded
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(csvEscape).join(",")).join("\n");
+  triggerDownload("job-tracker-export.csv", csv, "text/csv");
+}
+
+function ensureGoogleIdentity(){
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.accounts) return resolve();
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load Google Identity Services"));
+    document.head.appendChild(s);
+  });
+}
+async function exportToGoogleSheets(jobs, clientId){
+  await ensureGoogleIdentity();
+  return new Promise((resolve, reject) => {
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: "https://www.googleapis.com/auth/spreadsheets",
+      callback: async (resp) => {
+        if (resp.error) return reject(new Error(resp.error));
+        try {
+          const token = resp.access_token;
+          const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+            method:"POST",
+            headers:{ Authorization:"Bearer " + token, "Content-Type":"application/json" },
+            body: JSON.stringify({ properties:{ title:"Job Tracker Export " + new Date().toLocaleDateString() } })
+          });
+          const sheet = await createRes.json();
+          if (!sheet.spreadsheetId) throw new Error("Sheets API did not return a spreadsheet id");
+          const values = [
+            ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Salary Target","URL","Date Added"],
+            ...jobs.map(j => [j.title, j.company, j.location, j.workForm, j.status, j.matchScore, j.salaryMin || "", j.salaryMax || "", j.salaryTarget || "", j.url || "", j.dateAdded])
+          ];
+          await fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheet.spreadsheetId + "/values/Sheet1!A1:append?valueInputOption=USER_ENTERED", {
+            method:"POST",
+            headers:{ Authorization:"Bearer " + token, "Content-Type":"application/json" },
+            body: JSON.stringify({ values })
+          });
+          window.open(sheet.spreadsheetUrl, "_blank");
+          resolve(sheet.spreadsheetUrl);
+        } catch(e){ reject(e); }
+      }
+    });
+    tokenClient.requestAccessToken();
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SMALL UI HELPERS
+───────────────────────────────────────────────────────────── */
+function scoreClass(score){
+  if (score >= 70) return "score-high";
+  if (score >= 45) return "score-mid";
+  return "score-low";
+}
+function fmtMoney(n){
+  if (n == null || n === "") return null;
+  return "$" + Number(n).toLocaleString();
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+function ScoreDial({score}){
+  return (
+    <div className={"nb-score " + scoreClass(score)}>
+      <div className="num">{score}</div>
+      <div className="lbl">match</div>
+    </div>
+  );
+}
+
+function Callout({type = "info", children}){
+  return <div className={"nb-callout nb-callout-" + type}>{children}</div>;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ADD JOB TAB
+───────────────────────────────────────────────────────────── */
+function AddJobTab({profile, settings, onSave}){
+  const [url, setUrl] = useState("");
+  const [pasteText, setPasteText] = useState("");
+  const [mode, setMode] = useState("url"); // 'url' | 'paste'
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState("");
+  const [draft, setDraft] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [aiNote, setAiNote] = useState("");
+
+  async function handleFetch(useProxy){
+    if (!url.trim()) return;
+    setFetching(true); setFetchError("");
+    try {
+      const html = useProxy ? await fetchViaProxy(url.trim()) : await fetchDirect(url.trim());
+      const extracted = extractFromHTML(html);
+      setDraft({ ...extracted, url: url.trim(), skillsText: extracted.skills.join(", ") });
+    } catch(e){
+      setFetchError((useProxy ? "Proxy fetch" : "Direct fetch") + " failed — most job boards (LinkedIn, Indeed) block cross-origin requests entirely. " +
+        (useProxy ? "Try pasting the job description text instead." : "Try the demo proxy below, or switch to paste mode."));
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  function handleParsePaste(){
+    if (!pasteText.trim()) return;
+    const extracted = parseFreeText(pasteText);
+    setDraft({ ...extracted, url: url.trim(), skillsText: extracted.skills.join(", ") });
+  }
+
+  function updateDraft(field, value){
+    setDraft(d => ({ ...d, [field]: value }));
+  }
+
+  async function handleSave(){
+    if (!draft || !draft.title){ return; }
+    setSaving(true); setAiNote("");
+    const finalJob = {
+      ...draft,
+      skills: draft.skillsText.split(",").map(s => s.trim()).filter(Boolean),
+      id: uid(),
+      status: "In Progress",
+      dateAdded: new Date().toISOString().slice(0,10)
+    };
+
+    let matchResult = computeMatch(profile, finalJob);
+    let salaryTarget = computeSalaryTarget(profile, finalJob, matchResult);
+    let analysis = generateCareerAnalysis(profile, finalJob, matchResult, salaryTarget);
+    let engineUsed = "Offline heuristic engine";
+
+    if (settings.openaiKey){
+      try {
+        const ai = await callOpenAIEvaluate(settings.openaiKey, profile, finalJob);
+        matchResult = {
+          score: ai.matchScore,
+          matched: ai.matchedSkills || [],
+          missing: ai.missingSkills || [],
+          requiredYears: matchResult.requiredYears
+        };
+        salaryTarget = {
+          recommendation: ai.salaryTarget,
+          low: ai.salaryRangeLow,
+          high: ai.salaryRangeHigh,
+          note: "Generated by OpenAI (gpt-4o-mini)."
+        };
+        analysis = ai.analysis;
+        engineUsed = "OpenAI (gpt-4o-mini)";
+      } catch(e){
+        setAiNote("AI evaluation failed (" + e.message + ") — used the offline heuristic engine instead.");
+      }
+    }
+
+    onSave({
+      ...finalJob,
+      matchScore: matchResult.score,
+      matchedSkills: matchResult.matched,
+      missingSkills: matchResult.missing,
+      salaryTarget: salaryTarget.recommendation,
+      salaryTargetLow: salaryTarget.low,
+      salaryTargetHigh: salaryTarget.high,
+      careerAnalysis: analysis,
+      evalEngine: engineUsed
+    });
+
+    setDraft(null); setUrl(""); setPasteText(""); setSaving(false);
+  }
+
+  return (
+    <div>
+      <div className="nb-panel">
+        <div className="nb-panel-head">
+          <div>
+            <div className="nb-eyebrow">Step 1</div>
+            <div className="nb-title">Pull in a listing</div>
+          </div>
+          <div style={{display:"flex", gap:"0.5rem"}}>
+            <button className={"nb-tab nb-btn-sm " + (mode === "url" ? "active" : "")} onClick={() => setMode("url")}>By URL</button>
+            <button className={"nb-tab nb-btn-sm " + (mode === "paste" ? "active" : "")} onClick={() => setMode("paste")}>Paste Text</button>
+          </div>
+        </div>
+
+        {mode === "url" ? (
+          <div>
+            <Callout type="info">
+              <span>Company career pages (Greenhouse, Lever, Workday, most in-house sites) embed structured
+              <code>JobPosting</code> data we can read directly. <strong>LinkedIn and Indeed block cross-origin
+              requests</strong> — for those, switch to "Paste Text" below and drop in the description.</span>
+            </Callout>
+            <div className="nb-row" style={{alignItems:"flex-end"}}>
+              <div className="nb-field" style={{flex:3}}>
+                <label className="nb-label">Job listing URL</label>
+                <input className="nb-input" placeholder="https://boards.greenhouse.io/company/jobs/1234"
+                  value={url} onChange={e => setUrl(e.target.value)} />
+              </div>
+              <button className="nb-btn nb-btn-primary" disabled={fetching || !url.trim()} onClick={() => handleFetch(false)}>
+                {fetching ? "Fetching…" : "Fetch Listing"}
+              </button>
+            </div>
+            {fetchError && (
+              <div style={{marginTop:"0.75rem"}}>
+                <Callout type="warn">
+                  <span>{fetchError}</span>
+                </Callout>
+                <button className="nb-btn nb-btn-sm" onClick={() => handleFetch(true)} disabled={fetching}>
+                  {fetching ? "Trying proxy…" : "Try demo CORS proxy instead ↗"}
+                </button>
+                <div className="nb-hint" style={{marginTop:"0.4rem"}}>Routes the request through a public third-party proxy (allorigins.win) — only use this for public, non-sensitive listing URLs.</div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            <Callout type="info">
+              <span>Copy the full job description off the page (title, company, requirements, salary if listed) and paste it below. This always works, regardless of the source site's anti-bot protection.</span>
+            </Callout>
+            <div className="nb-field">
+              <label className="nb-label">Raw job posting text</label>
+              <textarea className="nb-textarea" rows="8" placeholder="Senior Product Manager&#10;Acme Corp&#10;Remote — $130,000 - $160,000&#10;&#10;About the role..."
+                value={pasteText} onChange={e => setPasteText(e.target.value)} />
+            </div>
+            <div className="nb-field">
+              <label className="nb-label">Source URL (optional)</label>
+              <input className="nb-input" placeholder="https://www.linkedin.com/jobs/view/…" value={url} onChange={e => setUrl(e.target.value)} />
+            </div>
+            <button className="nb-btn nb-btn-primary" disabled={!pasteText.trim()} onClick={handleParsePaste}>Parse Text</button>
+          </div>
+        )}
+      </div>
+
+      {draft && (
+        <div className="nb-panel">
+          <div className="nb-panel-head">
+            <div>
+              <div className="nb-eyebrow">Step 2 · Source: {draft.source}</div>
+              <div className="nb-title">Review &amp; edit</div>
+            </div>
+            <span className="nb-badge">Edit anything before saving</span>
+          </div>
+
+          <div className="nb-row">
+            <div className="nb-field">
+              <label className="nb-label">Job title</label>
+              <input className="nb-input" value={draft.title} onChange={e => updateDraft("title", e.target.value)} />
+            </div>
+            <div className="nb-field">
+              <label className="nb-label">Company</label>
+              <input className="nb-input" value={draft.company} onChange={e => updateDraft("company", e.target.value)} />
+            </div>
+          </div>
+          <div className="nb-row">
+            <div className="nb-field">
+              <label className="nb-label">Location</label>
+              <input className="nb-input" value={draft.location} onChange={e => updateDraft("location", e.target.value)} />
+            </div>
+            <div className="nb-field">
+              <label className="nb-label">Work form</label>
+              <select className="nb-select" value={draft.workForm} onChange={e => updateDraft("workForm", e.target.value)}>
+                <option value="">Unspecified</option>
+                <option>Remote</option>
+                <option>Hybrid</option>
+                <option>Onsite</option>
+              </select>
+            </div>
+          </div>
+          <div className="nb-row">
+            <div className="nb-field">
+              <label className="nb-label">Salary min</label>
+              <input className="nb-input" type="number" value={draft.salaryMin || ""} onChange={e => updateDraft("salaryMin", e.target.value ? Number(e.target.value) : null)} />
+            </div>
+            <div className="nb-field">
+              <label className="nb-label">Salary max</label>
+              <input className="nb-input" type="number" value={draft.salaryMax || ""} onChange={e => updateDraft("salaryMax", e.target.value ? Number(e.target.value) : null)} />
+            </div>
+          </div>
+          <div className="nb-field">
+            <label className="nb-label">Detected skills (comma separated — edit freely)</label>
+            <input className="nb-input" value={draft.skillsText} onChange={e => updateDraft("skillsText", e.target.value)} />
+          </div>
+          <div className="nb-field">
+            <label className="nb-label">Full description</label>
+            <textarea className="nb-textarea" rows="6" value={draft.description} onChange={e => updateDraft("description", e.target.value)} />
+          </div>
+
+          {!profile.skills.length && (
+            <Callout type="warn"><span>Your profile has no skills yet — the match score will be rough. Fill out the <strong>Profile</strong> tab first for a real read.</span></Callout>
+          )}
+          {aiNote && <Callout type="warn"><span>{aiNote}</span></Callout>}
+
+          <button className="nb-btn nb-btn-purple nb-btn-block" disabled={saving || !draft.title} onClick={handleSave}>
+            {saving ? "Analyzing…" : (settings.openaiKey ? "Analyze with AI & Save" : "Analyze & Save")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   DASHBOARD TAB
+───────────────────────────────────────────────────────────── */
+function JobCard({job, onStatusChange, onDelete}){
+  const [open, setOpen] = useState(false);
+
+  function copyRaw(){
+    const text = "Title: " + job.title + "\nCompany: " + job.company + "\n\n" + job.description;
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+
+  return (
+    <div className="job-card">
+      <div className="job-card-top">
+        <ScoreDial score={job.matchScore} />
+        <div className="job-card-main">
+          <div className="job-title">{job.title}</div>
+          <div className="job-company">{job.company}</div>
+          <div className="job-meta">
+            {job.location && <span className="nb-badge">{job.location}</span>}
+            {job.workForm && <span className="nb-badge">{job.workForm}</span>}
+            {(job.salaryMin || job.salaryMax) && (
+              <span className="nb-badge">{fmtMoney(job.salaryMin) || "?"} – {fmtMoney(job.salaryMax) || "?"}</span>
+            )}
+            {job.salaryTarget && <span className="nb-badge" style={{background:"var(--yellow)"}}>Target {fmtMoney(job.salaryTarget)}</span>}
+          </div>
+          <div className="job-actions">
+            <select className={"nb-select status-select status-" + job.status.replace(/ /g,"\\ ")}
+              value={job.status} onChange={e => onStatusChange(job.id, e.target.value)}>
+              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <button className="nb-btn nb-btn-sm" onClick={copyRaw}>Copy Raw</button>
+            <button className="nb-btn nb-btn-sm" onClick={() => setOpen(o => !o)}>{open ? "Hide Details" : "View Details"}</button>
+            {job.url && <a className="nb-btn nb-btn-sm" href={job.url} target="_blank" rel="noopener">Open Listing ↗</a>}
+            <button className="nb-btn nb-btn-sm nb-btn-pink" onClick={() => onDelete(job.id)}>Delete</button>
+          </div>
+        </div>
+      </div>
+
+      {open && (
+        <React.Fragment>
+          <div className="job-analysis">
+            <div className="job-analysis-label">Career move analysis · {job.evalEngine}</div>
+            {job.careerAnalysis}
+          </div>
+          {(job.matchedSkills?.length || job.missingSkills?.length) ? (
+            <div style={{marginTop:"0.75rem", display:"flex", flexWrap:"wrap", gap:"0.4rem"}}>
+              {job.matchedSkills.map(s => <span key={"m"+s} className="nb-skill-pill matched">✓ {s}</span>)}
+              {job.missingSkills.map(s => <span key={"g"+s} className="nb-skill-pill missing">− {s}</span>)}
+            </div>
+          ) : null}
+          <div className="job-desc-toggle">{job.description}</div>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+function DashboardTab({jobs, onStatusChange, onDelete, settings}){
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("date");
+  const [sheetsBusy, setSheetsBusy] = useState(false);
+  const [sheetsError, setSheetsError] = useState("");
+
+  const filtered = useMemo(() => {
+    let list = statusFilter === "All" ? jobs : jobs.filter(j => j.status === statusFilter);
+    list = [...list].sort((a,b) => {
+      if (sortBy === "score") return b.matchScore - a.matchScore;
+      if (sortBy === "salary") return (b.salaryTarget || 0) - (a.salaryTarget || 0);
+      return (b.dateAdded || "").localeCompare(a.dateAdded || "");
+    });
+    return list;
+  }, [jobs, statusFilter, sortBy]);
+
+  async function handleSheetsExport(){
+    if (!settings.googleClientId){ setSheetsError("Add a Google OAuth Client ID in Settings first."); return; }
+    setSheetsBusy(true); setSheetsError("");
+    try { await exportToGoogleSheets(jobs, settings.googleClientId); }
+    catch(e){ setSheetsError(e.message || "Export failed."); }
+    finally { setSheetsBusy(false); }
+  }
+
+  return (
+    <div className="nb-panel">
+      <div className="nb-panel-head">
+        <div>
+          <div className="nb-eyebrow">Pipeline</div>
+          <div className="nb-title">{jobs.length} Tracked Job{jobs.length === 1 ? "" : "s"}</div>
+        </div>
+        <div style={{display:"flex", gap:"0.5rem", flexWrap:"wrap"}}>
+          <select className="nb-select nb-btn-sm" style={{width:"auto"}} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option>All</option>
+            {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
+          </select>
+          <select className="nb-select nb-btn-sm" style={{width:"auto"}} value={sortBy} onChange={e => setSortBy(e.target.value)}>
+            <option value="date">Newest first</option>
+            <option value="score">Highest match</option>
+            <option value="salary">Highest target salary</option>
+          </select>
+          <button className="nb-btn nb-btn-sm nb-btn-yellow" onClick={() => exportCSV(jobs)} disabled={!jobs.length}>Export CSV</button>
+          <button className="nb-btn nb-btn-sm nb-btn-primary" onClick={handleSheetsExport} disabled={!jobs.length || sheetsBusy}>
+            {sheetsBusy ? "Exporting…" : "Export to Sheets"}
+          </button>
+        </div>
+      </div>
+
+      {sheetsError && <Callout type="warn"><span>{sheetsError}</span></Callout>}
+
+      {filtered.length ? (
+        <div className="job-list">
+          {filtered.map(job => (
+            <JobCard key={job.id} job={job} onStatusChange={onStatusChange} onDelete={onDelete} />
+          ))}
+        </div>
+      ) : (
+        <div className="nb-empty">
+          <div className="nb-empty-emoji">🗂️</div>
+          <div style={{fontWeight:700}}>Nothing tracked yet</div>
+          <div className="nb-hint">Head to "Add Job" to pull in your first listing.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PROFILE TAB
+───────────────────────────────────────────────────────────── */
+function ProfileTab({profile, onChange}){
+  const [local, setLocal] = useState(profile);
+  useEffect(() => setLocal(profile), [profile]);
+
+  function field(key, value){ setLocal(l => ({...l, [key]: value})); }
+  function save(){
+    onChange({
+      ...local,
+      skills: (local.skillsText != null ? local.skillsText : local.skills.join(", ")).split(",").map(s => s.trim()).filter(Boolean)
+    });
+  }
+
+  return (
+    <div className="nb-panel">
+      <div className="nb-panel-head">
+        <div>
+          <div className="nb-eyebrow">Your Background</div>
+          <div className="nb-title">Profile</div>
+        </div>
+        <span className="nb-sub">Powers the match score, salary target, and career analysis for every job you save.</span>
+      </div>
+
+      <div className="nb-row">
+        <div className="nb-field">
+          <label className="nb-label">Name</label>
+          <input className="nb-input" value={local.name} onChange={e => field("name", e.target.value)} />
+        </div>
+        <div className="nb-field">
+          <label className="nb-label">Years of experience</label>
+          <input className="nb-input" type="number" value={local.yearsExp} onChange={e => field("yearsExp", Number(e.target.value))} />
+        </div>
+      </div>
+
+      <div className="nb-field">
+        <label className="nb-label">Target roles</label>
+        <input className="nb-input" placeholder="Senior Financial Analyst, FP&A Manager…" value={local.targetRoles} onChange={e => field("targetRoles", e.target.value)} />
+      </div>
+
+      <div className="nb-field">
+        <label className="nb-label">Skills (comma separated)</label>
+        <textarea className="nb-textarea" rows="3" value={local.skillsText != null ? local.skillsText : local.skills.join(", ")}
+          onChange={e => field("skillsText", e.target.value)} />
+        <span className="nb-hint">Matched word-for-word (loosely) against each job's detected skill list.</span>
+      </div>
+
+      <div className="nb-row">
+        <div className="nb-field">
+          <label className="nb-label">Current salary</label>
+          <input className="nb-input" type="number" value={local.currentSalary} onChange={e => field("currentSalary", e.target.value)} />
+        </div>
+        <div className="nb-field">
+          <label className="nb-label">Target salary</label>
+          <input className="nb-input" type="number" value={local.targetSalary} onChange={e => field("targetSalary", e.target.value)} />
+        </div>
+      </div>
+
+      <div className="nb-field">
+        <label className="nb-label">Background summary</label>
+        <textarea className="nb-textarea" rows="4" placeholder="2-3 sentences on your experience — used as extra context if AI evaluation is enabled."
+          value={local.summary} onChange={e => field("summary", e.target.value)} />
+      </div>
+
+      <button className="nb-btn nb-btn-purple" onClick={save}>Save Profile</button>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ANALYTICS TAB
+───────────────────────────────────────────────────────────── */
+function AnalyticsTab({jobs}){
+  const stats = useMemo(() => {
+    const total = jobs.length;
+    const avgScore = total ? Math.round(jobs.reduce((a,j) => a + (j.matchScore||0), 0) / total) : 0;
+    const salaries = jobs.map(j => j.salaryTarget).filter(Boolean);
+    const avgTarget = salaries.length ? Math.round(salaries.reduce((a,b)=>a+b,0)/salaries.length) : null;
+
+    const byStatus = {};
+    STATUS_OPTIONS.forEach(s => byStatus[s] = 0);
+    jobs.forEach(j => { byStatus[j.status] = (byStatus[j.status]||0) + 1; });
+
+    const byWorkForm = {};
+    jobs.forEach(j => { const k = j.workForm || "Unspecified"; byWorkForm[k] = (byWorkForm[k]||0)+1; });
+
+    const skillFreq = {};
+    jobs.forEach(j => (j.skills||[]).forEach(s => { skillFreq[s] = (skillFreq[s]||0)+1; }));
+    const topSkills = Object.entries(skillFreq).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+    const companyFreq = {};
+    jobs.forEach(j => { if (j.company) companyFreq[j.company] = (companyFreq[j.company]||0)+1; });
+
+    return { total, avgScore, avgTarget, byStatus, byWorkForm, topSkills, companyCount: Object.keys(companyFreq).length };
+  }, [jobs]);
+
+  const maxStatus = Math.max(1, ...Object.values(stats.byStatus));
+  const maxSkill = Math.max(1, ...stats.topSkills.map(s => s[1]));
+
+  if (!jobs.length){
+    return (
+      <div className="nb-panel">
+        <div className="nb-empty">
+          <div className="nb-empty-emoji">📊</div>
+          <div style={{fontWeight:700}}>No data yet</div>
+          <div className="nb-hint">Track a few jobs and trends will show up here.</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="nb-grid-3" style={{marginTop:"1.75rem"}}>
+        <div className="stat-tile"><div className="n">{stats.total}</div><div className="l">Jobs Tracked</div></div>
+        <div className="stat-tile"><div className="n">{stats.avgScore}%</div><div className="l">Avg Match Score</div></div>
+        <div className="stat-tile"><div className="n">{stats.avgTarget ? fmtMoney(stats.avgTarget) : "—"}</div><div className="l">Avg Salary Target</div></div>
+      </div>
+
+      <div className="nb-panel">
+        <div className="nb-panel-head"><div className="nb-title" style={{fontSize:"1.1rem"}}>Pipeline breakdown</div></div>
+        {STATUS_OPTIONS.map(s => (
+          <div className="bar-row" key={s}>
+            <div className="bar-label">{s}</div>
+            <div className="bar-track"><div className="bar-fill" style={{width:(stats.byStatus[s]/maxStatus*100)+"%"}}></div></div>
+            <div className="bar-count">{stats.byStatus[s]}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="nb-grid-2">
+        <div className="nb-panel">
+          <div className="nb-panel-head"><div className="nb-title" style={{fontSize:"1.1rem"}}>Most-requested skills</div></div>
+          {stats.topSkills.length ? stats.topSkills.map(([skill,count]) => (
+            <div className="bar-row" key={skill}>
+              <div className="bar-label">{skill}</div>
+              <div className="bar-track"><div className="bar-fill" style={{width:(count/maxSkill*100)+"%", background:"var(--purple)"}}></div></div>
+              <div className="bar-count">{count}</div>
+            </div>
+          )) : <div className="nb-hint">No skills detected across saved jobs yet.</div>}
+        </div>
+
+        <div className="nb-panel">
+          <div className="nb-panel-head"><div className="nb-title" style={{fontSize:"1.1rem"}}>Work format</div></div>
+          {Object.entries(stats.byWorkForm).map(([k,v]) => (
+            <div className="bar-row" key={k}>
+              <div className="bar-label">{k}</div>
+              <div className="bar-track"><div className="bar-fill" style={{width:(v/stats.total*100)+"%", background:"var(--yellow)"}}></div></div>
+              <div className="bar-count">{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SETTINGS TAB
+───────────────────────────────────────────────────────────── */
+function SettingsTab({settings, onChange}){
+  const [local, setLocal] = useState(settings);
+  useEffect(() => setLocal(settings), [settings]);
+
+  return (
+    <div className="nb-panel">
+      <div className="nb-panel-head">
+        <div>
+          <div className="nb-eyebrow">Optional</div>
+          <div className="nb-title">Settings</div>
+        </div>
+      </div>
+
+      <Callout type="info">
+        <span>Everything in this app runs entirely in your browser — jobs, profile, and these keys are stored in
+        <code>localStorage</code> on this device only, nothing is sent to any server we control. Keys you add here
+        are sent directly from your browser to OpenAI / Google, which is fine for personal use but not how you'd
+        ship this to other users (see the architecture doc for the production pattern).</span>
+      </Callout>
+
+      <div className="nb-field">
+        <label className="nb-label">OpenAI API key (optional)</label>
+        <input className="nb-input" type="password" placeholder="sk-…" value={local.openaiKey}
+          onChange={e => setLocal(l => ({...l, openaiKey: e.target.value}))} />
+        <span className="nb-hint">When set, "Analyze &amp; Save" calls gpt-4o-mini for the match score, salary target, and career analysis instead of the offline heuristic engine.</span>
+      </div>
+
+      <div className="nb-field">
+        <label className="nb-label">Google OAuth Client ID (optional, for Sheets export)</label>
+        <input className="nb-input" placeholder="xxxxxxxx.apps.googleusercontent.com" value={local.googleClientId}
+          onChange={e => setLocal(l => ({...l, googleClientId: e.target.value}))} />
+        <span className="nb-hint">Create an OAuth 2.0 Client ID (Web application) in Google Cloud Console, enable the Sheets API, and add this page's origin to Authorized JavaScript origins.</span>
+      </div>
+
+      <button className="nb-btn nb-btn-purple" onClick={() => onChange(local)}>Save Settings</button>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   APP SHELL
+───────────────────────────────────────────────────────────── */
+function App(){
+  const [tab, setTab] = useState("dashboard");
+  const [jobs, setJobs] = useState(() => loadLS(LS_KEYS.jobs, []));
+  const [profile, setProfile] = useState(() => loadLS(LS_KEYS.profile, DEFAULT_PROFILE));
+  const [settings, setSettings] = useState(() => loadLS(LS_KEYS.settings, DEFAULT_SETTINGS));
+
+  useEffect(() => saveLS(LS_KEYS.jobs, jobs), [jobs]);
+  useEffect(() => saveLS(LS_KEYS.profile, profile), [profile]);
+  useEffect(() => saveLS(LS_KEYS.settings, settings), [settings]);
+
+  function addJob(job){
+    setJobs(list => [job, ...list]);
+    setTab("dashboard");
+  }
+  function updateStatus(id, status){
+    setJobs(list => list.map(j => j.id === id ? {...j, status} : j));
+  }
+  function deleteJob(id){
+    setJobs(list => list.filter(j => j.id !== id));
+  }
+
+  const tabs = [
+    { id:"dashboard", label:"Dashboard", count: jobs.length },
+    { id:"add", label:"Add Job" },
+    { id:"profile", label:"Profile" },
+    { id:"analytics", label:"Analytics" },
+    { id:"settings", label:"Settings" }
+  ];
+
+  return (
+    <div>
+      <div className="nb-topbar">
+        <div className="nb-topbar-inner">
+          <div className="nb-logo">
+            <span className="nb-logo-mark">JT</span>
+            <span>JOB TRACKER <span style={{color:"var(--purple)"}}>//</span> AI EVALUATOR</span>
+          </div>
+          <a className="nb-back" href="https://thejacobbarney.com/#personal">← thejacobbarney.com</a>
+        </div>
+      </div>
+
+      <div className="nb-shell">
+        <div className="hero-strip">
+          <div>
+            <h1>Paste a listing. Get a verdict.</h1>
+            <p>Match score, salary target, and a straight-talk read on whether it's worth your time — <span className="accent">then track the whole pipeline</span> in one place.</p>
+          </div>
+          <div className="nb-badge" style={{background:"var(--ink)", color:"#fff", borderColor:"#fff"}}>Neo-Brutalist Lab Build</div>
+        </div>
+
+        <div className="nb-tabs">
+          {tabs.map(t => (
+            <button key={t.id} className={"nb-tab " + (tab === t.id ? "active" : "")} onClick={() => setTab(t.id)}>
+              {t.label}{t.count != null && <span className="count">{t.count}</span>}
+            </button>
+          ))}
+        </div>
+
+        {tab === "dashboard" && <DashboardTab jobs={jobs} onStatusChange={updateStatus} onDelete={deleteJob} settings={settings} />}
+        {tab === "add" && <AddJobTab profile={profile} settings={settings} onSave={addJob} />}
+        {tab === "profile" && <ProfileTab profile={profile} onChange={setProfile} />}
+        {tab === "analytics" && <AnalyticsTab jobs={jobs} />}
+        {tab === "settings" && <SettingsTab settings={settings} onChange={setSettings} />}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+<script>
+  var source = document.getElementById("app-source").textContent;
+  var transformed = Babel.transform(source, { presets: [["react", { runtime: "classic" }]] }).code;
+  var runner = document.createElement("script");
+  runner.textContent = transformed;
+  document.body.appendChild(runner);
+</script>
+</body>
+</html>
