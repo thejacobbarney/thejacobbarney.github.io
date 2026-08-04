@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Bark — Job Tracker &amp; AI Evaluator</title>
+<link rel="icon" type="image/svg+xml" href="assets/bark-icon.svg" />
 <meta name="description" content="Paste a job listing, get an instant AI match score, salary target, and career-move read — then track the whole pipeline in one dashboard." />
 <meta property="og:title" content="Bark — Job Tracker & AI Evaluator" />
 <meta property="og:description" content="Scrape job listings, score your fit, and track your pipeline — a bold, high-contrast job search dashboard." />
@@ -69,9 +70,9 @@
     text-decoration:none;
   }
   .nb-logo-mark{
-    width:30px;height:30px;background:var(--ink);color:var(--turq);
-    display:flex;align-items:center;justify-content:center;
-    font-size:1rem;font-weight:800;flex-shrink:0;
+    width:34px;height:34px;flex-shrink:0;
+    border:2px solid var(--ink);
+    display:block;
   }
   .nb-back{
     font-size:0.72rem;font-weight:700;letter-spacing:0.04em;
@@ -2093,7 +2094,7 @@ function App(){
       <div className="nb-topbar">
         <div className="nb-topbar-inner">
           <div className="nb-logo">
-            <span className="nb-logo-mark">🐾</span>
+            <img className="nb-logo-mark" src="assets/bark-icon.svg" alt="Bark" />
             <span>BARK <span style={{color:"var(--purple)"}}>//</span> JOB TRACKER &amp; AI EVALUATOR</span>
           </div>
           <a className="nb-back" href="https://thejacobbarney.com/#personal">← thejacobbarney.com</a>
