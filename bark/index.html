@@ -716,12 +716,35 @@ function computeSalaryTarget(profile, job, matchResult, comparable){
 function generateCareerAnalysis(profile, job, matchResult, salaryTarget){
   const strengths = matchResult.matched.slice(0,3).join(", ");
   const gaps = matchResult.missing.slice(0,3).join(", ");
-  const verdict = matchResult.score >= 8 ? "a strong alignment with your background"
-    : matchResult.score >= 4 ? "a reasonable stretch from your current experience"
-    : "a significant reach given what's listed";
+
+  // Distinguish *why* a role scores below "strong" — a seniority/scope gap on
+  // top of solid skill overlap is a legitimate reach worth pursuing, while a
+  // gap concentrated in core skills is a real mismatch. This only changes the
+  // narrative below; matchResult.score itself is never touched.
+  const totalSkills = matchResult.matched.length + matchResult.missing.length;
+  const missingRatio = totalSkills ? matchResult.missing.length / totalSkills : 0;
+  const yearsGap = matchResult.requiredYears != null ? matchResult.requiredYears - (Number(profile.yearsExp) || 0) : 0;
+  const isSeniorityStretch = matchResult.score < 8 && missingRatio <= 0.35 && yearsGap > 0;
+  const isCoreSkillGap = matchResult.score < 8 && missingRatio > 0.35;
+
+  let verdict, s2;
+  if (matchResult.score >= 8){
+    verdict = "a strong alignment with your background";
+    s2 = gaps ? "The clearest gap is " + gaps + " — minor, and worth addressing directly in a cover letter or interview." : "Your listed skills cover the stated requirements well.";
+  } else if (isSeniorityStretch){
+    verdict = "a healthy stretch toward the next level — your core skills line up well, and the gap is mostly seniority or scope rather than ability";
+    s2 = gaps
+      ? "The gap on paper (" + gaps + ") reads more like experience depth than a missing skill — worth reaching for, and worth naming directly as growth-in-progress in a cover letter or interview."
+      : "Your core skills line up well; the main gap is years of experience or scope, not ability.";
+  } else if (isCoreSkillGap){
+    verdict = matchResult.score >= 4 ? "a real stretch, with gaps in core requirements rather than just seniority" : "a significant reach, with real gaps in core requirements";
+    s2 = gaps ? "The clearest gaps are " + gaps + " — these are foundational to the role, so treat this as a genuine skills mismatch rather than a seniority reach." : "Your listed skills cover the stated requirements well.";
+  } else {
+    verdict = matchResult.score >= 4 ? "a reasonable stretch from your current experience" : "a significant reach given what's listed";
+    s2 = gaps ? "The clearest gap is " + gaps + " — worth addressing directly in a cover letter or interview." : "Your listed skills cover the stated requirements well.";
+  }
 
   const s1 = "This role looks like " + verdict + (strengths ? ", particularly given your experience with " + strengths + "." : ".");
-  const s2 = gaps ? "The clearest gap is " + gaps + " — worth addressing directly in a cover letter or interview." : "Your listed skills cover the stated requirements well.";
   let s3;
   if (salaryTarget.recommendation && salaryTarget.source === "comparable"){
     s3 = "Salary wasn't posted, so use $" + salaryTarget.low.toLocaleString() + "–$" + salaryTarget.high.toLocaleString() +
@@ -747,7 +770,14 @@ const GROK_MODEL = "grok-4-fast";
 const MATCH_SYSTEM_PROMPT = "You are a career-matching engine inside a personal job application tracker. " +
   "Given a candidate's background and a single job posting, evaluate fit with rigor and honesty — do not " +
   "inflate scores to be encouraging, and call out real gaps. Score matchScore on a 1-10 integer scale where " +
-  "10 is a perfect match and 1 is a poor match — never use a 0-100 scale. When the posting does not disclose " +
+  "10 is a perfect match and 1 is a poor match — never use a 0-100 scale. A role does not have to be a near-" +
+  "perfect match to be worth pursuing: when the score is below 8, look at WHERE the gap actually is. If the " +
+  "candidate's core skills line up well and the shortfall is mainly seniority, years of experience, or scope " +
+  "(a role reaching toward their next career level), say so explicitly in the analysis and frame it as a " +
+  "legitimate, worthwhile stretch — not a warning sign. If instead the gap is concentrated in core skills the " +
+  "role actually requires, say so explicitly too and be direct that it's a real mismatch rather than a " +
+  "seniority reach. Do not change the numeric score based on this distinction — it only affects how you " +
+  "describe the gap in the analysis text. When the posting does not disclose " +
   "a salary, estimate a realistic market compensation range for comparable roles (same title/family, similar " +
   "seniority, industry, and location) from your general knowledge — this is an estimate for the candidate to " +
   "use as an anchor in an intro or welcome call, not a live quote, so say so plainly in the analysis and give " +

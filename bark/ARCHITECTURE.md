@@ -251,13 +251,32 @@ The prototype ships both tiers so it works with zero configuration:
 - **Tier 2 — LLM evaluation (Grok)**: richer, handles nuance (adjacent skills, seniority framing,
   culture/scope signals in the description) that keyword overlap can't.
 
+**Stretch vs. mismatch narrative.** The numeric score alone can't tell a user *why* a role landed
+below "strong match" — a role can score mid/low because it's a genuine reach toward the next
+career level (core skills line up, but it asks for more years/scope than the candidate has yet),
+or because the candidate is actually missing skills the role requires. Those call for opposite
+advice, so `generateCareerAnalysis` (and the equivalent instruction baked into
+`MATCH_SYSTEM_PROMPT` for the Grok tier) classifies which situation applies — using
+`matchResult.missing` as a share of total required skills plus the years-required-vs-years-held
+gap already computed by `computeMatch` — and writes the analysis accordingly: "healthy stretch
+toward the next level" when the shortfall is mostly seniority/scope, or a direct "real
+mismatch"/"gaps in core requirements" framing when the shortfall is mostly missing skills. This
+only changes the wording of the analysis text; `matchResult.score` and its red/yellow/green
+color coding are computed exactly as before and are never adjusted for this distinction.
+
 ### 4.2 Prompt template (production, server-side)
 
 ```
 SYSTEM:
 You are a career-matching engine inside a job application tracker. Given a candidate's
 background and a job posting, evaluate fit with rigor and honesty — do not inflate scores
-to be encouraging, and call out real gaps. Respond with ONLY a JSON object matching this
+to be encouraging, and call out real gaps. A role doesn't have to be a near-perfect match
+to be worth pursuing: when the score is below 8, look at WHERE the gap actually is. If core
+skills line up well and the shortfall is mainly seniority/years/scope, say so explicitly and
+frame it as a legitimate stretch toward the next level — not a warning sign. If the gap is
+concentrated in core skills the role requires, say so explicitly too and be direct that it's
+a real mismatch rather than a seniority reach. This distinction only affects the analysis
+text, never the numeric score. Respond with ONLY a JSON object matching this
 exact schema, no prose outside it:
 {
   "matchScore": number 1-10 (integer, 10 = perfect match),
