@@ -264,6 +264,8 @@
   /* ─── MISC ───────────────────────────────────────────── */
   .top-actions { display: flex; justify-content: flex-end; margin-bottom: 6px; }
   .storage-note { font-size: 12px; color: var(--ink-soft); margin: 10px 0 0; }
+  .storage-note.hidden { display: none; }
+  .storage-note.storage-warning { color: var(--status-critical); font-weight: 600; }
   .file-label { display: inline-flex; }
   .file-label input { display: none; }
 
@@ -304,6 +306,7 @@
   </main>
 
   <p class="storage-note">Data is stored only in this browser (localStorage). Use <strong>Export</strong> to back it up or move it to another device.</p>
+  <p class="storage-note storage-warning hidden" id="storageWarning">⚠️ This viewer isn't allowing local storage, so nothing you do here will be saved. Open this file in a full browser app (Safari, Chrome, Firefox) instead of a preview inside another app, then reload.</p>
 </div>
 
 <div class="modal-overlay hidden" id="modalOverlay">
@@ -447,15 +450,30 @@
 
   function uid() { return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 9); }
 
+  var storageOk = true;
+  function safeGetItem(key) {
+    try { return localStorage.getItem(key); } catch (e) { storageOk = false; return null; }
+  }
+  function safeSetItem(key, val) {
+    try { localStorage.setItem(key, val); return true; } catch (e) { return false; }
+  }
+  function updateStorageBanner() {
+    var el = document.getElementById("storageWarning");
+    if (el) el.classList.toggle("hidden", storageOk);
+  }
+
   function load() {
-    var raw = localStorage.getItem(STORAGE_KEY);
+    var raw = safeGetItem(STORAGE_KEY);
     if (raw) {
       try { state = JSON.parse(raw); return; } catch (e) { /* fall through to seed */ }
     }
     state = seedData();
     save();
   }
-  function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  function save() {
+    storageOk = safeSetItem(STORAGE_KEY, JSON.stringify(state)) && storageOk;
+    updateStorageBanner();
+  }
 
   function seedData() {
     var today = new Date();
@@ -933,20 +951,28 @@
 
   /* ─── EXPORT / IMPORT ──────────────────────────────── */
   document.getElementById("exportBtn").addEventListener("click", function () {
-    var blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = "supplement-tracker-" + new Date().toISOString().slice(0, 10) + ".json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    try {
+      var blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "supplement-tracker-" + new Date().toISOString().slice(0, 10) + ".json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("This browser view won't allow downloading a file. Open the page in a full browser app (Safari, Chrome, Firefox) to export.");
+    }
   });
   document.getElementById("importInput").addEventListener("change", function (e) {
     var file = e.target.files[0];
     if (!file) return;
     var reader = new FileReader();
+    reader.onerror = function () {
+      alert("Couldn't read that file in this browser view. Try opening the page in Safari, Chrome, or Firefox.");
+      e.target.value = "";
+    };
     reader.onload = function () {
       try {
         var parsed = JSON.parse(reader.result);
@@ -966,8 +992,15 @@
   });
 
   /* ─── INIT ─────────────────────────────────────────── */
-  load();
-  renderAll();
+  try {
+    load();
+    renderAll();
+  } catch (e) {
+    state = seedData();
+    try { renderAll(); } catch (e2) { /* give up rendering, tabs still switch */ }
+    var warn = document.getElementById("storageWarning");
+    if (warn) { warn.textContent = "⚠️ Something in this browser view is blocking part of the app. Try opening the page in Safari, Chrome, or Firefox."; warn.classList.remove("hidden"); }
+  }
 })();
 </script>
 </body>
