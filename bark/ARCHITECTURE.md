@@ -20,8 +20,9 @@ contract, and the export pipeline — everything needed to lift the prototype in
 | Frontend | **Next.js 14 (App Router) + React + Tailwind CSS** | Server components for the dashboard/analytics reads, client components for the interactive add-job flow; Tailwind maps cleanly onto the Neo-Brutalist token system (hard borders, flat shadows, no radius). |
 | Auth + DB | **Supabase (Postgres + Auth + Row-Level Security)** | One provider for auth, relational storage, and realtime subscriptions (pipeline status updates across tabs/devices) without standing up separate services. |
 | Scraping | **Playwright** on a **queue-backed worker** (see §3), fronted by **ScrapingBee or Browserless** for the JS-heavy / anti-bot sources (LinkedIn, Indeed) | Playwright handles the general case (JS-rendered career pages) cheaply; a managed scraping API absorbs residential-proxy and headless-detection costs for the two hardest sources instead of building that infrastructure in-house. |
-| AI (match scoring) | **xAI Grok API (`grok-4-fast` default)**, called **server-side only** | OpenAI-compatible request/response shape, so the same `response_format: json_object` pattern applies; keeps the key off the client and lets you cache/rate-limit per user (see §5). |
+| AI (match scoring) | **xAI Grok API (`grok-4-fast` default)**, called **server-side only** | OpenAI-compatible request/response shape, so the same `response_format: json_object` pattern applies; keeps the key off the client and lets you cache/rate-limit per user (see §4.3). |
 | AI (salary search) | **Perplexity Sonar API**, called **server-side only** | Web search grounding is built into the model rather than bolted on as a tool call — a better fit for "find current comp data" than a general-purpose model with a search plugin, and it returns real source citations (see §3.4). |
+| Profile import | **PDF.js** (client-side text extraction) + **Grok** for structured parsing (see §5) | Resumes/LinkedIn exports are unstructured PDFs; extraction has to happen somewhere, and doing it client-side avoids uploading a resume to a server just to read its text. |
 | Queue/Jobs | **Postgres-backed queue (`pgmq` or a Supabase Edge Function + cron)**, or **Inngest** if you want retries/backoff without managing infra | Scraping and AI evaluation are both slow, flaky, and rate-limited — they belong off the request/response path. |
 | Hosting | **Vercel** (frontend + API routes) — pairs natively with Next.js and Supabase | Zero-config previews, edge-friendly, no server ops. |
 | Export | **CSV**: generated server-side or client-side, trivial. **Google Sheets**: Google Identity Services (GIS) OAuth token flow, called directly from the browser with the user's own consent — no backend credential storage needed. | Sheets API supports CORS for authenticated browser requests, so this is the one integration that genuinely doesn't need a backend proxy. |
@@ -109,14 +110,14 @@ create table jobs (
 create table evaluations (
   id uuid primary key default gen_random_uuid(),
   job_id uuid not null references jobs(id) on delete cascade,
-  match_score integer check (match_score between 0 and 100),
+  match_score integer check (match_score between 1 and 10),
   salary_target numeric,
   salary_target_low numeric,
   salary_target_high numeric,
   matched_skills text[] default '{}',
   missing_skills text[] default '{}',
   analysis text,
-  model text,                      -- e.g. 'gpt-4o-mini'
+  model text,                      -- e.g. 'grok-4-fast'
   created_at timestamptz not null default now()
 );
 
@@ -196,7 +197,7 @@ each one upgrading the estimate when its prerequisite is configured:
      min_salary, median_salary, max_salary, confidence_score, rationale}`.
    - The call goes through Perplexity's REST endpoint directly (`fetch` to
      `api.perplexity.ai/chat/completions`, OpenAI-compatible chat-completions shape) — same
-     bring-your-own-key pattern as the Grok tier, with the same client-side-key caveat (§7).
+     bring-your-own-key pattern as the Grok tier, with the same client-side-key caveat (§8).
    - The response includes a `citations` array of real source URLs, which Bark renders as clickable
      links under the career analysis — actual sources beat a vague "estimated" sentence when
      you're prepping for a call.
@@ -218,7 +219,7 @@ sentence naming the sources behind the number — gets appended directly to that
 its citations render as clickable source links underneath.
 
 This is a reasonable production pattern already — live search grounding is a real market-data
-source, not a hardcoded table — but it still inherits the browser-side-key caveat from §7: for a
+source, not a hardcoded table — but it still inherits the browser-side-key caveat from §8: for a
 multi-user product, the Perplexity calls move server-side (same reasoning as the Grok evaluation
 call) so the key isn't exposed per-client. The alternative production path — a dedicated
 compensation data API like **BLS OEWS** (occupational wage percentiles by metro area) or
@@ -312,9 +313,66 @@ in production.
 - **Cache per (job, profile-version)** — re-evaluating on every dashboard load is wasteful; only
   re-run when the profile changes or the user explicitly asks to re-score.
 
+### 4.4 Refresh / re-scoring after the profile changes
+
+Match score, salary target, and career analysis are computed once when a job is saved and frozen
+into that job's record — if the profile changes afterward (new skills, updated years of experience,
+a resume import), previously-saved jobs go stale. `evaluateJob(job, profile, settings)` in
+`index.html` is the fix: it's the exact same offline/Perplexity/Grok pipeline described above,
+factored out of the "Add Job" save handler into a standalone function so it can run again later
+against any job's already-stored data plus the *current* profile, rather than only at save time.
+
+Two entry points call it:
+- **Per-job "Refresh"** on each `JobCard` — re-scores that one job.
+- **"Refresh All Scores"** on the dashboard toolbar — re-scores every tracked job in one pass
+  (`Promise.all` over the job list), useful right after a profile update or resume import so the
+  whole pipeline reflects the new information at once instead of one card at a time.
+
+Both write straight back onto the job record (matchScore, salaryTarget, comparableSalary\*,
+careerAnalysis, evalEngine, plus a `lastEvaluatedAt` timestamp shown on the card) — no separate
+history is kept client-side. That's a deliberate simplification the production schema already
+anticipates: §2's `evaluations` table is modeled 1:many against `jobs` specifically so re-running
+an evaluation writes a *new* row instead of overwriting the old one, which is what you'd want in
+production to see score drift over time rather than just the latest snapshot.
+
 ---
 
-## 5. Frontend Components (Next.js / Tailwind, Neo-Brutalist)
+## 5. Profile Building — Resume / LinkedIn PDF Import
+
+Manually typing skills, years of experience, and a summary into the Profile tab works, but most
+people already have that information sitting in a resume or a LinkedIn "Save to PDF" export. The
+prototype can read either directly:
+
+1. **PDF text extraction** — [PDF.js](https://mozilla.github.io/pdf.js/) loaded from CDN
+   (`unpkg.com/pdfjs-dist@3.11.174`), same "load a script tag, no build step" pattern as
+   React/Babel. `extractPdfText` walks every page and concatenates the text content; PDF.js exposes
+   a classic UMD global (`window.pdfjsLib`) at this pinned version, which matters because newer
+   `pdfjs-dist` releases dropped the non-module build from the default `build/` path — worth
+   re-checking if this version is bumped later.
+2. **Offline heuristic pass** (always runs): `extractSkillsFromText` — the same skill-dictionary
+   matcher used on scraped job postings — runs against the resume text, and
+   `estimateYearsFromResumeText` regex-matches work-history date ranges (`"2019 - Present"`,
+   `"2016 - 2019"`) to estimate total years from the earliest start year to the latest end year
+   (or the current year for "Present"/"Current"). Free, instant, no key required — the same
+   always-available floor as the rest of the app's AI-adjacent features.
+3. **Grok refinement** (if a key is set): `callGrokParseResume` sends the extracted text to
+   `grok-4-fast` with a schema asking for `skills`, `yearsExp`, `targetRoles`, and a first-person
+   `summary` — resumes are unstructured prose, so an LLM reading the whole document in context
+   does meaningfully better than keyword matching alone, especially for `targetRoles` and
+   `summary`, which the offline pass can't produce at all (LinkedIn/resumes don't spell out "the
+   user's next target job title" — that has to be inferred from career trajectory).
+
+Extracted results are shown in an editable review panel before anything touches the saved profile
+— same "extract → review → confirm" pattern as adding a job — with one deliberate asymmetry in
+how "Apply" merges fields: **skills merge and dedupe** against whatever's already in the profile
+(case-insensitive), since skills accumulate across resume versions and shouldn't be lost on a
+re-import, while **years of experience, target roles, and summary are overwritten** with the
+extracted values, since merging two numbers or two prose summaries doesn't make sense the way
+merging two skill lists does — the review step is what keeps this safe, not the merge logic.
+
+---
+
+## 6. Frontend Components (Next.js / Tailwind, Neo-Brutalist)
 
 The prototype's component split (`AddJobTab`, `DashboardTab`, `JobCard`, `ProfileTab`,
 `AnalyticsTab`, `SettingsTab`) maps directly onto Next.js — each becomes a client component under
@@ -363,7 +421,7 @@ export function JobCard({ job, onStatusChange }: { job: Job; onStatusChange: (id
 
 ---
 
-## 6. Export Logic
+## 7. Export Logic
 
 - **CSV** — fully implemented client-side in the prototype (`exportCSV` in `index.html`): builds
   the CSV string, wraps in a `Blob`, triggers a download via an object URL. Identical approach
@@ -378,7 +436,7 @@ export function JobCard({ job, onStatusChange }: { job: Job; onStatusChange: (id
 
 ---
 
-## 7. What the prototype deliberately simplifies
+## 8. What the prototype deliberately simplifies
 
 | Production concern | Prototype's stand-in |
 |---|---|
