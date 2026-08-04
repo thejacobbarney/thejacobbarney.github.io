@@ -227,6 +227,35 @@ compensation data API like **BLS OEWS** (occupational wage percentiles by metro 
 Sonar's search grounding proves inconsistent in practice; either way, this becomes a queue job
 alongside the AI evaluation once there's a backend, not an inline call.
 
+### 3.4a Target-clamping policy: when is the recommendation allowed to exceed the range?
+
+`computeSalaryTarget` nudges the recommendation above or below the midpoint of its anchor (posted
+range, comparable band, or profile target) based on match score — a strong fit should aim toward
+the top, a weak one toward the bottom. Whether that nudge is allowed to push the recommendation
+*past* the anchor's edges depends on what kind of anchor it is, and the three cases resolve
+differently:
+
+- **A real, two-sided posted range** (distinct `salaryMin`/`salaryMax`) is a hard employer-stated
+  ceiling and floor — the target is clamped to `[salaryMin, salaryMax]`. Recommending an ask above
+  the employer's own advertised top undermines the tool's straight-talk premise, so this direction
+  never exceeds.
+- **An open-ended floor** (`"$120,000+"` — parsed as `salaryMin` set, `salaryMax` left `null` rather
+  than collapsed into a fake `min === max` range) has no ceiling to respect, so the target is
+  allowed to exceed it on a strong match. It's still a floor, though: a weak match score is clamped
+  up to at least `salaryMin`, never recommending an ask below what the employer already committed to
+  paying at minimum.
+- **No posted salary at all**, falling back to the comparable-roles band: the target is clamped to
+  `[comparable.low, comparable.high]` for the same reason as the real-range case — the tool is
+  citing that band as the market anchor in the same breath as the recommendation, so exceeding it
+  would contradict its own advice. A profile-target-only fallback (no comparable data available
+  either) has no external range to clamp against and floats freely, same as before.
+
+The same clamping applies when Grok generates the salary numbers directly (bypassing
+`computeSalaryTarget` when a stated salary exists) — `evaluateJob` re-derives `isRealRange`/
+`isOpenFloor` from the job's own `salaryMin`/`salaryMax` and clamps Grok's `salaryTarget` the same
+way, rather than trusting the model to always honor the equivalent instruction baked into
+`MATCH_SYSTEM_PROMPT`.
+
 ### 3.5 Legal/ethical note
 
 Scraping LinkedIn and Indeed listing pages for personal job-search tracking (not republishing,

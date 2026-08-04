@@ -478,6 +478,22 @@ function parseFreeText(text){
     }
   }
 
+  // Some postings never show title/company as their own header line at all —
+  // only the copied job-description body came through, and the role only
+  // appears inline in the opening pitch ("As an FP&A Analyst at Array, you
+  // will..."). That sentence is usually well over 100 chars, so it never
+  // reaches the title-scoring pass below; catch it here first instead.
+  if (!title){
+    for (const line of header.slice(0, 8)){
+      const m = line.match(/\bas (?:an?|our new|the new|our)\s+(.{3,70}?)\s+at\s+(.{2,60}?)[,.\n]/i);
+      if (m && JOB_TITLE_WORDS.test(m[1]) && !JOB_TITLE_WORDS.test(m[2])){
+        title = m[1].trim();
+        company = m[2].trim();
+        break;
+      }
+    }
+  }
+
   const labeledCompany = header.find(l => /^(company|employer|organization)\s*[:\-]/i.test(l));
   if (labeledCompany) company = labeledCompany.replace(/^(company|employer|organization)\s*[:\-]\s*/i, "").trim();
 
@@ -548,10 +564,14 @@ function parseFreeText(text){
     salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
     salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
   } else {
-    const singleMatch = text.match(/\$\s?([\d,]{2,7})(k)?/i);
+    // A trailing "+" ("$120,000+") states an open-ended floor, not a real
+    // two-sided range — leave salaryMax unset so downstream logic (target
+    // clamping, the salary badge) doesn't treat the floor as a hard ceiling.
+    const singleMatch = text.match(/\$\s?([\d,]{2,7})(k)?(\+)?/i);
     if (singleMatch){
       const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
-      salaryMin = v; salaryMax = v;
+      salaryMin = v;
+      salaryMax = singleMatch[3] ? null : v;
     }
   }
 
@@ -675,11 +695,20 @@ function estimateComparableSalary(job, profile){
 
 function computeSalaryTarget(profile, job, matchResult, comparable){
   const profileTarget = Number(profile.targetSalary) || (Number(profile.currentSalary) ? Number(profile.currentSalary) * 1.15 : null);
+  const hasMin = job.salaryMin != null && job.salaryMin !== "";
+  const hasMax = job.salaryMax != null && job.salaryMax !== "";
+  // A real two-sided range (min < max) is a hard ceiling worth respecting —
+  // recommending an ask above the employer's own advertised top undermines
+  // the advice. An open-ended floor ("$120,000+", hasMin but no hasMax) has
+  // no ceiling by definition, so it's excluded from that treatment.
+  const isRealRange = hasMin && hasMax && Number(job.salaryMax) > Number(job.salaryMin);
+  const isOpenFloor = hasMin && !hasMax;
+
   let base = null;
   let source = "listing";
-  if (job.salaryMin && job.salaryMax) base = (Number(job.salaryMin) + Number(job.salaryMax)) / 2;
-  else if (job.salaryMax) base = Number(job.salaryMax);
-  else if (job.salaryMin) base = Number(job.salaryMin);
+  if (hasMin && hasMax) base = (Number(job.salaryMin) + Number(job.salaryMax)) / 2;
+  else if (hasMax) base = Number(job.salaryMax);
+  else if (hasMin) base = Number(job.salaryMin);
   else if (comparable && comparable.low && comparable.high){
     base = (comparable.low + comparable.high) / 2;
     source = "comparable";
@@ -695,12 +724,43 @@ function computeSalaryTarget(profile, job, matchResult, comparable){
   let target = Math.round((base * matchMultiplier) / 500) * 500;
   if (profileTarget && target < profileTarget * 0.9) target = Math.round((profileTarget * 0.95) / 500) * 500;
 
+  // Clamp the ask to whatever range we're citing as the anchor — a stated
+  // employer range, or (when nothing was posted) the comparable-roles band
+  // shown alongside it. An open floor has no ceiling to clamp against, but
+  // it's still a floor — a weak fit score should never push the ask below
+  // the minimum the employer already committed to paying.
+  if (isRealRange){
+    target = Math.min(Math.max(target, Number(job.salaryMin)), Number(job.salaryMax));
+  } else if (isOpenFloor){
+    target = Math.max(target, Number(job.salaryMin));
+  } else if (source === "comparable"){
+    target = Math.min(Math.max(target, comparable.low), comparable.high);
+  }
+
   if (source === "comparable"){
     return {
       recommendation: target,
       low: comparable.low,
       high: comparable.high,
       note: "No salary was listed — benchmarked against comparable " + comparable.family + " (" + comparable.level + ") roles" + (comparable.source === "grok" ? ", refined by Grok." : "."),
+      source
+    };
+  }
+  if (isRealRange){
+    return {
+      recommendation: target,
+      low: Number(job.salaryMin),
+      high: Number(job.salaryMax),
+      note: "Based on the posted range, adjusted for your fit score.",
+      source
+    };
+  }
+  if (isOpenFloor){
+    return {
+      recommendation: target,
+      low: Number(job.salaryMin),
+      high: null,
+      note: "Posting lists an open-ended floor (" + fmtMoney(job.salaryMin) + "+) rather than a capped range, so your ask can go above it.",
       source
     };
   }
@@ -777,11 +837,15 @@ const MATCH_SYSTEM_PROMPT = "You are a career-matching engine inside a personal 
   "legitimate, worthwhile stretch — not a warning sign. If instead the gap is concentrated in core skills the " +
   "role actually requires, say so explicitly too and be direct that it's a real mismatch rather than a " +
   "seniority reach. Do not change the numeric score based on this distinction — it only affects how you " +
-  "describe the gap in the analysis text. When the posting does not disclose " +
-  "a salary, estimate a realistic market compensation range for comparable roles (same title/family, similar " +
-  "seniority, industry, and location) from your general knowledge — this is an estimate for the candidate to " +
-  "use as an anchor in an intro or welcome call, not a live quote, so say so plainly in the analysis and give " +
-  "a specific opening number. Respond with ONLY a JSON object matching this exact schema, no prose outside it: " +
+  "describe the gap in the analysis text. When the posting states a real, capped salary range (a distinct low " +
+  "and high), keep salaryTarget within that range — recommending an ask above the employer's own advertised " +
+  "ceiling undermines the advice. When the posting only states an open-ended floor (e.g. \"$120,000+\", no " +
+  "distinct high end), there is no ceiling to respect and salaryTarget may exceed it. When the posting does " +
+  "not disclose a salary at all, estimate a realistic market compensation range for comparable roles (same " +
+  "title/family, similar seniority, industry, and location) from your general knowledge, and keep salaryTarget " +
+  "within that estimated range for the same reason — this is an estimate for the candidate to use as an anchor " +
+  "in an intro or welcome call, not a live quote, so say so plainly in the analysis and give a specific opening " +
+  "number. Respond with ONLY a JSON object matching this exact schema, no prose outside it: " +
   '{"matchScore": number 1-10 (integer), "salaryTarget": number|null, "salaryRangeLow": number|null, ' +
   '"salaryRangeHigh": number|null, "comparableSalaryLow": number|null, "comparableSalaryHigh": number|null, ' +
   '"comparableContext": string|null (short phrase, e.g. "mid-level Product Manager roles in tech"), ' +
@@ -802,7 +866,11 @@ function buildMatchPrompt(profile, job){
     "Company: " + job.company,
     "Location: " + (job.location || "n/a"),
     "Work form: " + (job.workForm || "n/a"),
-    "Stated salary: " + ((job.salaryMin || job.salaryMax) ? (job.salaryMin || "?") + " - " + (job.salaryMax || "?") + " " + (job.salaryCurrency || "") : "not disclosed")
+    "Stated salary: " + (job.salaryMin && job.salaryMax
+      ? job.salaryMin + " - " + job.salaryMax + " " + (job.salaryCurrency || "") + " (a real capped range — do not recommend an ask above the top of it)"
+      : job.salaryMin
+      ? job.salaryMin + "+ " + (job.salaryCurrency || "") + " (an open-ended floor, not a capped range — an ask above this is fine)"
+      : "not disclosed")
   ];
   if (!job.salaryMin && !job.salaryMax){
     const bench = estimateComparableSalary(job, profile);
@@ -955,10 +1023,24 @@ async function evaluateJob(job, profile, settings){
         requiredYears: matchResult.requiredYears
       };
       if (hasStatedSalary){
+        // Grok generates its own salaryTarget/salaryRangeLow/High from the
+        // prompt, so it can (rarely) ignore the "don't exceed a real range"
+        // instruction — clamp it here the same way the offline path does,
+        // rather than trusting the model to always honor the guardrail.
+        const hasMin = job.salaryMin != null && job.salaryMin !== "";
+        const hasMax = job.salaryMax != null && job.salaryMax !== "";
+        const isRealRange = hasMin && hasMax && Number(job.salaryMax) > Number(job.salaryMin);
+        const isOpenFloor = hasMin && !hasMax;
+        let target = Number(ai.salaryTarget);
+        if (isRealRange && Number.isFinite(target)){
+          target = Math.min(Math.max(target, Number(job.salaryMin)), Number(job.salaryMax));
+        } else if (isOpenFloor && Number.isFinite(target)){
+          target = Math.max(target, Number(job.salaryMin));
+        }
         salaryTarget = {
-          recommendation: ai.salaryTarget,
-          low: ai.salaryRangeLow,
-          high: ai.salaryRangeHigh,
+          recommendation: Number.isFinite(target) ? target : ai.salaryTarget,
+          low: isRealRange || isOpenFloor ? Number(job.salaryMin) : ai.salaryRangeLow,
+          high: isRealRange ? Number(job.salaryMax) : (isOpenFloor ? null : ai.salaryRangeHigh),
           note: "Generated by Grok (" + GROK_MODEL + ").",
           source: "listing"
         };
@@ -1500,7 +1582,10 @@ function JobCard({job, onStatusChange, onDelete, onRefresh, refreshing}){
           <div className="job-meta">
             {job.location && <span className="nb-badge">{job.location}</span>}
             {job.workForm && <span className="nb-badge">{job.workForm}</span>}
-            {(job.salaryMin || job.salaryMax) && (
+            {job.salaryMin && !job.salaryMax && (
+              <span className="nb-badge" title="Posting lists an open-ended floor, not a capped range">{fmtMoney(job.salaryMin)}+</span>
+            )}
+            {job.salaryMax && (
               <span className="nb-badge">{fmtMoney(job.salaryMin) || "?"} – {fmtMoney(job.salaryMax) || "?"}</span>
             )}
             {!(job.salaryMin || job.salaryMax) && job.comparableSalaryLow && (
