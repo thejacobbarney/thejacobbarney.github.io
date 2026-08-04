@@ -2,8 +2,8 @@
 
 `index.html` in this folder is a working, client-only prototype (React 18 + Babel Standalone,
 zero build step, deployed as a static page — same pattern as `/movie-spork`). It proves out the
-UX and the matching/salary logic using an offline heuristic engine, with an optional bring-your-own-
-OpenAI-key upgrade path.
+UX and the matching/salary logic using an offline heuristic engine, with optional bring-your-own-key
+upgrade paths for Grok (match scoring) and Perplexity (live salary search).
 
 A static GitHub Pages site cannot run a scraper or hold shared secrets, so it cannot be the real,
 multi-user product described in the brief — reliable LinkedIn/Indeed scraping and safe AI-key
@@ -20,7 +20,8 @@ contract, and the export pipeline — everything needed to lift the prototype in
 | Frontend | **Next.js 14 (App Router) + React + Tailwind CSS** | Server components for the dashboard/analytics reads, client components for the interactive add-job flow; Tailwind maps cleanly onto the Neo-Brutalist token system (hard borders, flat shadows, no radius). |
 | Auth + DB | **Supabase (Postgres + Auth + Row-Level Security)** | One provider for auth, relational storage, and realtime subscriptions (pipeline status updates across tabs/devices) without standing up separate services. |
 | Scraping | **Playwright** on a **queue-backed worker** (see §3), fronted by **ScrapingBee or Browserless** for the JS-heavy / anti-bot sources (LinkedIn, Indeed) | Playwright handles the general case (JS-rendered career pages) cheaply; a managed scraping API absorbs residential-proxy and headless-detection costs for the two hardest sources instead of building that infrastructure in-house. |
-| AI | **OpenAI API (`gpt-4o-mini` default, upgradeable to `gpt-4o`)**, called **server-side only** | Keeps the API key off the client; lets you cache/rate-limit per user; response-format `json_object` enforces the evaluation schema (see §5). |
+| AI (match scoring) | **xAI Grok API (`grok-4-fast` default)**, called **server-side only** | OpenAI-compatible request/response shape, so the same `response_format: json_object` pattern applies; keeps the key off the client and lets you cache/rate-limit per user (see §5). |
+| AI (salary search) | **Perplexity Sonar API**, called **server-side only** | Web search grounding is built into the model rather than bolted on as a tool call — a better fit for "find current comp data" than a general-purpose model with a search plugin, and it returns real source citations (see §3.4). |
 | Queue/Jobs | **Postgres-backed queue (`pgmq` or a Supabase Edge Function + cron)**, or **Inngest** if you want retries/backoff without managing infra | Scraping and AI evaluation are both slow, flaky, and rate-limited — they belong off the request/response path. |
 | Hosting | **Vercel** (frontend + API routes) — pairs natively with Next.js and Supabase | Zero-config previews, edge-friendly, no server ops. |
 | Export | **CSV**: generated server-side or client-side, trivial. **Google Sheets**: Google Identity Services (GIS) OAuth token flow, called directly from the browser with the user's own consent — no backend credential storage needed. | Sheets API supports CORS for authenticated browser requests, so this is the one integration that genuinely doesn't need a backend proxy. |
@@ -59,8 +60,9 @@ production.
                      └────────┬──────────┘
                                ▼
                      ┌──────────────────┐
-                     │  OpenAI Evaluation │
-                     │  (server-side key) │
+                     │  Grok match eval + │
+                     │  Perplexity salary │
+                     │  (server-side keys)│
                      └────────┬──────────┘
                                ▼
                      write job + evaluation → Postgres → push to client (Supabase Realtime)
@@ -171,11 +173,58 @@ function pickStrategy(url: string): 'json-ld' | 'playwright' | 'scrapingbee' {
 
 ### 3.4 Comparable compensation search (brief's §1.E.i)
 
-Stated salary is often absent. To estimate a market range: query a compensation data source
-(Levels.fyi has no public API; realistic options are the **BLS OEWS API** for occupational wage
-percentiles by metro area, or a paid source like **Payscale's API**) keyed on normalized job title
-+ location, and store the result on `jobs.comparable_salary_low/high`. This runs as a second queue
-job alongside the AI evaluation, not inline — it's a network call with its own latency/failure mode.
+Stated salary is often absent. The prototype layers three tiers, cheapest/always-available first,
+each one upgrading the estimate when its prerequisite is configured:
+
+1. **Offline benchmark table** (always on). `estimateComparableSalary` (`index.html`) matches the
+   title against a hardcoded table of ~16 role families (Software Engineering, Finance &
+   Accounting, Product, Sales, etc.), applies a seniority multiplier read off title keywords
+   ("Senior", "Director", "Staff") or the profile's years of experience, and returns a market
+   low/high. Zero network calls, zero keys required.
+2. **Grok static-knowledge estimate** (if a Grok key is set and no better source ran). The offline
+   estimate is passed to the model as a prior in `buildMatchPrompt`, and the model can refine it
+   using broader training-data knowledge of the specific title/industry/location
+   (`comparableSalaryLow/High/Context` in the match-eval schema, §4.2). Still not a live quote —
+   Grok isn't given search access for this call, just asked to reason from what it already knows.
+3. **Perplexity Sonar with built-in web search** (if a Perplexity key is set) — `fetchSalaryBenchmark`
+   in `index.html`. This is a genuine live web search, not a knowledge-cutoff guess, and takes
+   priority over both tiers above when it succeeds:
+   - **One call**, not two. Unlike a general-purpose model with a search tool bolted on, Sonar
+     reasons over live search results as part of normal generation, so the prompt asks it to
+     identify the standardized role (title, industry, seniority, location) *and* return the
+     benchmark in a single round trip — `{clean_title, industry, experience_level, location,
+     min_salary, median_salary, max_salary, confidence_score, rationale}`.
+   - The call goes through Perplexity's REST endpoint directly (`fetch` to
+     `api.perplexity.ai/chat/completions`, OpenAI-compatible chat-completions shape) — same
+     bring-your-own-key pattern as the Grok tier, with the same client-side-key caveat (§7).
+   - The response includes a `citations` array of real source URLs, which Bark renders as clickable
+     links under the career analysis — actual sources beat a vague "estimated" sentence when
+     you're prepping for a call.
+   - **Response parsing is defensive**: the app tries `JSON.parse` on the raw content first, then
+     falls back to extracting the first `{...}` block via regex, since Sonar isn't guaranteed to
+     skip prose around the JSON the way a strict-JSON-mode model would.
+   - The result is also validated before being trusted (`isUsableLiveBenchmark`): a
+     `confidence_score` of `"low"`, or numbers that don't hold up (non-numeric, `min > max`, `<= 0`),
+     get rejected in favor of whatever tier 1/2 already produced. On any failure — bad key, rate
+     limit, network, unusable numbers — it degrades to the existing estimate silently (a
+     `console.warn` only), since a live-search miss isn't an error state worth interrupting the
+     user over. Only a Grok match-eval failure surfaces a toast (§4.3), because that affects the
+     primary match score, not just an optional enrichment.
+
+Whichever tier wins, the range is surfaced as a `Market $X–$Y` badge (🔎 prefix when it's the live
+Perplexity result) and folded into the career analysis as a call-anchoring number: "use $X–$Y as
+your anchor on an intro call, with $Y as your opening ask." The Perplexity tier's `rationale` — a
+sentence naming the sources behind the number — gets appended directly to that analysis text, and
+its citations render as clickable source links underneath.
+
+This is a reasonable production pattern already — live search grounding is a real market-data
+source, not a hardcoded table — but it still inherits the browser-side-key caveat from §7: for a
+multi-user product, the Perplexity calls move server-side (same reasoning as the Grok evaluation
+call) so the key isn't exposed per-client. The alternative production path — a dedicated
+compensation data API like **BLS OEWS** (occupational wage percentiles by metro area) or
+**Payscale's API** — is still worth considering as a more structured, purpose-built data source if
+Sonar's search grounding proves inconsistent in practice; either way, this becomes a queue job
+alongside the AI evaluation once there's a backend, not an inline call.
 
 ### 3.5 Legal/ethical note
 
@@ -198,7 +247,7 @@ The prototype ships both tiers so it works with zero configuration:
   list, a years-of-experience-vs-required-years seniority adjustment, and a templated 2-3 sentence
   writeup. Deterministic, free, instant — the right default and the right fallback when the AI
   call fails or is rate-limited.
-- **Tier 2 — LLM evaluation**: richer, handles nuance (adjacent skills, seniority framing,
+- **Tier 2 — LLM evaluation (Grok)**: richer, handles nuance (adjacent skills, seniority framing,
   culture/scope signals in the description) that keyword overlap can't.
 
 ### 4.2 Prompt template (production, server-side)
@@ -210,7 +259,7 @@ background and a job posting, evaluate fit with rigor and honesty — do not inf
 to be encouraging, and call out real gaps. Respond with ONLY a JSON object matching this
 exact schema, no prose outside it:
 {
-  "matchScore": number 0-100,
+  "matchScore": number 1-10 (integer, 10 = perfect match),
   "salaryTarget": number | null,
   "salaryRangeLow": number | null,
   "salaryRangeHigh": number | null,
@@ -244,12 +293,15 @@ Evaluate the match and return the JSON object only.
 Call with `response_format: { type: "json_object" }` and a low temperature (0.3–0.4) — this is a
 scoring task, not a creative one; consistency matters more than variety. This exact template
 (minus the comparable-salary line, which the prototype has no data source for) is implemented in
-`index.html`'s `AI_SYSTEM_PROMPT` / `buildAiPrompt`, callable today if you supply your own key in
-the prototype's Settings tab.
+`index.html`'s `MATCH_SYSTEM_PROMPT` / `buildMatchPrompt`, callable today if you supply your own
+Grok key in the prototype's Settings tab. It's sent to `api.x.ai/v1/chat/completions` with
+`model: "grok-4-fast"` — xAI's endpoint mirrors OpenAI's chat-completions shape closely enough
+that this is effectively the same integration pattern regardless of which of the two you'd pick
+in production.
 
 ### 4.3 Production hardening
 
-- **Server-side only.** The prototype calls OpenAI directly from the browser with a user-supplied
+- **Server-side only.** The prototype calls Grok directly from the browser with a user-supplied
   key — acceptable for a single-user personal tool, wrong for a real product. In production this
   call moves into an API route/server action; the key lives in an environment variable, never
   reaches the client.
@@ -333,8 +385,8 @@ export function JobCard({ job, onStatusChange }: { job: Job; onStatusChange: (id
 | Multi-user auth + RLS | Single browser, `localStorage` |
 | Server-side scraping queue | Direct `fetch` + optional public CORS proxy, manual paste fallback |
 | LinkedIn/Indeed anti-bot handling | Not attempted — routes to manual paste |
-| Server-held OpenAI key | User-supplied key, stored in `localStorage`, called from the browser |
-| Comparable-salary market data | Not implemented — salary target derives from listing + profile only |
+| Server-held Grok / Perplexity keys | User-supplied keys, stored in `localStorage`, called from the browser |
+| Comparable-salary market data | Three-tier fallback (offline table → Grok static-knowledge estimate → live Perplexity search) — the Perplexity tier is genuinely live with real citations, but still called client-side with a user-supplied key (see §3.4) |
 | Evaluation history / score drift | Only the latest evaluation per job is kept |
 
 Everything else — extraction logic, scoring math, salary targeting, the career-analysis prompt,

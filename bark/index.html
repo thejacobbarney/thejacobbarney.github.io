@@ -193,10 +193,11 @@
     box-shadow:var(--shadow-sm);
   }
   .nb-score .num{font-size:1.4rem;font-weight:700;line-height:1;}
+  .nb-score .num .denom{font-size:0.68rem;font-weight:700;opacity:0.65;}
   .nb-score .lbl{font-size:0.55rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;}
-  .score-high{background:var(--turq);}
+  .score-high{background:var(--green);}
   .score-mid{background:var(--yellow);}
-  .score-low{background:#FFB9B9;}
+  .score-low{background:#FF5C5C;}
 
   /* ── job cards ──────────────────────────────── */
   .job-list{display:flex;flex-direction:column;gap:1.1rem;}
@@ -341,7 +342,7 @@ const DEFAULT_PROFILE = {
   name:"", yearsExp:3, targetRoles:"", skills:[], summary:"",
   currentSalary:"", targetSalary:""
 };
-const DEFAULT_SETTINGS = { openaiKey:"", googleClientId:"" };
+const DEFAULT_SETTINGS = { grokKey:"", perplexityKey:"", googleClientId:"" };
 
 /* ─────────────────────────────────────────────────────────────
    EXTRACTION — JSON-LD (schema.org JobPosting), meta-tag
@@ -494,7 +495,7 @@ function computeMatch(profile, job){
     seniorityScore = diff >= 0 ? 1 : Math.max(0.15, 1 + diff / Math.max(requiredYears, 1));
   }
 
-  const score = Math.round(Math.min(100, Math.max(4, skillScore * 68 + seniorityScore * 32)));
+  const score = Math.round(Math.min(10, Math.max(1, skillScore * 6.8 + seniorityScore * 3.2)));
   return {
     score,
     matched: [...new Set(matched)],
@@ -503,57 +504,155 @@ function computeMatch(profile, job){
   };
 }
 
-function computeSalaryTarget(profile, job, matchResult){
+/* ─────────────────────────────────────────────────────────────
+   COMPARABLE COMPENSATION BENCHMARK — when a listing doesn't
+   disclose salary, estimate a market range for similar roles in
+   the same family so there's still a defensible number to open
+   with on an intro/welcome call. Always available offline;
+   refined by the AI tiers below when a Grok or Perplexity key is
+   configured.
+───────────────────────────────────────────────────────────── */
+const SALARY_BENCHMARKS = [
+  { id:"software", label:"Software Engineering", match:/software engineer|\bswe\b|back.?end|front.?end|full.?stack|developer|programmer|site reliability|devops|mobile engineer|ios engineer|android engineer/i, low:105000, high:150000 },
+  { id:"data", label:"Data & ML", match:/data scientist|data engineer|data analyst|machine learning|\bml engineer\b|analytics engineer/i, low:100000, high:145000 },
+  { id:"product", label:"Product Management", match:/product manager|product owner/i, low:115000, high:155000 },
+  { id:"design", label:"Design", match:/\bux\b|\bui\b designer|product designer|graphic designer|visual designer/i, low:90000, high:125000 },
+  { id:"finance", label:"Finance & Accounting", match:/financial analyst|fp\s*&\s*a|finance manager|accountant|controller|treasury|investment analyst/i, low:75000, high:110000 },
+  { id:"marketing", label:"Marketing", match:/marketing manager|content marketing|\bseo\b|growth marketing|brand manager|marketing specialist|demand generation/i, low:65000, high:100000 },
+  { id:"sales", label:"Sales", match:/account executive|sales representative|sales manager|business development|\bbdr\b|\bsdr\b/i, low:70000, high:115000 },
+  { id:"hr", label:"HR & Talent", match:/recruiter|talent acquisition|hr generalist|human resources|people operations/i, low:65000, high:95000 },
+  { id:"operations", label:"Operations & Supply Chain", match:/operations manager|supply chain|logistics|procurement/i, low:70000, high:105000 },
+  { id:"project", label:"Project & Program Management", match:/project manager|program manager|scrum master/i, low:80000, high:120000 },
+  { id:"success", label:"Customer Success", match:/customer success|client success|account manager/i, low:65000, high:98000 },
+  { id:"legal", label:"Legal & Compliance", match:/paralegal|attorney|counsel|compliance officer/i, low:85000, high:145000 },
+  { id:"healthcare", label:"Healthcare", match:/registered nurse|\brn\b|nurse practitioner|clinical/i, low:75000, high:112000 },
+  { id:"education", label:"Education", match:/teacher|instructor|curriculum/i, low:48000, high:75000 },
+  { id:"engineering", label:"Engineering (non-software)", match:/mechanical engineer|civil engineer|electrical engineer|chemical engineer/i, low:80000, high:118000 },
+  { id:"admin", label:"Administrative", match:/administrative assistant|office manager|coordinator/i, low:45000, high:65000 }
+];
+const DEFAULT_BENCHMARK = { id:"general", label:"General Professional", low:60000, high:92000 };
+
+const SENIORITY_MULTIPLIERS = [
+  { match:/\bintern\b/i, mult:0.42, label:"Intern" },
+  { match:/\bchief\b|\bc[a-z]o\b/i, mult:2.5, label:"Executive" },
+  { match:/\bvp\b|vice president/i, mult:2.05, label:"VP" },
+  { match:/\bdirector\b|head of/i, mult:1.65, label:"Director" },
+  { match:/\bstaff\b|\bprincipal\b/i, mult:1.5, label:"Staff/Principal" },
+  { match:/\blead\b/i, mult:1.4, label:"Lead" },
+  { match:/\bsenior\b|\bsr\.?\s/i, mult:1.25, label:"Senior" },
+  { match:/\bjunior\b|\bentry.level\b/i, mult:0.8, label:"Junior/Entry" }
+];
+
+function experienceMultiplier(years){
+  const y = Number(years) || 0;
+  if (y < 2) return 0.85;
+  if (y < 5) return 1.0;
+  if (y < 8) return 1.15;
+  if (y < 12) return 1.35;
+  return 1.6;
+}
+
+function estimateComparableSalary(job, profile){
+  const text = (job.title || "") + " " + (job.description || "").slice(0, 800);
+  const family = SALARY_BENCHMARKS.find(b => b.match.test(text)) || DEFAULT_BENCHMARK;
+  const seniorityHit = SENIORITY_MULTIPLIERS.find(s => s.match.test(job.title || ""));
+  const multiplier = seniorityHit ? seniorityHit.mult : experienceMultiplier(profile.yearsExp);
+  const level = seniorityHit ? seniorityHit.label : (Number(profile.yearsExp) >= 8 ? "Senior" : Number(profile.yearsExp) >= 3 ? "Mid" : "Early Career");
+  return {
+    low: Math.round((family.low * multiplier) / 1000) * 1000,
+    high: Math.round((family.high * multiplier) / 1000) * 1000,
+    family: family.label,
+    level,
+    source: "benchmark"
+  };
+}
+
+function computeSalaryTarget(profile, job, matchResult, comparable){
   const profileTarget = Number(profile.targetSalary) || (Number(profile.currentSalary) ? Number(profile.currentSalary) * 1.15 : null);
   let base = null;
+  let source = "listing";
   if (job.salaryMin && job.salaryMax) base = (Number(job.salaryMin) + Number(job.salaryMax)) / 2;
   else if (job.salaryMax) base = Number(job.salaryMax);
   else if (job.salaryMin) base = Number(job.salaryMin);
-  else base = profileTarget;
+  else if (comparable && comparable.low && comparable.high){
+    base = (comparable.low + comparable.high) / 2;
+    source = "comparable";
+  } else if (profileTarget){
+    base = profileTarget;
+    source = "profile";
+  }
 
   if (!base){
-    return { recommendation:null, low:null, high:null, note:"No salary was listed and no target salary is set on your profile — add one for a recommendation." };
+    return { recommendation:null, low:null, high:null, note:"No salary was listed and no target salary is set on your profile — add one for a recommendation.", source:"none" };
   }
-  const matchMultiplier = 0.9 + (matchResult.score / 100) * 0.2;
+  const matchMultiplier = 0.9 + (matchResult.score / 10) * 0.2;
   let target = Math.round((base * matchMultiplier) / 500) * 500;
   if (profileTarget && target < profileTarget * 0.9) target = Math.round((profileTarget * 0.95) / 500) * 500;
+
+  if (source === "comparable"){
+    return {
+      recommendation: target,
+      low: comparable.low,
+      high: comparable.high,
+      note: "No salary was listed — benchmarked against comparable " + comparable.family + " (" + comparable.level + ") roles" + (comparable.source === "grok" ? ", refined by Grok." : "."),
+      source
+    };
+  }
   return {
     recommendation: target,
     low: Math.round((target * 0.93) / 500) * 500,
     high: Math.round((target * 1.08) / 500) * 500,
-    note: job.salaryMin || job.salaryMax ? "Based on the posted range, adjusted for your fit score." : "Posting had no salary listed — estimated from your profile target."
+    note: source === "listing" ? "Based on the posted range, adjusted for your fit score." : "Posting had no salary listed — estimated from your profile target.",
+    source
   };
 }
 
 function generateCareerAnalysis(profile, job, matchResult, salaryTarget){
   const strengths = matchResult.matched.slice(0,3).join(", ");
   const gaps = matchResult.missing.slice(0,3).join(", ");
-  const verdict = matchResult.score >= 75 ? "a strong alignment with your background"
-    : matchResult.score >= 50 ? "a reasonable stretch from your current experience"
+  const verdict = matchResult.score >= 8 ? "a strong alignment with your background"
+    : matchResult.score >= 4 ? "a reasonable stretch from your current experience"
     : "a significant reach given what's listed";
 
   const s1 = "This role looks like " + verdict + (strengths ? ", particularly given your experience with " + strengths + "." : ".");
   const s2 = gaps ? "The clearest gap is " + gaps + " — worth addressing directly in a cover letter or interview." : "Your listed skills cover the stated requirements well.";
-  const s3 = salaryTarget.recommendation
-    ? "Target roughly $" + salaryTarget.recommendation.toLocaleString() + " in negotiations — " + salaryTarget.note.toLowerCase()
-    : salaryTarget.note;
+  let s3;
+  if (salaryTarget.recommendation && salaryTarget.source === "comparable"){
+    s3 = "Salary wasn't posted, so use $" + salaryTarget.low.toLocaleString() + "–$" + salaryTarget.high.toLocaleString() +
+      " (comparable roles) as your anchor on an intro or welcome call, with $" + salaryTarget.recommendation.toLocaleString() + " as your opening ask.";
+  } else if (salaryTarget.recommendation){
+    s3 = "Target roughly $" + salaryTarget.recommendation.toLocaleString() + " in negotiations — " + salaryTarget.note.toLowerCase();
+  } else {
+    s3 = salaryTarget.note;
+  }
   return s1 + " " + s2 + " " + s3;
 }
 
 /* ─────────────────────────────────────────────────────────────
-   AI-ENHANCED EVALUATION — optional, only runs if the user has
-   supplied their own OpenAI key in Settings. Falls back to the
-   offline heuristic above on any error.
+   AI-ENHANCED EVALUATION — Grok (xAI). Optional, only runs if the
+   user has supplied their own Grok key in Settings. Falls back to
+   the offline heuristic above on any error. xAI's chat completions
+   endpoint is OpenAI-compatible, so this is the same request/
+   response shape as the match-scoring calls in the architecture
+   doc's production plan — just a different base URL and model.
 ───────────────────────────────────────────────────────────── */
-const AI_SYSTEM_PROMPT = "You are a career-matching engine inside a personal job application tracker. " +
-  "Given a candidate's background and a single job posting, evaluate fit with rigor and honesty — do not " +
-  "inflate scores to be encouraging, and call out real gaps. Respond with ONLY a JSON object matching this " +
-  "exact schema, no prose outside it: " +
-  '{"matchScore": number 0-100, "salaryTarget": number|null, "salaryRangeLow": number|null, ' +
-  '"salaryRangeHigh": number|null, "analysis": string (2-3 sentences), "matchedSkills": string[], "missingSkills": string[]}';
+const GROK_MODEL = "grok-4-fast";
 
-function buildAiPrompt(profile, job){
-  return [
+const MATCH_SYSTEM_PROMPT = "You are a career-matching engine inside a personal job application tracker. " +
+  "Given a candidate's background and a single job posting, evaluate fit with rigor and honesty — do not " +
+  "inflate scores to be encouraging, and call out real gaps. Score matchScore on a 1-10 integer scale where " +
+  "10 is a perfect match and 1 is a poor match — never use a 0-100 scale. When the posting does not disclose " +
+  "a salary, estimate a realistic market compensation range for comparable roles (same title/family, similar " +
+  "seniority, industry, and location) from your general knowledge — this is an estimate for the candidate to " +
+  "use as an anchor in an intro or welcome call, not a live quote, so say so plainly in the analysis and give " +
+  "a specific opening number. Respond with ONLY a JSON object matching this exact schema, no prose outside it: " +
+  '{"matchScore": number 1-10 (integer), "salaryTarget": number|null, "salaryRangeLow": number|null, ' +
+  '"salaryRangeHigh": number|null, "comparableSalaryLow": number|null, "comparableSalaryHigh": number|null, ' +
+  '"comparableContext": string|null (short phrase, e.g. "mid-level Product Manager roles in tech"), ' +
+  '"analysis": string (2-3 sentences), "matchedSkills": string[], "missingSkills": string[]}';
+
+function buildMatchPrompt(profile, job){
+  const lines = [
     "CANDIDATE BACKGROUND",
     "Years of experience: " + (profile.yearsExp || "n/a"),
     "Skills: " + ((profile.skills || []).join(", ") || "n/a"),
@@ -567,31 +666,107 @@ function buildAiPrompt(profile, job){
     "Company: " + job.company,
     "Location: " + (job.location || "n/a"),
     "Work form: " + (job.workForm || "n/a"),
-    "Stated salary: " + ((job.salaryMin || job.salaryMax) ? (job.salaryMin || "?") + " - " + (job.salaryMax || "?") + " " + (job.salaryCurrency || "") : "not disclosed"),
-    "Description:",
-    (job.description || "").slice(0, 6000),
-    "",
-    "Evaluate the match and return the JSON object only."
-  ].join("\n");
+    "Stated salary: " + ((job.salaryMin || job.salaryMax) ? (job.salaryMin || "?") + " - " + (job.salaryMax || "?") + " " + (job.salaryCurrency || "") : "not disclosed")
+  ];
+  if (!job.salaryMin && !job.salaryMax){
+    const bench = estimateComparableSalary(job, profile);
+    lines.push("Rough offline benchmark for reference (refine with your own knowledge if you can do better): $" +
+      bench.low.toLocaleString() + " - $" + bench.high.toLocaleString() + " for " + bench.family + " (" + bench.level + " level)");
+  }
+  lines.push("Description:", (job.description || "").slice(0, 6000), "", "Evaluate the match and return the JSON object only.");
+  return lines.join("\n");
 }
 
-async function callOpenAIEvaluate(apiKey, profile, job){
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+async function callGrokEvaluate(apiKey, profile, job){
+  const res = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type":"application/json", "Authorization":"Bearer " + apiKey },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: GROK_MODEL,
       response_format: { type: "json_object" },
       temperature: 0.4,
       messages: [
-        { role:"system", content: AI_SYSTEM_PROMPT },
-        { role:"user", content: buildAiPrompt(profile, job) }
+        { role:"system", content: MATCH_SYSTEM_PROMPT },
+        { role:"user", content: buildMatchPrompt(profile, job) }
       ]
     })
   });
-  if (!res.ok) throw new Error("OpenAI request failed (" + res.status + ")");
+  if (!res.ok) throw new Error("Grok request failed (" + res.status + ")");
   const data = await res.json();
   return JSON.parse(data.choices[0].message.content);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LIVE SALARY BENCHMARK — Perplexity (Sonar), which has web search
+   grounding built into the model rather than bolted on as a tool.
+   Optional, only runs if the user has supplied their own
+   Perplexity key in Settings and the listing has no stated salary.
+   One call: Sonar reasons over live search results directly, so
+   there's no separate extraction pass first. Falls back to the
+   offline/Grok comparable estimate on any error. Returns real
+   source citations, which get surfaced in the UI — actual links
+   beat a vague "estimated" sentence when you're prepping for a
+   call.
+───────────────────────────────────────────────────────────── */
+const PERPLEXITY_MODEL = "sonar";
+
+function extractJsonObject(text){
+  try { return JSON.parse(text); } catch(e){}
+  const match = text.match(/\{[\s\S]*\}/);
+  if (match){
+    try { return JSON.parse(match[0]); } catch(e){}
+  }
+  throw new Error("Could not parse JSON from response");
+}
+
+async function callPerplexity(apiKey, prompt){
+  const res = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+    body: JSON.stringify({
+      model: PERPLEXITY_MODEL,
+      messages: [
+        { role: "system", content: "Respond with ONLY a single strict JSON object — no prose, no markdown code fences, nothing outside the JSON." },
+        { role: "user", content: prompt }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error("Perplexity request failed (" + res.status + ")");
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error("Perplexity returned no content");
+  const citations = data.citations || (data.search_results || []).map(r => r.url).filter(Boolean);
+  return { ...extractJsonObject(text), citations };
+}
+
+async function fetchSalaryBenchmark(apiKey, job){
+  const prompt = `Research current market compensation for this job posting. Identify the standardized role (title, industry, seniority level, location), search for live compensation data on comparable roles, then return ONLY a strict JSON object with this exact shape:
+{
+  "clean_title": string,
+  "industry": string,
+  "experience_level": string,
+  "location": string | null,
+  "min_salary": number,
+  "median_salary": number,
+  "max_salary": number,
+  "confidence_score": "low" | "medium" | "high",
+  "rationale": "short explanation of the market data found"
+}
+
+JOB POSTING
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location || "unknown"}
+Description:
+${(job.description || "").slice(0, 4000)}`;
+  return callPerplexity(apiKey, prompt);
+}
+
+function isUsableLiveBenchmark(live){
+  if (!live || live.confidence_score === "low") return false;
+  const { min_salary, max_salary } = live;
+  return typeof min_salary === "number" && typeof max_salary === "number" &&
+    min_salary > 0 && max_salary >= min_salary;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -610,10 +785,10 @@ function triggerDownload(filename, content, mime){
   URL.revokeObjectURL(url);
 }
 function exportCSV(jobs){
-  const headers = ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Salary Target","URL","Date Added"];
+  const headers = ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Comparable Low","Comparable High","Comparable Source","Comparable Confidence","Salary Target","URL","Date Added"];
   const rows = jobs.map(j => [
     j.title, j.company, j.location, j.workForm, j.status, j.matchScore,
-    j.salaryMin || "", j.salaryMax || "", j.salaryTarget || "", j.url || "", j.dateAdded
+    j.salaryMin || "", j.salaryMax || "", j.comparableSalaryLow || "", j.comparableSalaryHigh || "", j.comparableSource || "", j.comparableConfidence || "", j.salaryTarget || "", j.url || "", j.dateAdded
   ]);
   const csv = [headers, ...rows].map(r => r.map(csvEscape).join(",")).join("\n");
   triggerDownload("bark-export.csv", csv, "text/csv");
@@ -647,8 +822,8 @@ async function exportToGoogleSheets(jobs, clientId){
           const sheet = await createRes.json();
           if (!sheet.spreadsheetId) throw new Error("Sheets API did not return a spreadsheet id");
           const values = [
-            ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Salary Target","URL","Date Added"],
-            ...jobs.map(j => [j.title, j.company, j.location, j.workForm, j.status, j.matchScore, j.salaryMin || "", j.salaryMax || "", j.salaryTarget || "", j.url || "", j.dateAdded])
+            ["Title","Company","Location","Work Form","Status","Match Score","Salary Min","Salary Max","Comparable Low","Comparable High","Comparable Source","Comparable Confidence","Salary Target","URL","Date Added"],
+            ...jobs.map(j => [j.title, j.company, j.location, j.workForm, j.status, j.matchScore, j.salaryMin || "", j.salaryMax || "", j.comparableSalaryLow || "", j.comparableSalaryHigh || "", j.comparableSource || "", j.comparableConfidence || "", j.salaryTarget || "", j.url || "", j.dateAdded])
           ];
           await fetch("https://sheets.googleapis.com/v4/spreadsheets/" + sheet.spreadsheetId + "/values/Sheet1!A1:append?valueInputOption=USER_ENTERED", {
             method:"POST",
@@ -668,8 +843,8 @@ async function exportToGoogleSheets(jobs, clientId){
    SMALL UI HELPERS
 ───────────────────────────────────────────────────────────── */
 function scoreClass(score){
-  if (score >= 70) return "score-high";
-  if (score >= 45) return "score-mid";
+  if (score >= 8) return "score-high";
+  if (score >= 4) return "score-mid";
   return "score-low";
 }
 function fmtMoney(n){
@@ -677,11 +852,20 @@ function fmtMoney(n){
   return "$" + Number(n).toLocaleString();
 }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function comparableSourceLabel(source){
+  if (source === "perplexity-live") return "Perplexity live search";
+  if (source === "grok") return "Grok estimate";
+  return "offline benchmark";
+}
+function hostnameOf(url){
+  try { return new URL(url).hostname.replace(/^www\./, ""); }
+  catch(e){ return url; }
+}
 
 function ScoreDial({score}){
   return (
     <div className={"nb-score " + scoreClass(score)}>
-      <div className="num">{score}</div>
+      <div className="num">{score}<span className="denom">/10</span></div>
       <div className="lbl">match</div>
     </div>
   );
@@ -702,7 +886,6 @@ function AddJobTab({profile, settings, onSave}){
   const [fetchError, setFetchError] = useState("");
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [aiNote, setAiNote] = useState("");
 
   async function handleFetch(useProxy){
     if (!url.trim()) return;
@@ -731,7 +914,7 @@ function AddJobTab({profile, settings, onSave}){
 
   async function handleSave(){
     if (!draft || !draft.title){ return; }
-    setSaving(true); setAiNote("");
+    setSaving(true);
     const finalJob = {
       ...draft,
       skills: draft.skillsText.split(",").map(s => s.trim()).filter(Boolean),
@@ -740,30 +923,65 @@ function AddJobTab({profile, settings, onSave}){
       dateAdded: new Date().toISOString().slice(0,10)
     };
 
+    const hasStatedSalary = !!(finalJob.salaryMin || finalJob.salaryMax);
+    let comparable = hasStatedSalary ? null : estimateComparableSalary(finalJob, profile);
+    const notes = [];
+
+    if (!hasStatedSalary && settings.perplexityKey){
+      try {
+        const live = await fetchSalaryBenchmark(settings.perplexityKey, finalJob);
+        if (!isUsableLiveBenchmark(live)){
+          console.warn("Perplexity salary benchmark skipped (low confidence or unusable numbers) — using the offline estimate instead.", live);
+        } else {
+          comparable = {
+            low: live.min_salary,
+            high: live.max_salary,
+            median: live.median_salary || null,
+            family: live.clean_title || comparable.family,
+            level: live.experience_level || comparable.level,
+            confidence: live.confidence_score || null,
+            rationale: live.rationale || null,
+            citations: live.citations || [],
+            source: "perplexity-live"
+          };
+        }
+      } catch(e){
+        console.warn("Perplexity salary benchmark failed — using the offline estimate instead.", e);
+      }
+    }
+
     let matchResult = computeMatch(profile, finalJob);
-    let salaryTarget = computeSalaryTarget(profile, finalJob, matchResult);
+    let salaryTarget = computeSalaryTarget(profile, finalJob, matchResult, comparable);
     let analysis = generateCareerAnalysis(profile, finalJob, matchResult, salaryTarget);
     let engineUsed = "Offline heuristic engine";
 
-    if (settings.openaiKey){
+    if (settings.grokKey){
       try {
-        const ai = await callOpenAIEvaluate(settings.openaiKey, profile, finalJob);
+        const ai = await callGrokEvaluate(settings.grokKey, profile, finalJob);
         matchResult = {
           score: ai.matchScore,
           matched: ai.matchedSkills || [],
           missing: ai.missingSkills || [],
           requiredYears: matchResult.requiredYears
         };
-        salaryTarget = {
-          recommendation: ai.salaryTarget,
-          low: ai.salaryRangeLow,
-          high: ai.salaryRangeHigh,
-          note: "Generated by OpenAI (gpt-4o-mini)."
-        };
-        analysis = ai.analysis;
-        engineUsed = "OpenAI (gpt-4o-mini)";
+        if (hasStatedSalary){
+          salaryTarget = {
+            recommendation: ai.salaryTarget,
+            low: ai.salaryRangeLow,
+            high: ai.salaryRangeHigh,
+            note: "Generated by Grok (" + GROK_MODEL + ").",
+            source: "listing"
+          };
+        } else {
+          if (comparable.source === "benchmark" && ai.comparableSalaryLow && ai.comparableSalaryHigh){
+            comparable = { low: ai.comparableSalaryLow, high: ai.comparableSalaryHigh, family: ai.comparableContext || comparable.family, level: comparable.level, source: "grok" };
+          }
+          salaryTarget = computeSalaryTarget(profile, finalJob, matchResult, comparable);
+        }
+        analysis = ai.analysis + (!hasStatedSalary && comparable && comparable.rationale ? " " + comparable.rationale : "");
+        engineUsed = "Grok (" + GROK_MODEL + ")";
       } catch(e){
-        setAiNote("AI evaluation failed (" + e.message + ") — used the offline heuristic engine instead.");
+        notes.push("AI evaluation failed (" + e.message + ") — used the offline heuristic engine instead.");
       }
     }
 
@@ -775,9 +993,17 @@ function AddJobTab({profile, settings, onSave}){
       salaryTarget: salaryTarget.recommendation,
       salaryTargetLow: salaryTarget.low,
       salaryTargetHigh: salaryTarget.high,
+      comparableSalaryLow: comparable ? comparable.low : null,
+      comparableSalaryHigh: comparable ? comparable.high : null,
+      comparableMedian: comparable ? (comparable.median || null) : null,
+      comparableFamily: comparable ? comparable.family : null,
+      comparableConfidence: comparable ? (comparable.confidence || null) : null,
+      comparableRationale: comparable ? (comparable.rationale || null) : null,
+      comparableCitations: comparable ? (comparable.citations || []) : [],
+      comparableSource: comparable ? comparable.source : null,
       careerAnalysis: analysis,
       evalEngine: engineUsed
-    });
+    }, notes.length ? notes.join(" ") : null);
 
     setDraft(null); setUrl(""); setPasteText(""); setSaving(false);
   }
@@ -901,10 +1127,9 @@ function AddJobTab({profile, settings, onSave}){
           {!profile.skills.length && (
             <Callout type="warn"><span>Your profile has no skills yet — the match score will be rough. Fill out the <strong>Profile</strong> tab first for a real read.</span></Callout>
           )}
-          {aiNote && <Callout type="warn"><span>{aiNote}</span></Callout>}
 
           <button className="nb-btn nb-btn-purple nb-btn-block" disabled={saving || !draft.title} onClick={handleSave}>
-            {saving ? "Analyzing…" : (settings.openaiKey ? "Analyze with AI & Save" : "Analyze & Save")}
+            {saving ? "Analyzing…" : (settings.grokKey ? "Analyze with AI & Save" : "Analyze & Save")}
           </button>
         </div>
       )}
@@ -936,6 +1161,14 @@ function JobCard({job, onStatusChange, onDelete}){
             {(job.salaryMin || job.salaryMax) && (
               <span className="nb-badge">{fmtMoney(job.salaryMin) || "?"} – {fmtMoney(job.salaryMax) || "?"}</span>
             )}
+            {!(job.salaryMin || job.salaryMax) && job.comparableSalaryLow && (
+              <span className="nb-badge" style={{background:"var(--cream-2)"}}
+                title={"Comparable " + (job.comparableFamily || "roles") + " · " + comparableSourceLabel(job.comparableSource) +
+                  (job.comparableConfidence ? " · " + job.comparableConfidence + " confidence" : "") +
+                  (job.comparableRationale ? " — " + job.comparableRationale : "")}>
+                {job.comparableSource === "perplexity-live" ? "🔎 " : ""}Market {fmtMoney(job.comparableSalaryLow)}–{fmtMoney(job.comparableSalaryHigh)}
+              </span>
+            )}
             {job.salaryTarget && <span className="nb-badge" style={{background:"var(--yellow)"}}>Target {fmtMoney(job.salaryTarget)}</span>}
           </div>
           <div className="job-actions">
@@ -956,6 +1189,17 @@ function JobCard({job, onStatusChange, onDelete}){
           <div className="job-analysis">
             <div className="job-analysis-label">Career move analysis · {job.evalEngine}</div>
             {job.careerAnalysis}
+            {job.comparableCitations && job.comparableCitations.length > 0 && (
+              <div style={{marginTop:"0.6rem", fontSize:"0.76rem"}}>
+                <strong>Sources: </strong>
+                {job.comparableCitations.slice(0, 4).map((url, i) => (
+                  <React.Fragment key={url}>
+                    {i > 0 && ", "}
+                    <a href={url} target="_blank" rel="noopener" style={{color:"var(--purple-dark)", textDecoration:"underline"}}>{hostnameOf(url)}</a>
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
           </div>
           {(job.matchedSkills?.length || job.missingSkills?.length) ? (
             <div style={{marginTop:"0.75rem", display:"flex", flexWrap:"wrap", gap:"0.4rem"}}>
@@ -1113,7 +1357,7 @@ function ProfileTab({profile, onChange}){
 function AnalyticsTab({jobs}){
   const stats = useMemo(() => {
     const total = jobs.length;
-    const avgScore = total ? Math.round(jobs.reduce((a,j) => a + (j.matchScore||0), 0) / total) : 0;
+    const avgScore = total ? Math.round((jobs.reduce((a,j) => a + (j.matchScore||0), 0) / total) * 10) / 10 : 0;
     const salaries = jobs.map(j => j.salaryTarget).filter(Boolean);
     const avgTarget = salaries.length ? Math.round(salaries.reduce((a,b)=>a+b,0)/salaries.length) : null;
 
@@ -1153,7 +1397,7 @@ function AnalyticsTab({jobs}){
     <div>
       <div className="nb-grid-3" style={{marginTop:"1.75rem"}}>
         <div className="stat-tile"><div className="n">{stats.total}</div><div className="l">Jobs Tracked</div></div>
-        <div className="stat-tile"><div className="n">{stats.avgScore}%</div><div className="l">Avg Match Score</div></div>
+        <div className="stat-tile"><div className="n">{stats.avgScore}<span style={{fontSize:"1rem"}}>/10</span></div><div className="l">Avg Match Score</div></div>
         <div className="stat-tile"><div className="n">{stats.avgTarget ? fmtMoney(stats.avgTarget) : "—"}</div><div className="l">Avg Salary Target</div></div>
       </div>
 
@@ -1214,15 +1458,22 @@ function SettingsTab({settings, onChange}){
       <Callout type="info">
         <span>Everything in this app runs entirely in your browser — jobs, profile, and these keys are stored in
         <code>localStorage</code> on this device only, nothing is sent to any server we control. Keys you add here
-        are sent directly from your browser to OpenAI / Google, which is fine for personal use but not how you'd
-        ship this to other users (see the architecture doc for the production pattern).</span>
+        are sent directly from your browser to Grok / Perplexity / Google, which is fine for personal use but not
+        how you'd ship this to other users (see the architecture doc for the production pattern).</span>
       </Callout>
 
       <div className="nb-field">
-        <label className="nb-label">OpenAI API key (optional)</label>
-        <input className="nb-input" type="password" placeholder="sk-…" value={local.openaiKey}
-          onChange={e => setLocal(l => ({...l, openaiKey: e.target.value}))} />
-        <span className="nb-hint">When set, "Analyze &amp; Save" calls gpt-4o-mini for the match score, salary target, and career analysis instead of the offline heuristic engine.</span>
+        <label className="nb-label">Grok API key (optional)</label>
+        <input className="nb-input" type="password" placeholder="xai-…" value={local.grokKey}
+          onChange={e => setLocal(l => ({...l, grokKey: e.target.value}))} />
+        <span className="nb-hint">When set, "Analyze &amp; Save" calls grok-4-fast (xAI) for the match score, salary target, and career analysis instead of the offline heuristic engine. Get a key at console.x.ai.</span>
+      </div>
+
+      <div className="nb-field">
+        <label className="nb-label">Perplexity API key (optional, for live salary benchmarks)</label>
+        <input className="nb-input" type="password" placeholder="pplx-…" value={local.perplexityKey}
+          onChange={e => setLocal(l => ({...l, perplexityKey: e.target.value}))} />
+        <span className="nb-hint">When set and a listing has no posted salary, calls Perplexity's sonar model — web search is built into the model, so this pulls a live comparable-role range (min/median/max + confidence) with real source citations instead of the hardcoded benchmark table. Get a key at perplexity.ai/settings/api.</span>
       </div>
 
       <div className="nb-field">
@@ -1246,12 +1497,20 @@ function App(){
   const [profile, setProfile] = useState(() => loadLS(LS_KEYS.profile, DEFAULT_PROFILE));
   const [settings, setSettings] = useState(() => loadLS(LS_KEYS.settings, DEFAULT_SETTINGS));
 
+  const [toast, setToast] = useState(null);
+
   useEffect(() => saveLS(LS_KEYS.jobs, jobs), [jobs]);
   useEffect(() => saveLS(LS_KEYS.profile, profile), [profile]);
   useEffect(() => saveLS(LS_KEYS.settings, settings), [settings]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
-  function addJob(job){
+  function addJob(job, note){
     setJobs(list => [job, ...list]);
+    setToast(note || null);
     setTab("dashboard");
   }
   function updateStatus(id, status){
@@ -1289,6 +1548,13 @@ function App(){
           </div>
           <div className="nb-badge" style={{background:"var(--ink)", color:"#fff", borderColor:"#fff"}}>Neo-Brutalist Lab Build</div>
         </div>
+
+        {toast && (
+          <div className="nb-callout nb-callout-warn" style={{marginTop:"1.25rem", justifyContent:"space-between", alignItems:"center"}}>
+            <span>{toast}</span>
+            <button className="nb-btn nb-btn-sm" onClick={() => setToast(null)}>Dismiss</button>
+          </div>
+        )}
 
         <div className="nb-tabs">
           {tabs.map(t => (
