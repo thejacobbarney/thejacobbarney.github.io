@@ -1521,9 +1521,9 @@ function JobCard({job, onStatusChange, onDelete, onRefresh, refreshing}){
             <button className="nb-btn nb-btn-sm" onClick={onRefresh} disabled={refreshing} title="Re-run the match score and salary target against your current profile">
               {refreshing ? "Refreshing…" : "Refresh"}
             </button>
-            <button className="nb-btn nb-btn-sm" onClick={() => setOpen(o => !o)}>{open ? "Hide Details" : "View Details"}</button>
+            <button className="nb-btn nb-btn-sm" onClick={() => setOpen(o => !o)}>{open ? "Hide Role Evaluation" : "View Role Evaluation"}</button>
             {job.url && <a className="nb-btn nb-btn-sm" href={job.url} target="_blank" rel="noopener">Open Listing ↗</a>}
-            <button className="nb-btn nb-btn-sm" onClick={copyRaw}>Copy Raw</button>
+            <button className="nb-btn nb-btn-sm" onClick={copyRaw}>Copy Job Details</button>
             <button className="nb-btn nb-btn-sm nb-btn-pink" onClick={() => onDelete(job.id)}>Delete</button>
           </div>
         </div>
