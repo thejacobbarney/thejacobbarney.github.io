@@ -426,14 +426,121 @@ function parseSalaryToken(numStr, hasK){
   return Math.round(n);
 }
 
-function parseFreeText(text){
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-  const title = (lines[0] || "").slice(0, 120);
+/* ─────────────────────────────────────────────────────────────
+   Manual-paste header parsing — pulls title/company/location out
+   of the messy first ~15 lines of a copy-pasted LinkedIn/Indeed
+   posting: UI chrome ("Save", "47 applicants", star ratings) gets
+   filtered out first, then title/company/location are picked by
+   scoring candidate lines rather than assuming a fixed line order,
+   since LinkedIn puts company before title and Indeed puts it
+   after, and both often combine them on one "Company · Location ·
+   Full-time" line.
+───────────────────────────────────────────────────────────── */
+const NOISE_LINE = /^(apply now|easy apply|save job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*))$/i;
 
-  let company = "";
-  const labeled = lines.slice(0, 8).find(l => /^(company|employer)\s*[:\-]/i.test(l));
-  if (labeled) company = labeled.replace(/^(company|employer)\s*[:\-]\s*/i, "");
-  else if (lines[1] && lines[1].length < 60 && !/[.:]$/.test(lines[1])) company = lines[1];
+const JOB_TITLE_WORDS = /\b(engineer|manager|analyst|director|coordinator|specialist|developer|designer|scientist|lead|associate|consultant|representative|administrator|officer|executive|intern|architect|technician|supervisor|strategist|recruiter|accountant|counsel|attorney|nurse|teacher|instructor|planner|advisor|president|controller|producer|editor|assistant|clerk|agent|buyer)\b/i;
+
+const COMPANY_SUFFIX = /\b(inc\.?|llc|l\.l\.c\.?|corp\.?|corporation|co\.?|ltd\.?|llp|company|group|technologies|systems|solutions|holdings|partners|labs?)\.?$/i;
+
+const WORK_FORM_WORD = /\b(remote|hybrid|on-?site)\b/i;
+
+const EMPLOYMENT_META = /^(full-time|part-time|contract|internship|temporary|seasonal|volunteer|entry level|associate|mid-senior level|director level|executive level)$/i;
+
+function isNoiseLine(line){
+  return !line || NOISE_LINE.test(line.trim());
+}
+
+function looksLikeLocation(segment){
+  const s = segment.trim();
+  if (/^remote$/i.test(s)) return true;
+  if (/^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z]{2}(\s?\d{5})?$/.test(s)) return true;
+  if (/^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*$/.test(s)) return true;
+  if (/\barea$/i.test(s)) return true;
+  return false;
+}
+
+function splitHeaderSegments(line){
+  return line.split(/\s*[·•|]\s*|\s+-\s+/).map(s => s.trim()).filter(Boolean);
+}
+
+function parseFreeText(text){
+  const header = text.split("\n").map(l => l.trim()).filter(l => l && !isNoiseLine(l)).slice(0, 15);
+
+  let title = "", company = "", location = "";
+
+  // "Title at Company" / "Title @ Company" on one line
+  for (const line of header.slice(0, 6)){
+    const m = line.match(/^(.{3,90}?)\s+(?:at|@)\s+(.{2,90})$/i);
+    if (m && JOB_TITLE_WORDS.test(m[1]) && !JOB_TITLE_WORDS.test(m[2])){
+      title = m[1].trim();
+      company = m[2].trim();
+      break;
+    }
+  }
+
+  const labeledCompany = header.find(l => /^(company|employer|organization)\s*[:\-]/i.test(l));
+  if (labeledCompany) company = labeledCompany.replace(/^(company|employer|organization)\s*[:\-]\s*/i, "").trim();
+
+  const labeledLocation = header.find(l => /^location\s*[:\-]/i.test(l));
+  if (labeledLocation) location = labeledLocation.replace(/^location\s*[:\-]\s*/i, "").trim();
+
+  // Combined "Company · Location · Full-time" style lines (skip salary lines —
+  // "$110,000 - $140,000" also matches the "·/-"-separated shape but isn't one)
+  for (const line of header){
+    if (/\$/.test(line)) continue;
+    if (!/[·•]|\s-\s/.test(line)) continue;
+    const segments = splitHeaderSegments(line);
+    let locSeg = segments.find(looksLikeLocation);
+    if (!locSeg){
+      // A segment mentioning remote/hybrid/on-site might have a city glued on
+      // ("Phoenix, AZ (On-site)") — only borrow it if there's an actual place
+      // in there; a bare "Hybrid"/"Remote" segment isn't a location by itself.
+      const wf = segments.find(s => WORK_FORM_WORD.test(s));
+      if (wf){
+        const cityMatch = wf.match(/[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z]{2}(\s?\d{5})?/);
+        if (cityMatch) locSeg = cityMatch[0];
+      }
+    }
+    if (locSeg && !location) location = locSeg;
+    if (!company){
+      const companySeg = segments.find(s =>
+        s !== locSeg && s.length < 60 && !JOB_TITLE_WORDS.test(s) &&
+        !looksLikeLocation(s) && !EMPLOYMENT_META.test(s) && !WORK_FORM_WORD.test(s)
+      );
+      if (companySeg) company = companySeg;
+    }
+  }
+
+  // Score header lines to find the title: reward job-title keywords, penalize
+  // company-suffix and location-shaped lines, slight preference for earlier lines
+  if (!title){
+    let bestScore = -Infinity, bestLine = header[0] || "";
+    header.forEach((line, i) => {
+      if (line.length > 100 || line.length < 3) return;
+      let score = -i * 0.15;
+      if (JOB_TITLE_WORDS.test(line)) score += 3;
+      if (COMPANY_SUFFIX.test(line)) score -= 4;
+      if (looksLikeLocation(line)) score -= 4;
+      if (/[.:]$/.test(line)) score -= 1;
+      if (score > bestScore){ bestScore = score; bestLine = line; }
+    });
+    title = bestLine;
+  }
+
+  if (!company){
+    const titleIdx = header.indexOf(title);
+    const nearby = [...header.slice(Math.max(0, titleIdx - 2), titleIdx), ...header.slice(titleIdx + 1, titleIdx + 4)];
+    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l)) || "";
+  }
+
+  if (!location){
+    for (const line of header){
+      const cityState = line.match(/([A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2}),\s?([A-Z]{2})\b/);
+      if (cityState){ location = cityState[1] + ", " + cityState[2]; break; }
+      const metro = line.match(/([A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2}\s(?:Bay\s|Metro(?:politan)?\s)?Area)\b/i);
+      if (metro){ location = metro[1]; break; }
+    }
+  }
 
   let salaryMin = null, salaryMax = null;
   const rangeMatch = text.match(/\$\s?([\d,]{2,7})(k)?\s*(?:-|to|–|—)\s*\$?\s?([\d,]{2,7})(k)?/i);
@@ -452,11 +559,10 @@ function parseFreeText(text){
   if (/\bremote\b/i.test(text)) workForm = "Remote";
   if (/\bhybrid\b/i.test(text)) workForm = "Hybrid";
 
-  const locMatch = text.match(/([A-Z][a-zA-Z.]+(?:\s[A-Z][a-zA-Z.]+)?),\s?([A-Z]{2})\b/);
-  const location = locMatch ? (locMatch[1] + ", " + locMatch[2]) : (workForm === "Remote" ? "Remote" : "");
+  if (!location && workForm === "Remote") location = "Remote";
 
   return {
-    title, company, description: text, location, workForm,
+    title: title.slice(0, 120), company, description: text, location, workForm,
     salaryMin, salaryMax, salaryCurrency: salaryMin ? "USD" : "",
     skills: extractSkillsFromText(text),
     source: "manual-paste"
