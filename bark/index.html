@@ -694,19 +694,28 @@ function parseFreeText(text){
   // pay-scale format (this dollar figure never needs sub-dollar precision,
   // so parseSalaryToken's parseFloat+round just discards it).
   let salaryMin = null, salaryMax = null;
-  const rangeMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:-|to|–|—)\s*\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
-  if (rangeMatch){
-    salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
-    salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
-  } else {
-    // A trailing "+" ("$120,000+") states an open-ended floor, not a real
-    // two-sided range — leave salaryMax unset so downstream logic (target
-    // clamping, the salary badge) doesn't treat the floor as a hard ceiling.
-    const singleMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?(\+)?/i);
-    if (singleMatch){
-      const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
-      salaryMin = v;
-      salaryMax = singleMatch[3] ? null : v;
+  // An hourly/gig rate ("$70/hr", "$70 per hour") isn't a stable annual
+  // salary — annualizing it would need assumptions about hours worked that
+  // this kind of flexible/part-time posting explicitly doesn't give (and
+  // parseSalaryToken's "under 1000 means it's shorthand for thousands"
+  // heuristic would otherwise silently turn $70/hr into a $70,000 salary).
+  // Leave it blank rather than mislabel it.
+  const isHourlyRate = /\$\s?[\d,]+(?:\.\d{1,2})?\s*(?:\/\s*(?:hr|hour)\b|per\s+hour\b|hourly\b)/i.test(text);
+  if (!isHourlyRate){
+    const rangeMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:-|to|–|—)\s*\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+    if (rangeMatch){
+      salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
+      salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
+    } else {
+      // A trailing "+" ("$120,000+") states an open-ended floor, not a real
+      // two-sided range — leave salaryMax unset so downstream logic (target
+      // clamping, the salary badge) doesn't treat the floor as a hard ceiling.
+      const singleMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?(\+)?/i);
+      if (singleMatch){
+        const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
+        salaryMin = v;
+        salaryMax = singleMatch[3] ? null : v;
+      }
     }
   }
 
