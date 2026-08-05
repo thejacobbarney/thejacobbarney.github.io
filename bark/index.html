@@ -543,6 +543,21 @@ function parseFreeText(text){
     }
   }
 
+  // Other headerless postings instead open by describing the role itself
+  // ("The Market Finance Lead is a necessary financial and strategic
+  // partner...") rather than naming a company at all. Gated on the
+  // captured phrase matching a job-title keyword so it doesn't fire on an
+  // unrelated "The [company] is a leading..." intro sentence instead.
+  if (!title){
+    for (const line of header.slice(0, 8)){
+      const m = line.match(/^(?:the|this)\s+(.{3,60}?)\s+is\s+(?:an?|the)\b/i);
+      if (m && JOB_TITLE_WORDS.test(m[1])){
+        title = m[1].trim();
+        break;
+      }
+    }
+  }
+
   const labeledCompany = header.find(l => /^(company|employer|organization)\s*[:\-]/i.test(l));
   if (labeledCompany) company = labeledCompany.replace(/^(company|employer|organization)\s*[:\-]\s*/i, "").trim();
 
