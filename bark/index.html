@@ -2451,7 +2451,7 @@ function App(){
   const [tab, setTab] = useState("dashboard");
   const [jobs, setJobs] = useState(() => loadLS(LS_KEYS.jobs, []));
   const [profile, setProfile] = useState(() => loadLS(LS_KEYS.profile, DEFAULT_PROFILE));
-  const [settings, setSettings] = useState(() => loadLS(LS_KEYS.settings, DEFAULT_SETTINGS));
+  const [settings, setSettings] = useState(() => ({ ...DEFAULT_SETTINGS, ...loadLS(LS_KEYS.settings, DEFAULT_SETTINGS) }));
   const [connectionStatus, setConnectionStatus] = useState(() => loadLS(LS_KEYS.connectionStatus, { grok:null, perplexity:null, github:null }));
   const [syncStatus, setSyncStatus] = useState(() => loadLS(LS_KEYS.syncStatus, { lastPushedAt:null, lastPulledAt:null }));
 
