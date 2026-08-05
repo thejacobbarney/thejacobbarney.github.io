@@ -1314,6 +1314,15 @@ async function evaluateJob(job, profile, settings){
     }
   }
 
+  // Note Perplexity's contribution alongside whichever engine produced the
+  // match score/career analysis above — a live Sonar salary search is a
+  // separate AI tier from Grok's evaluation and can run even when Grok is
+  // off (or when Grok ran but never touched the comparable-salary numbers,
+  // e.g. because Perplexity had already filled them in).
+  if (comparable && comparable.source === "perplexity-live"){
+    engineUsed += " + Perplexity (" + PERPLEXITY_MODEL + ") live search";
+  }
+
   const fields = {
     matchScore: matchResult.score,
     matchedSkills: matchResult.matched,
