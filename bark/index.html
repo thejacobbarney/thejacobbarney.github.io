@@ -732,7 +732,16 @@ function parseFreeText(text){
     const titleIdx = titleLineIdx !== -1 ? titleLineIdx : header.indexOf(title);
     const nearby = titleIdx === -1 ? [] :
       [...header.slice(Math.max(0, titleIdx - 2), titleIdx), ...header.slice(titleIdx + 1, titleIdx + 4)];
-    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l)) || "";
+    // Some Workday postings render metadata as bare, colon-less field labels
+    // ("locations", "time type") each followed by their value on the next
+    // line — nothing else in this file recognizes them as labels (the
+    // labeled-location detection requires a "Location" \b boundary, which
+    // "locations" fails on its trailing "s"), so without this they read as
+    // perfectly plausible-looking short "nearby" lines and get mistaken for
+    // the company name instead of being left for the real answer (often
+    // buried in prose too far away for any of the fallbacks above to reach).
+    const NEARBY_FIELD_LABEL = /^(locations?|time type)$/i;
+    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l)) || "";
   }
 
   if (!location){
