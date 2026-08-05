@@ -1221,7 +1221,7 @@ async function testPerplexityConnection(apiKey){
     const res = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
-      body: JSON.stringify({ model: PERPLEXITY_MODEL, messages: [{ role: "user", content: "Reply with only the word: ok" }], max_tokens: 5 })
+      body: JSON.stringify({ model: PERPLEXITY_MODEL, messages: [{ role: "user", content: "Reply with only the word: ok" }], max_tokens: 16 })
     });
     if (res.ok) return { ok: true };
     return { ok: false, message: await extractApiErrorMessage(res) };
