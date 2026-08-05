@@ -438,7 +438,7 @@ function parseSalaryToken(numStr, hasK){
    after, and both often combine them on one "Company · Location ·
    Full-time" line.
 ───────────────────────────────────────────────────────────── */
-const NOISE_LINE = /^(apply now|easy apply|apply|save job|share job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|company overview|job overview|position overview|role overview|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*)|(category\s+.+)|(job id\s+.+)|(job requisition id\s*.*)|(requisition id\s*.*))$/i;
+const NOISE_LINE = /^(apply now|easy apply|apply|save job|share job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|company overview|job overview|position overview|role overview|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*)|(category\s+.+)|(job id\s+.+)|(job requisition id\s*.*)|(requisition id\s*.*)|(department\s*[:\-]\s*.+)|(reports?\s+to\s*[:\-]\s*.+)|(format\s*[:\-]\s*.+))$/i;
 
 const JOB_TITLE_WORDS = /\b(engineer|manager|analyst|director|coordinator|specialist|developer|designer|scientist|lead|associate|consultant|representative|administrator|officer|executive|intern|architect|technician|supervisor|strategist|recruiter|accountant|counsel|attorney|nurse|teacher|instructor|planner|advisor|president|controller|producer|editor|assistant|clerk|agent|buyer)\b/i;
 
@@ -448,6 +448,29 @@ const WORK_FORM_WORD = /\b(remote|hybrid|on-?site)\b/i;
 
 const EMPLOYMENT_META = /^(full-time|part-time|contract|internship|temporary|seasonal|volunteer|entry level|associate|mid-senior level|director level|executive level)$/i;
 
+// A bare [A-Z]{2} is too easy to satisfy by coincidence — a product/business
+// unit acronym next to a comma-separated list ("Mobile, Compute, XR, ...")
+// can look exactly like "City, ST" (e.g. "Compute, XR"). Requiring an actual
+// US state/territory code closes that off without giving up real matches.
+const US_STATE_CODE = "(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)";
+const CITY_STATE_RE = new RegExp("^[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?" + US_STATE_CODE + "(\\s?\\d{5})?$");
+
+// "City, Region" ("London, United Kingdom") or "City, Region, Country"
+// ("Scottsdale, Arizona, United States") — spelled-out region/country names,
+// as opposed to CITY_STATE_RE's 2-letter US state/territory abbreviation.
+// Exported as a plain string (not anchored) so both looksLikeLocation
+// (anchored ^...$) and free-text extraction (searched as a substring) can
+// build the regex they each need from the same core pattern.
+const CITY_REGION_CORE = "[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*(?:,\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*)?";
+const CITY_REGION_RE = new RegExp("^" + CITY_REGION_CORE + "$");
+
+// Matches a single "City, ST[, zip]" or "City, Region[, Country]" occurrence
+// anywhere within a longer string (unanchored) — for pulling the first real
+// place out of a labeled value or descriptive sentence, as opposed to
+// CITY_STATE_RE/CITY_REGION_RE which test whether an entire string is
+// exactly one place with nothing else around it.
+const PLACE_MATCH_CORE = "[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?(?:" + US_STATE_CODE + "(?:\\s?\\d{5})?|[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*(?:,\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*)?)";
+
 function isNoiseLine(line){
   return !line || NOISE_LINE.test(line.trim());
 }
@@ -455,15 +478,18 @@ function isNoiseLine(line){
 function looksLikeLocation(segment){
   const s = segment.trim();
   if (/^remote$/i.test(s)) return true;
-  if (/^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z]{2}(\s?\d{5})?$/.test(s)) return true;
-  if (/^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*$/.test(s)) return true;
-  if (/\barea$/i.test(s)) return true;
+  if (CITY_STATE_RE.test(s)) return true;
+  if (CITY_REGION_RE.test(s)) return true;
+  // Require "Bay"/"Metro(politan)" immediately before "Area" — a bare
+  // "<word> Area" ending is too permissive (e.g. a "Job Area:" ATS field
+  // label, not a location, also ends that way).
+  if (/\b(?:bay|metro(?:politan)?)\s+area$/i.test(s)) return true;
   // A multi-office posting often lists several "City, ST" locations joined by
   // semicolons on one line ("New York, NY; San Francisco, CA; ...") — treat
   // the whole line as location-shaped if every semicolon-separated part is.
   if (/;/.test(s)){
     const parts = s.split(/\s*;\s*/).filter(Boolean);
-    if (parts.length > 1 && parts.every(p => /^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z]{2}(\s?\d{5})?$/.test(p))) return true;
+    if (parts.length > 1 && parts.every(p => CITY_STATE_RE.test(p))) return true;
   }
   return false;
 }
@@ -476,6 +502,20 @@ function parseFreeText(text){
   const header = text.split("\n").map(l => l.trim()).filter(l => l && !isNoiseLine(l)).slice(0, 15);
 
   let title = "", company = "", location = "";
+  // Tracks which header line the title came from, when it's a stripped
+  // fragment of that line rather than the line verbatim — the company-
+  // guessing fallback below needs a real index to build its "nearby lines"
+  // window from, and header.indexOf(title) can't find a fragment.
+  let titleLineIdx = -1;
+
+  // Some postings label the title explicitly ("Position: Lead Accountant,
+  // Affiliates – Full Time/Exempt") — a stronger, more direct signal than
+  // any scoring heuristic, so honor it before anything else runs.
+  const labeledTitleIdx = header.findIndex(l => /^(position|job title|title|role)\s*[:\-]\s*\S/i.test(l));
+  if (labeledTitleIdx !== -1){
+    title = header[labeledTitleIdx].replace(/^(position|job title|title|role)\s*[:\-]\s*/i, "").trim();
+    titleLineIdx = labeledTitleIdx;
+  }
 
   // "Title at Company" / "Title @ Company" on one line
   for (const line of header.slice(0, 6)){
@@ -503,8 +543,32 @@ function parseFreeText(text){
     }
   }
 
+  // Other headerless postings instead open by describing the role itself
+  // ("The Market Finance Lead is a necessary financial and strategic
+  // partner...") rather than naming a company at all. Gated on the
+  // captured phrase matching a job-title keyword so it doesn't fire on an
+  // unrelated "The [company] is a leading..." intro sentence instead.
+  if (!title){
+    for (const line of header.slice(0, 8)){
+      const m = line.match(/^(?:the|this)\s+(.{3,60}?)\s+is\s+(?:an?|the)\b/i);
+      if (m && JOB_TITLE_WORDS.test(m[1])){
+        title = m[1].trim();
+        break;
+      }
+    }
+  }
+
   const labeledCompany = header.find(l => /^(company|employer|organization)\s*[:\-]/i.test(l));
   if (labeledCompany) company = labeledCompany.replace(/^(company|employer|organization)\s*[:\-]\s*/i, "").trim();
+
+  // Some ATS pages put the label completely alone on its own line ("Company:"
+  // with nothing after it) and the actual value on the next line — the
+  // same-line match above leaves company empty in that case, so fall back
+  // to reading the very next header line as the value.
+  if (!company){
+    const idx = header.findIndex(l => /^(company|employer|organization)\s*[:\-]?\s*$/i.test(l));
+    if (idx !== -1 && idx + 1 < header.length) company = header[idx + 1].trim();
+  }
 
   // Some ATS exports glue the "Location" label straight onto its value with
   // no colon/hyphen at all ("Location Mountain View, California; Remote -
@@ -523,8 +587,26 @@ function parseFreeText(text){
   const labeledLocationLine = header.find(l => /^location\b\s*[:\-]?\s*[A-Z]/i.test(l));
   if (labeledLocationLine){
     const raw = labeledLocationLine.replace(/^location\b\s*[:\-]?\s*/i, "").trim();
-    const firstPlace = raw.match(/[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?(?:[A-Z]{2}(?:\s?\d{5})?|[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)/);
-    location = firstPlace ? firstPlace[0] : raw;
+    const firstPlace = raw.match(new RegExp(PLACE_MATCH_CORE));
+    // Trust the match only when it's right at the front of the value — a
+    // real "Location: City, ST; City, ST; ..." list starts with a place
+    // immediately, whereas "Onsite 4x/week (Tuesday-Friday) at an Axon Hub
+    // (Seattle, San Francisco-Presidio, ...)" only *contains* city-shaped
+    // text deep inside a work-schedule description that isn't the answer.
+    if (firstPlace && firstPlace.index <= 2){
+      location = firstPlace[0];
+    } else if (WORK_FORM_WORD.test(raw) && raw.length <= 20){
+      // A bare "Remote"/"Hybrid"/"Onsite" value is a legitimate location
+      // stand-in even with no city attached.
+      location = raw;
+    }
+    // Otherwise the labeled value doesn't look like a clean, trustworthy
+    // place — e.g. "Onsite 4x/week (Tuesday-Friday) at an Axon Hub
+    // (Seattle, San Francisco-Presidio, ...)" is describing a work
+    // schedule/office-hub arrangement, not a location, and coincidentally
+    // contains city-shaped text ("Seattle, San Francisco") that isn't the
+    // real answer either. Leave location unset so a cleaner candidate
+    // found elsewhere (often right after the title) wins instead.
   }
 
   // Combined "Company · Location · Full-time" style lines (skip salary lines —
@@ -549,7 +631,7 @@ function parseFreeText(text){
       // in there; a bare "Hybrid"/"Remote" segment isn't a location by itself.
       const wf = segments.find(s => WORK_FORM_WORD.test(s));
       if (wf){
-        const cityMatch = wf.match(/[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z]{2}(\s?\d{5})?/);
+        const cityMatch = wf.match(new RegExp("[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?" + US_STATE_CODE + "(\\s?\\d{5})?"));
         if (cityMatch) locSeg = cityMatch[0];
       }
     }
@@ -566,9 +648,20 @@ function parseFreeText(text){
   // Score header lines to find the title: reward job-title keywords, penalize
   // company-suffix and location-shaped lines, slight preference for earlier lines
   if (!title){
-    let bestScore = -Infinity, bestLine = header[0] || "";
+    // Exclude labeled-field lines (and their value on the next line) that are
+    // clearly not a title even when nothing else looks like one either — a
+    // bare "Job Area:" (department/function, not the role) can otherwise
+    // "win" simply by not being penalized the way a real candidate is scored.
+    const titleExcluded = new Set();
+    header.forEach((l, i) => {
+      if (/^(company|employer|organization|job area)\s*[:\-]?\s*$/i.test(l)){
+        titleExcluded.add(i);
+        titleExcluded.add(i + 1);
+      }
+    });
+    let bestScore = -Infinity, bestLine = "";
     header.forEach((line, i) => {
-      if (line.length > 100 || line.length < 3) return;
+      if (titleExcluded.has(i) || line.length > 100 || line.length < 3) return;
       let score = -i * 0.15;
       if (JOB_TITLE_WORDS.test(line)) score += 3;
       if (COMPANY_SUFFIX.test(line)) score -= 4;
@@ -609,50 +702,81 @@ function parseFreeText(text){
     }
   }
 
-  // Other postings instead open with a "Company Overview" section header
-  // (filtered above as noise for the header/title scoring, since it's not
-  // a company name itself) whose very next line typically leads with the
-  // company's name ("Intuit is the global financial technology platform
-  // that powers..."). Look at the line right after that marker directly.
+  // Other postings instead open with a "Company Overview"-style section
+  // header (filtered above as noise for the header/title scoring, since
+  // it's not a company name itself) — sometimes with the org's own name
+  // tacked on the front ("Cardinals Organizational Summary") — whose very
+  // next line typically leads with the full company name ("The Arizona
+  // Cardinals Football Club is a professional football team...", "Intuit
+  // is the global financial technology platform that powers..."). Look at
+  // the line right after that marker directly.
   if (!company){
     const lines = text.split("\n").map(l => l.trim());
-    const idx = lines.findIndex(l => /^(company|job|position|role)\s+overview$/i.test(l));
+    const idx = lines.findIndex(l => /^(?:[A-Za-z]+\s+)?(?:company|organization(?:al)?|job|position|role)\s+(?:overview|summary):?$/i.test(l));
     if (idx !== -1){
       const nextLine = lines.slice(idx + 1).find(l => l);
-      const m = nextLine && nextLine.match(/^([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,2})\s+(?:is|was)\b/);
+      const m = nextLine && nextLine.match(/^([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,5})\s+(?:is|was)\b/);
       if (m) company = m[1].trim();
     }
   }
 
   if (!company){
-    const titleIdx = header.indexOf(title);
-    const nearby = [...header.slice(Math.max(0, titleIdx - 2), titleIdx), ...header.slice(titleIdx + 1, titleIdx + 4)];
+    const titleIdx = titleLineIdx !== -1 ? titleLineIdx : header.indexOf(title);
+    const nearby = titleIdx === -1 ? [] :
+      [...header.slice(Math.max(0, titleIdx - 2), titleIdx), ...header.slice(titleIdx + 1, titleIdx + 4)];
     company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l)) || "";
   }
 
   if (!location){
-    for (const line of header){
-      const cityState = line.match(/([A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2}),\s?([A-Z]{2})\b/);
+    for (let i = 0; i < header.length; i++){
+      const line = header[i];
+      const cityState = line.match(new RegExp("([A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2}),\\s?(" + US_STATE_CODE + ")\\b"));
       if (cityState){ location = cityState[1] + ", " + cityState[2]; break; }
-      const metro = line.match(/([A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2}\s(?:Bay\s|Metro(?:politan)?\s)?Area)\b/i);
+      // Require "Bay"/"Metro(politan)" immediately before "Area" — otherwise
+      // any generic ATS "<Word> Area" label (e.g. "Job Area:", a department
+      // field, not a location) satisfies "capitalized word + Area" too.
+      const metro = line.match(/((?:[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2}\s)?(?:Bay|Metro(?:politan)?)\s+Area)\b/i);
       if (metro){ location = metro[1]; break; }
+      // Spelled-out region/country, not a 2-letter code ("Scottsdale,
+      // Arizona, United States", "London, United Kingdom") — "Capitalized
+      // Word(s), Capitalized Word(s)" is too common a shape in ordinary
+      // English (title text, a company's corporate suffix, a random
+      // "Finance, Accounting" mid-sentence) to trust anywhere in the
+      // document, so only look for it among the first few header lines,
+      // where a real location almost always sits (right after the title).
+      if (i < 4 && line.length <= 60 && !JOB_TITLE_WORDS.test(line) && !COMPANY_SUFFIX.test(line)){
+        const cityRegion = line.match(new RegExp(CITY_REGION_CORE));
+        if (cityRegion){ location = cityRegion[0]; break; }
+      }
     }
   }
 
+  // Optional ".00" cents suffix: "$88,000.00 - $132,000.00" is a common
+  // pay-scale format (this dollar figure never needs sub-dollar precision,
+  // so parseSalaryToken's parseFloat+round just discards it).
   let salaryMin = null, salaryMax = null;
-  const rangeMatch = text.match(/\$\s?([\d,]{2,7})(k)?\s*(?:-|to|–|—)\s*\$?\s?([\d,]{2,7})(k)?/i);
-  if (rangeMatch){
-    salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
-    salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
-  } else {
-    // A trailing "+" ("$120,000+") states an open-ended floor, not a real
-    // two-sided range — leave salaryMax unset so downstream logic (target
-    // clamping, the salary badge) doesn't treat the floor as a hard ceiling.
-    const singleMatch = text.match(/\$\s?([\d,]{2,7})(k)?(\+)?/i);
-    if (singleMatch){
-      const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
-      salaryMin = v;
-      salaryMax = singleMatch[3] ? null : v;
+  // An hourly/gig rate ("$70/hr", "$70 per hour") isn't a stable annual
+  // salary — annualizing it would need assumptions about hours worked that
+  // this kind of flexible/part-time posting explicitly doesn't give (and
+  // parseSalaryToken's "under 1000 means it's shorthand for thousands"
+  // heuristic would otherwise silently turn $70/hr into a $70,000 salary).
+  // Leave it blank rather than mislabel it.
+  const isHourlyRate = /\$\s?[\d,]+(?:\.\d{1,2})?\s*(?:\/\s*(?:hr|hour)\b|per\s+hour\b|hourly\b)/i.test(text);
+  if (!isHourlyRate){
+    const rangeMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:-|to|–|—)\s*\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+    if (rangeMatch){
+      salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
+      salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
+    } else {
+      // A trailing "+" ("$120,000+") states an open-ended floor, not a real
+      // two-sided range — leave salaryMax unset so downstream logic (target
+      // clamping, the salary badge) doesn't treat the floor as a hard ceiling.
+      const singleMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?(\+)?/i);
+      if (singleMatch){
+        const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
+        salaryMin = v;
+        salaryMax = singleMatch[3] ? null : v;
+      }
     }
   }
 
