@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supplement Tracker</title>
+<meta name="description" content="A daily supplement regimen tracker — schedules, dosing, and inventory, kept entirely in your browser.">
+<style>
+  /* ─── TOKENS ─────────────────────────────────────────── */
+  :root {
+    --paper: #EDF0E9;
+    --paper-raised: #F7F8F3;
+    --ink: #23261F;
+    --ink-soft: #5B5F51;
+    --border: #D7DACB;
+    --border-soft: #E6E8DD;
+    --accent: #1C5C56;
+    --accent-hover: #164A45;
+    --accent-soft: #DCEAE6;
+    --status-critical: #B8452E;
+    --status-critical-soft: #F3DFD9;
+    --status-warning: #A97418;
+    --status-warning-soft: #F3E7CD;
+    --status-good: #43714D;
+    --status-good-soft: #DEE9DE;
+    --status-neutral: #837C6D;
+    --status-neutral-soft: #EAE8DE;
+    --time-morning: #B7852A;
+    --time-afternoon: #B0602C;
+    --time-evening: #34617E;
+    --time-bedtime: #453A63;
+    --shadow: 0 1px 2px rgba(35,38,31,0.07), 0 4px 14px rgba(35,38,31,0.07);
+    --radius-card: 10px;
+    --radius-pill: 999px;
+    --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171A15; --paper-raised: #1E221A; --ink: #E8EBE0; --ink-soft: #A8AD9A;
+      --border: #343A2C; --border-soft: #262A20; --accent: #59B0A5; --accent-hover: #74C4B9;
+      --accent-soft: #203A36; --status-critical: #E27C61; --status-critical-soft: #3B2620;
+      --status-warning: #E3B155; --status-warning-soft: #3A2F1B; --status-good: #86B78F;
+      --status-good-soft: #24301F; --status-neutral: #ACA694; --status-neutral-soft: #2A2820;
+      --time-morning: #E2B85D; --time-afternoon: #E19664; --time-evening: #77A6C6; --time-bedtime: #9384BE;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 18px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #171A15; --paper-raised: #1E221A; --ink: #E8EBE0; --ink-soft: #A8AD9A;
+    --border: #343A2C; --border-soft: #262A20; --accent: #59B0A5; --accent-hover: #74C4B9;
+    --accent-soft: #203A36; --status-critical: #E27C61; --status-critical-soft: #3B2620;
+    --status-warning: #E3B155; --status-warning-soft: #3A2F1B; --status-good: #86B78F;
+    --status-good-soft: #24301F; --status-neutral: #ACA694; --status-neutral-soft: #2A2820;
+    --time-morning: #E2B85D; --time-afternoon: #E19664; --time-evening: #77A6C6; --time-bedtime: #9384BE;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 18px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #EDF0E9; --paper-raised: #F7F8F3; --ink: #23261F; --ink-soft: #5B5F51;
+    --border: #D7DACB; --border-soft: #E6E8DD; --accent: #1C5C56; --accent-hover: #164A45;
+    --accent-soft: #DCEAE6; --status-critical: #B8452E; --status-critical-soft: #F3DFD9;
+    --status-warning: #A97418; --status-warning-soft: #F3E7CD; --status-good: #43714D;
+    --status-good-soft: #DEE9DE; --status-neutral: #837C6D; --status-neutral-soft: #EAE8DE;
+    --time-morning: #B7852A; --time-afternoon: #B0602C; --time-evening: #34617E; --time-bedtime: #453A63;
+    --shadow: 0 1px 2px rgba(35,38,31,0.07), 0 4px 14px rgba(35,38,31,0.07);
+  }
+
+  /* ─── RESET / BASE ───────────────────────────────────── */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+  button, input, select, textarea { font-family: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+  .app { max-width: 1040px; margin: 0 auto; padding: 28px 20px 100px; }
+
+  /* ─── HEADER TICKET ──────────────────────────────────── */
+  .ticket {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--paper-raised);
+    padding: 22px 26px;
+    margin-bottom: 26px;
+    box-shadow: var(--shadow);
+  }
+  .ticket-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .eyebrow {
+    font-family: var(--font-display);
+    font-variant: small-caps;
+    letter-spacing: 0.09em;
+    color: var(--accent);
+    font-size: 13px;
+    margin: 0 0 6px;
+  }
+  .ticket h1 { font-size: clamp(24px, 3.4vw, 32px); font-weight: 600; }
+  .ticket-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ticket-stats {
+    display: flex; gap: 22px; flex-wrap: wrap;
+    margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border);
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  }
+  .ticket-stat { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+  .ticket-stat strong { display: block; font-size: 22px; color: var(--ink); font-family: var(--font-body); font-weight: 700; letter-spacing: 0; text-transform: none; }
+  .ticket-stat.critical strong { color: var(--status-critical); }
+  .ticket-stat.warning strong { color: var(--status-warning); }
+
+  /* ─── BUTTONS ────────────────────────────────────────── */
+  .btn {
+    font-weight: 600; font-size: 13px; border-radius: var(--radius-pill);
+    padding: 8px 16px; border: 1px solid var(--border); background: var(--paper);
+    color: var(--ink); transition: background .15s ease, border-color .15s ease;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--border-soft); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn.ghost { background: none; border-color: transparent; color: var(--ink-soft); padding: 8px 10px; }
+  .btn.ghost:hover { background: var(--border-soft); color: var(--ink); }
+  .btn.small { padding: 5px 13px; font-size: 12px; }
+  .btn.danger:hover { background: var(--status-critical-soft); border-color: var(--status-critical); color: var(--status-critical); }
+  @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+
+  /* ─── TABS ───────────────────────────────────────────── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
+  .tab {
+    font-size: 14px; font-weight: 600; padding: 10px 16px; background: none; border: none;
+    color: var(--ink-soft); border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 7px;
+    margin-bottom: -1px;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab .count-badge {
+    background: var(--status-critical); color: #fff; font-size: 11px; padding: 1px 7px;
+    border-radius: var(--radius-pill); font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ─── TIME-OF-DAY SECTIONS ───────────────────────────── */
+  .time-section { margin-bottom: 30px; }
+  .time-section-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 13px; }
+  .time-rail { width: 4px; height: 18px; border-radius: 2px; background: var(--time-color); align-self: center; }
+  .time-section-header h2 { font-size: 17px; font-weight: 600; }
+  .time-section-header .time-note { font-size: 12px; color: var(--ink-soft); font-family: var(--font-mono); }
+  .empty-note {
+    color: var(--ink-soft); font-size: 13px; border: 1px dashed var(--border); border-radius: 8px;
+    padding: 22px; text-align: center; background: var(--paper-raised);
+  }
+
+  /* ─── CARDS ──────────────────────────────────────────── */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  .supp-card {
+    position: relative; background: var(--paper-raised); border: 1px solid var(--border);
+    border-radius: var(--radius-card); padding: 15px 16px 15px 19px; box-shadow: var(--shadow);
+    overflow: hidden; transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .supp-card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--stripe-color, var(--status-neutral));
+  }
+  .supp-card:hover { transform: translateY(-2px); box-shadow: 0 2px 6px rgba(0,0,0,.1), 0 12px 26px rgba(0,0,0,.10); }
+  .supp-card.inactive { opacity: .55; }
+  @media (prefers-reduced-motion: reduce) { .supp-card { transition: none; } .supp-card:hover { transform: none; } }
+
+  .card-top { display: flex; gap: 10px; align-items: flex-start; }
+  .form-icon { width: 26px; height: 26px; flex-shrink: 0; color: var(--accent); margin-top: 1px; }
+  .card-title { flex: 1; min-width: 0; }
+  .card-title .name { font-weight: 700; font-size: 15px; line-height: 1.25; }
+  .card-title .brand { font-size: 12px; color: var(--ink-soft); }
+  .dose-line {
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12.5px;
+    color: var(--ink-soft); margin-top: 9px;
+  }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip {
+    font-size: 11px; padding: 3px 10px 3px 8px; border-radius: var(--radius-pill);
+    background: var(--status-neutral-soft); color: var(--status-neutral); font-weight: 700;
+    display: inline-flex; align-items: center; gap: 5px; letter-spacing: 0.01em;
+  }
+  .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .chip.critical { background: var(--status-critical-soft); color: var(--status-critical); }
+  .chip.warning { background: var(--status-warning-soft); color: var(--status-warning); }
+  .chip.good { background: var(--status-good-soft); color: var(--status-good); }
+  .chip.tag { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .card-actions { margin-top: 13px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ─── MODAL ──────────────────────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(23,26,21,.5); display: flex;
+    align-items: flex-start; justify-content: center; padding: 5vh 20px; z-index: 60; overflow-y: auto;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: var(--paper-raised); border-radius: 12px; max-width: 580px; width: 100%;
+    padding: 26px 28px 30px; box-shadow: var(--shadow); border: 1px solid var(--border);
+  }
+  .modal h2 { font-size: 20px; margin-bottom: 4px; }
+  .modal .modal-sub { font-size: 13px; color: var(--ink-soft); margin-bottom: 18px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .form-grid .span-2 { grid-column: 1 / -1; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 700; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px;
+  }
+  .field input, .field select, .field textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+    font-size: 14px; background: var(--paper); color: var(--ink);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .field textarea { resize: vertical; min-height: 56px; }
+  .amount-row { display: flex; gap: 8px; }
+  .amount-row input { flex: 1; }
+  .amount-row select { flex: 1.2; }
+  .days-of-week { display: flex; gap: 6px; flex-wrap: wrap; }
+  .days-of-week label {
+    display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 5px 10px; cursor: pointer;
+    text-transform: none; color: var(--ink);
+  }
+  .days-of-week input { width: auto; margin: 0; }
+  .conditional-field { display: none; }
+  .conditional-field.show { display: block; }
+  .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; }
+  .checkbox-field { display: flex; align-items: center; gap: 8px; }
+  .checkbox-field input { width: auto; }
+
+  /* ─── INVENTORY TABLE ────────────────────────────────── */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--paper-raised); box-shadow: var(--shadow); }
+  .inv-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
+  .inv-table th {
+    text-align: left; font-family: var(--font-display); font-weight: 700; font-size: 11.5px;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft);
+    border-bottom: 1px solid var(--border); padding: 10px 14px; white-space: nowrap;
+  }
+  .inv-table td { padding: 11px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+  .inv-table tr:last-child td { border-bottom: none; }
+  .inv-name { font-weight: 700; }
+  .inv-sub { font-size: 11.5px; color: var(--ink-soft); font-weight: 400; }
+  .supply-cell { display: flex; align-items: center; gap: 9px; min-width: 140px; }
+  .supply-bar { flex: 1; height: 6px; background: var(--border-soft); border-radius: 3px; overflow: hidden; }
+  .supply-bar-fill { height: 100%; border-radius: 3px; }
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  /* ─── TOAST ──────────────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 26px; left: 50%; transform: translate(-50%, 8px); background: var(--ink);
+    color: var(--paper); padding: 11px 18px; border-radius: var(--radius-pill); font-size: 13px;
+    box-shadow: var(--shadow); display: flex; gap: 14px; align-items: center; opacity: 0; pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease; z-index: 70;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .toast button { background: none; border: none; color: var(--accent-soft); font-weight: 700; font-size: 13px; text-decoration: underline; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+
+  /* ─── MISC ───────────────────────────────────────────── */
+  .top-actions { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+  .storage-note { font-size: 12px; color: var(--ink-soft); margin: 10px 0 0; }
+  .storage-note.hidden { display: none; }
+  .storage-note.storage-warning { color: var(--status-critical); font-weight: 600; }
+  .file-label { display: inline-flex; }
+  .file-label input { display: none; }
+
+  @media (max-width: 560px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .ticket-stats { gap: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="ticket">
+    <div class="ticket-top">
+      <div>
+        <p class="eyebrow">Today's Regimen</p>
+        <h1 id="ticketDate">—</h1>
+      </div>
+      <div class="ticket-actions">
+        <button class="btn ghost" id="exportBtn" type="button">Export</button>
+        <label class="file-label btn ghost" for="importInput">Import<input type="file" id="importInput" accept="application/json"></label>
+        <button class="btn primary" id="addBtn" type="button">+ Add Supplement</button>
+      </div>
+    </div>
+    <div class="ticket-stats" id="ticketStats"></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="today" type="button">Today</button>
+    <button class="tab" data-tab="all" type="button">All Supplements</button>
+    <button class="tab" data-tab="inventory" type="button">Inventory</button>
+  </nav>
+
+  <main>
+    <section id="tab-today" class="tab-panel active"></section>
+    <section id="tab-all" class="tab-panel"></section>
+    <section id="tab-inventory" class="tab-panel"></section>
+  </main>
+
+  <p class="storage-note">Data is stored only in this browser (localStorage). Use <strong>Export</strong> to back it up or move it to another device.</p>
+  <p class="storage-note storage-warning hidden" id="storageWarning">⚠️ This viewer isn't allowing local storage, so nothing you do here will be saved. Open this file in a full browser app (Safari, Chrome, Firefox) instead of a preview inside another app, then reload.</p>
+</div>
+
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Supplement</h2>
+    <p class="modal-sub" id="modalSub">Record a new item and how it fits into your regimen.</p>
+    <form id="itemForm">
+      <div class="form-grid">
+        <div class="field span-2">
+          <label for="f-name">Name</label>
+          <input id="f-name" name="name" required placeholder="Magnesium Glycinate">
+        </div>
+        <div class="field">
+          <label for="f-brand">Brand</label>
+          <input id="f-brand" name="brand" placeholder="Thorne">
+        </div>
+        <div class="field">
+          <label for="f-form">Form</label>
+          <select id="f-form" name="form">
+            <option>Capsule</option>
+            <option>Softgel</option>
+            <option>Powder</option>
+            <option>Liquid/Dropper</option>
+            <option>Sublingual</option>
+            <option>Gummy</option>
+            <option>Topical</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-amount">Dosage</label>
+          <div class="amount-row">
+            <input id="f-amount" name="dosageAmount" type="number" step="any" min="0" required placeholder="2">
+            <select id="f-unit" name="dosageUnit">
+              <option>capsules</option><option>mg</option><option>mcg</option><option>IU</option>
+              <option>g</option><option>mL</option><option>drops</option><option>scoop</option><option>billion CFU</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-freq">Frequency</label>
+          <select id="f-freq" name="frequencyType">
+            <option>Daily</option>
+            <option>Every X Days</option>
+            <option>Specific Days</option>
+            <option>As Needed</option>
+          </select>
+        </div>
+        <div class="field conditional-field" id="field-interval">
+          <label for="f-interval">Every how many days</label>
+          <input id="f-interval" name="intervalDays" type="number" min="1" step="1" placeholder="3">
+        </div>
+        <div class="field conditional-field span-2" id="field-days">
+          <label>Days of week</label>
+          <div class="days-of-week" id="daysOfWeekBoxes"></div>
+        </div>
+        <div class="field conditional-field" id="field-minhours">
+          <label for="f-minhours">Minimum hours between doses</label>
+          <input id="f-minhours" name="minHoursBetween" type="number" min="0" step="any" placeholder="6">
+        </div>
+        <div class="field" id="field-timing">
+          <label for="f-time">Time of day</label>
+          <select id="f-time" name="timeOfDay">
+            <option>Morning</option><option>Afternoon</option><option>Evening</option><option>Bedtime</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-meal">Meal requirement</label>
+          <select id="f-meal" name="mealRequirement">
+            <option>None</option><option>With Food</option><option>Empty Stomach</option><option>Fasted</option><option>With Fat</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-goals">Purpose / goals</label>
+          <input id="f-goals" name="goals" placeholder="Sleep Support, Recovery">
+        </div>
+        <div class="field span-2">
+          <label for="f-notes">Notes &amp; interactions</label>
+          <textarea id="f-notes" name="notes" placeholder="e.g. Fat-soluble — take with a meal containing fat."></textarea>
+        </div>
+        <div class="field">
+          <label for="f-units">Units remaining</label>
+          <input id="f-units" name="unitsRemaining" type="number" min="0" step="any" placeholder="60">
+        </div>
+        <div class="field">
+          <label for="f-container">Container size</label>
+          <input id="f-container" name="containerSize" type="number" min="0" step="any" placeholder="120">
+        </div>
+        <div class="field">
+          <label for="f-reorder">Reorder threshold (days)</label>
+          <input id="f-reorder" name="reorderThresholdDays" type="number" min="0" step="1" value="14">
+        </div>
+        <div class="field">
+          <label for="f-start">Start date</label>
+          <input id="f-start" name="startDate" type="date">
+        </div>
+        <div class="field span-2 checkbox-field" id="field-active">
+          <input id="f-active" name="active" type="checkbox" checked>
+          <label for="f-active" style="text-transform:none;font-weight:600;font-size:13px;margin:0;">Active</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn primary" id="saveBtn">Save Supplement</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="toastMsg"></span>
+  <button type="button" id="toastUndo" hidden>Undo</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ─── ICONS ────────────────────────────────────────── */
+  var ICONS = {
+    "Capsule": '<path d="M4 12a4 4 0 0 1 4-4h8a4 4 0 1 1 0 8H8a4 4 0 0 1-4-4z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 12a4 4 0 0 1 4-4h4v8H8a4 4 0 0 1-4-4z" fill="currentColor" opacity="0.3"/><line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" stroke-width="1.6"/>',
+    "Softgel": '<ellipse cx="12" cy="12" rx="8" ry="5" fill="currentColor" opacity="0.25"/><ellipse cx="12" cy="12" rx="8" ry="5" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    "Powder": '<rect x="7" y="10" width="10" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 10V7.5A1.5 1.5 0 0 1 10 6h4a1.5 1.5 0 0 1 1.5 1.5V10" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="7" y1="14" x2="17" y2="14" stroke="currentColor" stroke-width="1.2" opacity="0.5"/>',
+    "Liquid/Dropper": '<path d="M12 3.2c1.9 1.9 3.4 3.7 3.4 5.8a3.4 3.4 0 1 1-6.8 0c0-2.1 1.5-3.9 3.4-5.8z" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="12" y1="12.5" x2="12" y2="19" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="20.5" r="1.1" fill="currentColor"/>',
+    "Sublingual": '<circle cx="12" cy="7.5" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 13.5c2.2 3 11.8 3 14 0" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    "Gummy": '<path d="M12 4.2c3.1 0 5.6 1.9 5.6 5 0 1.8-.9 2.8-.9 4.4 0 2.6-2.1 4.2-4.7 4.2s-4.7-1.6-4.7-4.2c0-1.6-.9-2.6-.9-4.4 0-3.1 2.5-5 5.6-5z" fill="currentColor" opacity="0.28" stroke="currentColor" stroke-width="1.4"/>',
+    "Topical": '<path d="M9.3 3h5.4l1 3.2H8.3z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.2 6.2h7.6l-1 12.3a2 2 0 0 1-2 1.85h-1.6a2 2 0 0 1-2-1.85z" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+  };
+  function formIcon(form) {
+    var body = ICONS[form] || ICONS["Capsule"];
+    return '<svg class="form-icon" viewBox="0 0 24 24" aria-hidden="true">' + body + '</svg>';
+  }
+
+  var TIME_ORDER = ["Morning", "Afternoon", "Evening", "Bedtime"];
+  var TIME_WINDOW = { Morning: "before noon", Afternoon: "noon – 5pm", Evening: "5pm – 9pm", Bedtime: "before sleep" };
+  var DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var DAY_JS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  /* ─── STORAGE ──────────────────────────────────────── */
+  var STORAGE_KEY = "supplementTrackerV1";
+  var state = { items: [] };
+
+  function uid() { return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 9); }
+
+  var storageOk = true;
+  function safeGetItem(key) {
+    try { return localStorage.getItem(key); } catch (e) { storageOk = false; return null; }
+  }
+  function safeSetItem(key, val) {
+    try { localStorage.setItem(key, val); return true; } catch (e) { return false; }
+  }
+  function updateStorageBanner() {
+    var el = document.getElementById("storageWarning");
+    if (el) el.classList.toggle("hidden", storageOk);
+  }
+
+  function load() {
+    var raw = safeGetItem(STORAGE_KEY);
+    if (raw) {
+      try { state = JSON.parse(raw); return; } catch (e) { /* fall through to seed */ }
+    }
+    state = seedData();
+    save();
+  }
+  function save() {
+    storageOk = safeSetItem(STORAGE_KEY, JSON.stringify(state)) && storageOk;
+    updateStorageBanner();
+  }
+
+  function seedData() {
+    var today = new Date();
+    function iso(daysAgo, hh, mm) {
+      var d = new Date(today);
+      d.setDate(d.getDate() - daysAgo);
+      d.setHours(hh, mm, 0, 0);
+      return d.toISOString();
+    }
+    return {
+      items: [
+        {
+          id: uid(), name: "Magnesium Glycinate", brand: "Thorne", form: "Capsule",
+          dosageAmount: 2, dosageUnit: "capsules", frequencyType: "Daily", intervalDays: null,
+          daysOfWeek: [], timeOfDay: "Bedtime", mealRequirement: "With Food",
+          goals: ["Sleep Support"], notes: "Take at bedtime; may cause drowsiness. Avoid taking within 2 hours of calcium/zinc — competes for absorption.",
+          minHoursBetween: null, unitsRemaining: 46, containerSize: 120, reorderThresholdDays: 14,
+          startDate: "2026-01-15", active: true,
+          doseLog: [{ id: uid(), takenAt: iso(2, 22, 0), amount: 2, status: "Taken" }]
+        },
+        {
+          id: uid(), name: "Vitamin D3 5000 IU", brand: "NOW Foods", form: "Softgel",
+          dosageAmount: 1, dosageUnit: "capsules", frequencyType: "Every X Days", intervalDays: 3,
+          daysOfWeek: [], timeOfDay: "Morning", mealRequirement: "With Fat",
+          goals: ["Immune"], notes: "Fat-soluble — take with a meal containing fat for best absorption.",
+          minHoursBetween: null, unitsRemaining: 18, containerSize: 90, reorderThresholdDays: 14,
+          startDate: "2026-02-01", active: true,
+          doseLog: [{ id: uid(), takenAt: iso(2, 8, 0), amount: 1, status: "Taken" }]
+        },
+        {
+          id: uid(), name: "Omega-3 Fish Oil", brand: "Nordic Naturals", form: "Softgel",
+          dosageAmount: 2, dosageUnit: "capsules", frequencyType: "Specific Days", intervalDays: null,
+          daysOfWeek: ["Mon", "Wed", "Fri"], timeOfDay: "Morning", mealRequirement: "With Food",
+          goals: ["Joint Health"], notes: "Take with food to reduce reflux.",
+          minHoursBetween: null, unitsRemaining: 60, containerSize: 120, reorderThresholdDays: 14,
+          startDate: "2026-03-01", active: true,
+          doseLog: [{ id: uid(), takenAt: iso(1, 8, 0), amount: 2, status: "Taken" }]
+        },
+        {
+          id: uid(), name: "Ibuprofen 200mg", brand: "Generic", form: "Capsule",
+          dosageAmount: 1, dosageUnit: "capsules", frequencyType: "As Needed", intervalDays: null,
+          daysOfWeek: [], timeOfDay: "Morning", mealRequirement: "With Food",
+          goals: ["Recovery"], notes: "PRN for pain/inflammation. Do not exceed 6 per day.",
+          minHoursBetween: 6, unitsRemaining: 40, containerSize: 50, reorderThresholdDays: 10,
+          startDate: "2026-01-01", active: true,
+          doseLog: [{ id: uid(), takenAt: iso(1, 9, 0), amount: 1, status: "Taken" }]
+        },
+        {
+          id: uid(), name: "Zinc Picolinate 50mg", brand: "Thorne", form: "Capsule",
+          dosageAmount: 1, dosageUnit: "capsules", frequencyType: "Daily", intervalDays: null,
+          daysOfWeek: [], timeOfDay: "Morning", mealRequirement: "Empty Stomach",
+          goals: ["Immune"], notes: "Don't take within 2 hours of calcium or iron — competes for absorption.",
+          minHoursBetween: null, unitsRemaining: 25, containerSize: 60, reorderThresholdDays: 14,
+          startDate: "2026-05-01", active: true,
+          doseLog: [{ id: uid(), takenAt: iso(1, 7, 30), amount: 1, status: "Taken" }]
+        }
+      ]
+    };
+  }
+
+  /* ─── CALCULATION LOGIC ────────────────────────────── */
+  function addDays(date, n) { var d = new Date(date); d.setDate(d.getDate() + n); return d; }
+  function startOfDay(date) { var d = new Date(date); d.setHours(0, 0, 0, 0); return d; }
+
+  function lastTakenDate(item) {
+    var taken = (item.doseLog || []).filter(function (l) { return l.status === "Taken"; });
+    if (!taken.length) return null;
+    var max = taken.reduce(function (a, b) { return new Date(a.takenAt) > new Date(b.takenAt) ? a : b; });
+    return new Date(max.takenAt);
+  }
+
+  function dailyRate(item) {
+    var amt = Number(item.dosageAmount) || 0;
+    if (item.frequencyType === "Daily") return amt;
+    if (item.frequencyType === "Every X Days") {
+      var interval = Number(item.intervalDays) || 0;
+      return interval > 0 ? amt / interval : 0;
+    }
+    if (item.frequencyType === "Specific Days") {
+      var n = (item.daysOfWeek || []).length;
+      return amt * n / 7;
+    }
+    if (item.frequencyType === "As Needed") {
+      var cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+      var recent = (item.doseLog || []).filter(function (l) { return l.status === "Taken" && new Date(l.takenAt).getTime() >= cutoff; });
+      var total = recent.reduce(function (s, l) { return s + (Number(l.amount) || 0); }, 0);
+      return total / 30;
+    }
+    return 0;
+  }
+
+  function nextDueDateSpecificDays(item) {
+    if (!item.daysOfWeek || !item.daysOfWeek.length) return null;
+    var last = lastTakenDate(item);
+    var cursor = startOfDay(last ? addDays(last, 1) : new Date());
+    for (var i = 0; i < 8; i++) {
+      if (item.daysOfWeek.indexOf(DAY_JS[cursor.getDay()]) !== -1) return cursor;
+      cursor = addDays(cursor, 1);
+    }
+    return null;
+  }
+
+  function nextDueDate(item) {
+    var last = lastTakenDate(item);
+    if (item.frequencyType === "Daily") {
+      return last ? addDays(last, 1) : new Date(item.startDate);
+    }
+    if (item.frequencyType === "Every X Days") {
+      var interval = Number(item.intervalDays) || 0;
+      if (!interval) return null;
+      return last ? addDays(last, interval) : new Date(item.startDate);
+    }
+    if (item.frequencyType === "Specific Days") return nextDueDateSpecificDays(item);
+    return null; // As Needed
+  }
+
+  function doseStatus(item) {
+    var now = new Date();
+    if (item.frequencyType === "As Needed") {
+      var last = lastTakenDate(item);
+      if (!last || !item.minHoursBetween) return { label: "Available", cls: "good" };
+      var earliest = new Date(last.getTime() + Number(item.minHoursBetween) * 3600 * 1000);
+      if (now >= earliest) return { label: "Available", cls: "good" };
+      var hh = String(earliest.getHours()).padStart(2, "0"), mm = String(earliest.getMinutes()).padStart(2, "0");
+      return { label: "Wait until " + hh + ":" + mm, cls: "" };
+    }
+    var due = nextDueDate(item);
+    if (!due) return { label: "No schedule", cls: "" };
+    var dueDay = startOfDay(due), today = startOfDay(now);
+    if (dueDay.getTime() < today.getTime()) return { label: "Overdue", cls: "critical" };
+    if (dueDay.getTime() === today.getTime()) return { label: "Due today", cls: "warning" };
+    return { label: "Upcoming · " + fmtDate(due), cls: "good" };
+  }
+
+  function daysOfSupplyLeft(item) {
+    var rate = dailyRate(item);
+    if (!rate) return Infinity;
+    return (Number(item.unitsRemaining) || 0) / rate;
+  }
+
+  function estimatedRunoutDate(item) {
+    var days = daysOfSupplyLeft(item);
+    if (!isFinite(days)) return null;
+    return addDays(new Date(), Math.round(days));
+  }
+
+  function supplyStatus(item) {
+    var days = daysOfSupplyLeft(item);
+    var threshold = Number(item.reorderThresholdDays) || 14;
+    if (!isFinite(days)) return { cls: "", label: "N/A", days: null };
+    if (days <= threshold) return { cls: "critical", label: Math.round(days) + " days", days: days };
+    if (days <= threshold * 2) return { cls: "warning", label: Math.round(days) + " days", days: days };
+    return { cls: "good", label: Math.round(days) + " days", days: days };
+  }
+
+  function fmtDate(d) { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  /* ─── DOSE ACTIONS ─────────────────────────────────── */
+  function logDose(itemId) {
+    var item = state.items.find(function (i) { return i.id === itemId; });
+    if (!item) return;
+    var amt = Number(item.dosageAmount) || 0;
+    item.doseLog = item.doseLog || [];
+    item.doseLog.push({ id: uid(), takenAt: new Date().toISOString(), amount: amt, status: "Taken" });
+    item.unitsRemaining = Math.max(0, (Number(item.unitsRemaining) || 0) - amt);
+    save();
+    renderAll();
+    showToast(item.name + " logged.", function () { undoLastDose(itemId); });
+  }
+  function undoLastDose(itemId) {
+    var item = state.items.find(function (i) { return i.id === itemId; });
+    if (!item || !item.doseLog.length) return;
+    var last = item.doseLog.pop();
+    item.unitsRemaining = (Number(item.unitsRemaining) || 0) + (Number(last.amount) || 0);
+    save();
+    renderAll();
+  }
+
+  var toastTimer = null;
+  function showToast(msg, undoFn) {
+    var toast = document.getElementById("toast");
+    var msgEl = document.getElementById("toastMsg");
+    var undoBtn = document.getElementById("toastUndo");
+    msgEl.textContent = msg;
+    undoBtn.hidden = !undoFn;
+    undoBtn.onclick = function () { undoFn && undoFn(); toast.classList.remove("show"); };
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 4200);
+  }
+
+  /* ─── RENDERING ────────────────────────────────────── */
+  function chipHtml(text, cls, withDot) {
+    return '<span class="chip ' + (cls || "") + '">' + (withDot ? '<span class="dot"></span>' : "") + escapeHtml(text) + "</span>";
+  }
+
+  function stripeVar(cls) {
+    if (cls === "critical") return "var(--status-critical)";
+    if (cls === "warning") return "var(--status-warning)";
+    if (cls === "good") return "var(--status-good)";
+    return "var(--status-neutral)";
+  }
+
+  function supplementCard(item, opts) {
+    opts = opts || {};
+    var status = doseStatus(item);
+    var supply = supplyStatus(item);
+    var goals = (item.goals || []).map(function (g) { return chipHtml(g, "tag"); }).join("");
+    var editAndDelete = opts.manage ? (
+      '<button class="btn ghost small" data-action="edit" data-id="' + item.id + '">Edit</button>' +
+      '<button class="btn ghost small danger" data-action="delete" data-id="' + item.id + '">Delete</button>' +
+      '<button class="btn ghost small" data-action="toggle" data-id="' + item.id + '">' + (item.active ? "Archive" : "Restore") + "</button>"
+    ) : "";
+    var logBtn = item.active ? '<button class="btn primary small" data-action="log" data-id="' + item.id + '">Log dose</button>' : "";
+    return (
+      '<div class="supp-card' + (item.active ? "" : " inactive") + '" style="--stripe-color:' + stripeVar(status.cls) + '">' +
+        '<div class="card-top">' + formIcon(item.form) +
+          '<div class="card-title"><div class="name">' + escapeHtml(item.name) + '</div>' +
+          (item.brand ? '<div class="brand">' + escapeHtml(item.brand) + "</div>" : "") + "</div></div>" +
+        '<div class="dose-line">' + escapeHtml(item.dosageAmount) + " " + escapeHtml(item.dosageUnit) + " · " + escapeHtml(item.frequencyType) +
+          (item.frequencyType === "Every X Days" && item.intervalDays ? " (" + item.intervalDays + "d)" : "") +
+          (item.frequencyType === "Specific Days" && item.daysOfWeek && item.daysOfWeek.length ? " (" + item.daysOfWeek.join("/") + ")" : "") +
+        "</div>" +
+        '<div class="chip-row">' +
+          chipHtml(status.label, status.cls, true) +
+          (item.mealRequirement && item.mealRequirement !== "None" ? chipHtml(item.mealRequirement, "") : "") +
+          (opts.showSupply ? chipHtml("Supply: " + supply.label, supply.cls) : "") +
+          goals +
+        "</div>" +
+        '<div class="card-actions">' + logBtn + editAndDelete + "</div>" +
+      "</div>"
+    );
+  }
+
+  function renderToday() {
+    var el = document.getElementById("tab-today");
+    var active = state.items.filter(function (i) { return i.active; });
+    var byTime = {};
+    TIME_ORDER.forEach(function (t) { byTime[t] = []; });
+    var prn = [];
+    active.forEach(function (i) {
+      if (i.frequencyType === "As Needed") prn.push(i);
+      else (byTime[i.timeOfDay] || (byTime[i.timeOfDay] = [])).push(i);
+    });
+
+    var html = "";
+    TIME_ORDER.forEach(function (t) {
+      var items = byTime[t] || [];
+      if (!items.length) return;
+      html += '<div class="time-section"><div class="time-section-header">' +
+        '<span class="time-rail" style="--time-color:var(--time-' + t.toLowerCase() + ')"></span>' +
+        "<h2>" + t + "</h2><span class=\"time-note\">" + TIME_WINDOW[t] + "</span></div>" +
+        '<div class="card-grid">' + items.map(function (i) { return supplementCard(i, { showSupply: false }); }).join("") + "</div></div>";
+    });
+    if (prn.length) {
+      html += '<div class="time-section"><div class="time-section-header">' +
+        '<span class="time-rail" style="--time-color:var(--status-neutral)"></span>' +
+        "<h2>As Needed</h2><span class=\"time-note\">taken when required</span></div>" +
+        '<div class="card-grid">' + prn.map(function (i) { return supplementCard(i, { showSupply: false }); }).join("") + "</div></div>";
+    }
+    if (!html) html = '<p class="empty-note">No active supplements yet. Use “+ Add Supplement” to build your regimen.</p>';
+    el.innerHTML = html;
+  }
+
+  function renderAllTab() {
+    var el = document.getElementById("tab-all");
+    if (!state.items.length) {
+      el.innerHTML = '<p class="empty-note">Nothing here yet — add your first supplement to get started.</p>';
+      return;
+    }
+    var sorted = state.items.slice().sort(function (a, b) {
+      if (a.active !== b.active) return a.active ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    el.innerHTML = '<div class="card-grid">' + sorted.map(function (i) { return supplementCard(i, { manage: true, showSupply: true }); }).join("") + "</div>";
+  }
+
+  function renderInventory() {
+    var el = document.getElementById("tab-inventory");
+    var items = state.items.filter(function (i) { return i.active; }).slice()
+      .sort(function (a, b) { return daysOfSupplyLeft(a) - daysOfSupplyLeft(b); });
+    if (!items.length) {
+      el.innerHTML = '<p class="empty-note">No active supplements to track inventory for.</p>';
+      return;
+    }
+    var rows = items.map(function (item) {
+      var supply = supplyStatus(item);
+      var runout = estimatedRunoutDate(item);
+      var pct = supply.days == null ? 0 : Math.max(4, Math.min(100, Math.round((item.unitsRemaining / (item.containerSize || item.unitsRemaining || 1)) * 100)));
+      var barColor = stripeVar(supply.cls);
+      return "<tr>" +
+        "<td><div class=\"inv-name\">" + escapeHtml(item.name) + "</div><div class=\"inv-sub\">" + escapeHtml(item.brand || "") + "</div></td>" +
+        "<td class=\"num\">" + (item.unitsRemaining != null ? item.unitsRemaining : "—") + " / " + (item.containerSize != null ? item.containerSize : "—") + " " + escapeHtml(item.dosageUnit) + "</td>" +
+        "<td><div class=\"supply-cell\">" + chipHtml(supply.label, supply.cls) +
+          "<div class=\"supply-bar\"><div class=\"supply-bar-fill\" style=\"width:" + pct + "%;background:" + barColor + "\"></div></div></div></td>" +
+        "<td class=\"num\">" + (runout ? fmtDate(runout) : "—") + "</td>" +
+        "<td class=\"num\">" + (item.reorderThresholdDays != null ? item.reorderThresholdDays + "d" : "—") + "</td>" +
+      "</tr>";
+    }).join("");
+    el.innerHTML = '<div class="table-scroll"><table class="inv-table"><thead><tr>' +
+      "<th>Supplement</th><th>Remaining</th><th>Supply status</th><th>Est. run-out</th><th>Reorder at</th>" +
+      "</tr></thead><tbody>" + rows + "</tbody></table></div>";
+  }
+
+  function renderTicket() {
+    var now = new Date();
+    document.getElementById("ticketDate").textContent = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    var active = state.items.filter(function (i) { return i.active; });
+    var overdue = 0, dueToday = 0, lowStock = 0;
+    active.forEach(function (i) {
+      var s = doseStatus(i);
+      if (s.cls === "critical") overdue++;
+      if (s.cls === "warning") dueToday++;
+      if (supplyStatus(i).cls === "critical") lowStock++;
+    });
+    var stats = document.getElementById("ticketStats");
+    stats.innerHTML =
+      '<div class="ticket-stat"><strong>' + active.length + "</strong>Active</div>" +
+      '<div class="ticket-stat critical"><strong>' + overdue + "</strong>Overdue</div>" +
+      '<div class="ticket-stat warning"><strong>' + dueToday + "</strong>Due today</div>" +
+      '<div class="ticket-stat critical"><strong>' + lowStock + "</strong>Low stock</div>";
+    var todayTab = document.querySelector('.tab[data-tab="today"]');
+    var badgeCount = overdue + dueToday;
+    todayTab.innerHTML = "Today" + (badgeCount ? ' <span class="count-badge">' + badgeCount + "</span>" : "");
+  }
+
+  function renderAll() {
+    renderTicket();
+    renderToday();
+    renderAllTab();
+    renderInventory();
+  }
+
+  /* ─── EVENT DELEGATION FOR CARD ACTIONS ────────────── */
+  document.getElementById("tab-today").addEventListener("click", cardClickHandler);
+  document.getElementById("tab-all").addEventListener("click", cardClickHandler);
+  function cardClickHandler(e) {
+    var btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    var id = btn.getAttribute("data-id");
+    var action = btn.getAttribute("data-action");
+    if (action === "log") logDose(id);
+    if (action === "edit") openModal(id);
+    if (action === "delete") {
+      if (confirm("Delete this supplement and its dose history? This can't be undone.")) {
+        state.items = state.items.filter(function (i) { return i.id !== id; });
+        save(); renderAll();
+      }
+    }
+    if (action === "toggle") {
+      var item = state.items.find(function (i) { return i.id === id; });
+      if (item) { item.active = !item.active; save(); renderAll(); }
+    }
+  }
+
+  /* ─── TABS ─────────────────────────────────────────── */
+  document.querySelectorAll(".tab").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      document.querySelectorAll(".tab").forEach(function (t) { t.classList.remove("active"); });
+      document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
+      tab.classList.add("active");
+      document.getElementById("tab-" + tab.getAttribute("data-tab")).classList.add("active");
+    });
+  });
+
+  /* ─── MODAL / FORM ─────────────────────────────────── */
+  var overlay = document.getElementById("modalOverlay");
+  var form = document.getElementById("itemForm");
+  var editingId = null;
+
+  var dowBoxes = document.getElementById("daysOfWeekBoxes");
+  dowBoxes.innerHTML = DAYS.map(function (d) {
+    return '<label><input type="checkbox" name="daysOfWeek" value="' + d + '">' + d + "</label>";
+  }).join("");
+
+  function updateConditionalFields() {
+    var freq = document.getElementById("f-freq").value;
+    document.getElementById("field-interval").classList.toggle("show", freq === "Every X Days");
+    document.getElementById("field-days").classList.toggle("show", freq === "Specific Days");
+    document.getElementById("field-minhours").classList.toggle("show", freq === "As Needed");
+    document.getElementById("field-timing").style.display = freq === "As Needed" ? "none" : "";
+  }
+  document.getElementById("f-freq").addEventListener("change", updateConditionalFields);
+
+  function openModal(id) {
+    editingId = id || null;
+    form.reset();
+    document.getElementById("field-active").style.display = editingId ? "flex" : "none";
+    if (editingId) {
+      var item = state.items.find(function (i) { return i.id === editingId; });
+      document.getElementById("modalTitle").textContent = "Edit Supplement";
+      document.getElementById("modalSub").textContent = "Update the details for " + item.name + ".";
+      form.name.value = item.name || "";
+      form.brand.value = item.brand || "";
+      form.form.value = item.form || "Capsule";
+      form.dosageAmount.value = item.dosageAmount != null ? item.dosageAmount : "";
+      form.dosageUnit.value = item.dosageUnit || "capsules";
+      form.frequencyType.value = item.frequencyType || "Daily";
+      form.intervalDays.value = item.intervalDays != null ? item.intervalDays : "";
+      form.minHoursBetween.value = item.minHoursBetween != null ? item.minHoursBetween : "";
+      form.timeOfDay.value = item.timeOfDay || "Morning";
+      form.mealRequirement.value = item.mealRequirement || "None";
+      form.goals.value = (item.goals || []).join(", ");
+      form.notes.value = item.notes || "";
+      form.unitsRemaining.value = item.unitsRemaining != null ? item.unitsRemaining : "";
+      form.containerSize.value = item.containerSize != null ? item.containerSize : "";
+      form.reorderThresholdDays.value = item.reorderThresholdDays != null ? item.reorderThresholdDays : 14;
+      form.startDate.value = item.startDate || "";
+      form["f-active"] ? null : null;
+      document.getElementById("f-active").checked = !!item.active;
+      Array.prototype.forEach.call(form.querySelectorAll('input[name="daysOfWeek"]'), function (cb) {
+        cb.checked = (item.daysOfWeek || []).indexOf(cb.value) !== -1;
+      });
+    } else {
+      document.getElementById("modalTitle").textContent = "Add Supplement";
+      document.getElementById("modalSub").textContent = "Record a new item and how it fits into your regimen.";
+      form.startDate.value = new Date().toISOString().slice(0, 10);
+      form.reorderThresholdDays.value = 14;
+    }
+    updateConditionalFields();
+    overlay.classList.remove("hidden");
+    setTimeout(function () { document.getElementById("f-name").focus(); }, 0);
+  }
+  function closeModal() { overlay.classList.add("hidden"); editingId = null; }
+
+  document.getElementById("addBtn").addEventListener("click", function () { openModal(null); });
+  document.getElementById("cancelBtn").addEventListener("click", closeModal);
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) closeModal(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !overlay.classList.contains("hidden")) closeModal(); });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var fd = new FormData(form);
+    var daysOfWeek = fd.getAll("daysOfWeek");
+    var goals = (fd.get("goals") || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    var payload = {
+      name: (fd.get("name") || "").trim(),
+      brand: (fd.get("brand") || "").trim(),
+      form: fd.get("form"),
+      dosageAmount: Number(fd.get("dosageAmount")) || 0,
+      dosageUnit: fd.get("dosageUnit"),
+      frequencyType: fd.get("frequencyType"),
+      intervalDays: fd.get("intervalDays") ? Number(fd.get("intervalDays")) : null,
+      daysOfWeek: daysOfWeek,
+      timeOfDay: fd.get("timeOfDay"),
+      mealRequirement: fd.get("mealRequirement"),
+      goals: goals,
+      notes: (fd.get("notes") || "").trim(),
+      minHoursBetween: fd.get("minHoursBetween") ? Number(fd.get("minHoursBetween")) : null,
+      unitsRemaining: fd.get("unitsRemaining") !== "" ? Number(fd.get("unitsRemaining")) : 0,
+      containerSize: fd.get("containerSize") !== "" ? Number(fd.get("containerSize")) : null,
+      reorderThresholdDays: fd.get("reorderThresholdDays") !== "" ? Number(fd.get("reorderThresholdDays")) : 14,
+      startDate: fd.get("startDate") || new Date().toISOString().slice(0, 10)
+    };
+    if (!payload.name) return;
+    if (editingId) {
+      var item = state.items.find(function (i) { return i.id === editingId; });
+      payload.active = document.getElementById("f-active").checked;
+      Object.assign(item, payload);
+    } else {
+      payload.active = true;
+      payload.id = uid();
+      payload.doseLog = [];
+      state.items.push(payload);
+    }
+    save();
+    closeModal();
+    renderAll();
+  });
+
+  /* ─── EXPORT / IMPORT ──────────────────────────────── */
+  document.getElementById("exportBtn").addEventListener("click", function () {
+    try {
+      var blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "supplement-tracker-" + new Date().toISOString().slice(0, 10) + ".json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("This browser view won't allow downloading a file. Open the page in a full browser app (Safari, Chrome, Firefox) to export.");
+    }
+  });
+  document.getElementById("importInput").addEventListener("change", function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onerror = function () {
+      alert("Couldn't read that file in this browser view. Try opening the page in Safari, Chrome, or Firefox.");
+      e.target.value = "";
+    };
+    reader.onload = function () {
+      try {
+        var parsed = JSON.parse(reader.result);
+        if (!parsed || !Array.isArray(parsed.items)) throw new Error("bad shape");
+        if (confirm("Import will replace all current data in this browser. Continue?")) {
+          state = parsed;
+          save();
+          renderAll();
+          showToast("Data imported.");
+        }
+      } catch (err) {
+        alert("That file doesn't look like a valid Supplement Tracker export.");
+      }
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  /* ─── INIT ─────────────────────────────────────────── */
+  try {
+    load();
+    renderAll();
+  } catch (e) {
+    state = seedData();
+    try { renderAll(); } catch (e2) { /* give up rendering, tabs still switch */ }
+    var warn = document.getElementById("storageWarning");
+    if (warn) { warn.textContent = "⚠️ Something in this browser view is blocking part of the app. Try opening the page in Safari, Chrome, or Firefox."; warn.classList.remove("hidden"); }
+  }
+})();
+</script>
+</body>
+</html>
