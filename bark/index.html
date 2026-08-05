@@ -15,18 +15,18 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
   :root{
-    --ink:#18151F;
-    --cream:#FAF9FC;
-    --cream-2:#ECE8F5;
+    --ink:#111111;
+    --cream:#F5F5F5;
+    --cream-2:#E8E8E8;
     --paper:#FFFFFF;
-    --turq:#0CC0B9;
-    --turq-dark:#098883;
-    --purple:#5223C6;
-    --purple-dark:#3B1690;
+    --turq:#12D6D0;
+    --turq-dark:#0A9995;
+    --purple:#7C3AED;
+    --purple-dark:#5B21B6;
     --yellow:#FFCE3D;
-    --pink:#FF5C8A;
+    --danger:#E5484D;
     --green:#00C853;
-    --gray:#726C82;
+    --gray:#6B6B6B;
     --shadow: 4px 4px 0 var(--ink);
     --shadow-sm: 2px 2px 0 var(--ink);
     --shadow-lg: 7px 7px 0 var(--ink);
@@ -47,7 +47,7 @@
   h1,h2,h3,.display{font-family:'Bebas Neue',sans-serif;font-weight:400;text-transform:uppercase;letter-spacing:0.015em;}
   a{color:inherit;}
   button{font-family:inherit;}
-  ::selection{background:var(--yellow);color:var(--ink);}
+  ::selection{background:var(--turq);color:var(--ink);}
 
   .mono{font-family:'JetBrains Mono',monospace;}
 
@@ -106,8 +106,7 @@
   .nb-btn:disabled{opacity:0.45;cursor:not-allowed;transform:none;box-shadow:var(--shadow-sm);}
   .nb-btn-primary{background:var(--turq);}
   .nb-btn-purple{background:var(--purple);color:#fff;}
-  .nb-btn-yellow{background:var(--yellow);}
-  .nb-btn-pink{background:var(--pink);color:#fff;}
+  .nb-btn-danger{background:var(--danger);color:#fff;}
   .nb-btn-sm{padding:0.4rem 0.7rem;font-size:0.72rem;box-shadow:2px 2px 0 var(--ink);}
   .nb-btn-sm:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink);}
   .nb-btn-block{width:100%;}
@@ -125,11 +124,11 @@
   .nb-tab.active{background:var(--ink);color:var(--cream);}
   .nb-tab .count{
     display:inline-block;margin-left:0.4rem;
-    background:var(--yellow);color:var(--ink);
+    background:var(--paper);color:var(--ink);
     border:2px solid var(--ink);
     padding:0 0.35rem;font-size:0.68rem;
   }
-  .nb-tab.active .count{background:var(--turq);}
+  .nb-tab.active .count{background:var(--turq);color:var(--ink);}
 
   /* ── generic panel/card ─────────────────────── */
   .nb-panel{
@@ -152,6 +151,7 @@
     color:var(--purple-dark);
   }
   .nb-title{font-size:1.5rem;font-weight:700;letter-spacing:-0.01em;}
+  .nb-title-display{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:2.1rem;letter-spacing:0.01em;text-transform:uppercase;}
   .nb-sub{font-size:0.85rem;color:#5C5568;max-width:640px;}
 
   /* ── form elements ──────────────────────────── */
@@ -204,9 +204,9 @@
   .nb-score .num{font-size:1.7rem;line-height:1;}
   .nb-score .num .denom{font-size:0.8rem;opacity:0.65;}
   .nb-score .lbl{font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;}
-  .score-high{background:var(--green);}
-  .score-mid{background:var(--yellow);}
-  .score-low{background:#FF5C5C;}
+  .score-high{background:var(--purple);color:#fff;border-bottom:5px solid var(--turq);}
+  .score-mid{background:var(--paper);color:var(--purple);}
+  .score-low{background:var(--paper);color:var(--ink);}
 
   /* ── job cards ──────────────────────────────── */
   .job-list{display:flex;flex-direction:column;gap:1.1rem;}
@@ -1846,14 +1846,14 @@ function JobCard({job, onStatusChange, onDelete, onRefresh, refreshing}){
               <span className="nb-badge">{fmtMoney(job.salaryMin) || "?"} – {fmtMoney(job.salaryMax) || "?"}</span>
             )}
             {!(job.salaryMin || job.salaryMax) && job.comparableSalaryLow && (
-              <span className="nb-badge" style={{background:"var(--cream-2)"}}
+              <span className="nb-badge" style={{background:"#fff", color:"var(--purple-dark)"}}
                 title={"Comparable " + (job.comparableFamily || "roles") + " · " + comparableSourceLabel(job.comparableSource) +
                   (job.comparableConfidence ? " · " + job.comparableConfidence + " confidence" : "") +
                   (job.comparableRationale ? " — " + job.comparableRationale : "")}>
                 {job.comparableSource === "perplexity-live" ? "🔎 " : ""}Market {fmtMoney(job.comparableSalaryLow)}–{fmtMoney(job.comparableSalaryHigh)}
               </span>
             )}
-            {job.salaryTarget && <span className="nb-badge" style={{background:"var(--yellow)"}}>Target {fmtMoney(job.salaryTarget)}</span>}
+            {job.salaryTarget && <span className="nb-badge" style={{background:"var(--purple)", color:"#fff"}}>Target {fmtMoney(job.salaryTarget)}</span>}
           </div>
           <div className="job-actions">
             <select className={"nb-select status-select status-" + job.status.replace(/ /g,"\\ ")}
@@ -1866,7 +1866,7 @@ function JobCard({job, onStatusChange, onDelete, onRefresh, refreshing}){
             <button className="nb-btn nb-btn-sm" onClick={() => setOpen(o => !o)}>{open ? "Hide Role Evaluation" : "View Role Evaluation"}</button>
             {job.url && <a className="nb-btn nb-btn-sm" href={job.url} target="_blank" rel="noopener">Open Listing ↗</a>}
             <button className="nb-btn nb-btn-sm" onClick={copyRaw}>Copy Job Details</button>
-            <button className="nb-btn nb-btn-sm nb-btn-pink" onClick={() => onDelete(job.id)}>Delete</button>
+            <button className="nb-btn nb-btn-sm nb-btn-danger" onClick={() => onDelete(job.id)}>Delete</button>
           </div>
         </div>
       </div>
@@ -1947,7 +1947,7 @@ function DashboardTab({jobs, onStatusChange, onDelete, onRefresh, onRefreshAll, 
       <div className="nb-panel-head">
         <div>
           <div className="nb-eyebrow">Pipeline</div>
-          <div className="nb-title">{jobs.length} Tracked Job{jobs.length === 1 ? "" : "s"}</div>
+          <div className="nb-title nb-title-display">{jobs.length} Tracked Job{jobs.length === 1 ? "" : "s"}</div>
         </div>
         <div style={{display:"flex", gap:"0.5rem", flexWrap:"wrap"}}>
           <select className="nb-select nb-btn-sm" style={{width:"auto"}} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
@@ -1962,7 +1962,7 @@ function DashboardTab({jobs, onStatusChange, onDelete, onRefresh, onRefreshAll, 
           <button className="nb-btn nb-btn-sm" onClick={handleRefreshAll} disabled={!jobs.length || refreshingAll}>
             {refreshingAll ? "Refreshing…" : "Refresh All Scores"}
           </button>
-          <button className="nb-btn nb-btn-sm nb-btn-yellow" onClick={() => exportCSV(jobs)} disabled={!jobs.length}>Export CSV</button>
+          <button className="nb-btn nb-btn-sm nb-btn-primary" onClick={() => exportCSV(jobs)} disabled={!jobs.length}>Export CSV</button>
           <button className="nb-btn nb-btn-sm nb-btn-primary" onClick={handleSheetsExport} disabled={!jobs.length || sheetsBusy}>
             {sheetsBusy ? "Exporting…" : "Export to Sheets"}
           </button>
