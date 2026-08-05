@@ -438,7 +438,7 @@ function parseSalaryToken(numStr, hasK){
    after, and both often combine them on one "Company · Location ·
    Full-time" line.
 ───────────────────────────────────────────────────────────── */
-const NOISE_LINE = /^(apply now|easy apply|apply|save job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*))$/i;
+const NOISE_LINE = /^(apply now|easy apply|apply|save job|share job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|company overview|job overview|position overview|role overview|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*)|(category\s+.+)|(job id\s+.+)|(job requisition id\s*.*)|(requisition id\s*.*))$/i;
 
 const JOB_TITLE_WORDS = /\b(engineer|manager|analyst|director|coordinator|specialist|developer|designer|scientist|lead|associate|consultant|representative|administrator|officer|executive|intern|architect|technician|supervisor|strategist|recruiter|accountant|counsel|attorney|nurse|teacher|instructor|planner|advisor|president|controller|producer|editor|assistant|clerk|agent|buyer)\b/i;
 
@@ -506,13 +506,34 @@ function parseFreeText(text){
   const labeledCompany = header.find(l => /^(company|employer|organization)\s*[:\-]/i.test(l));
   if (labeledCompany) company = labeledCompany.replace(/^(company|employer|organization)\s*[:\-]\s*/i, "").trim();
 
-  const labeledLocation = header.find(l => /^location\s*[:\-]/i.test(l));
-  if (labeledLocation) location = labeledLocation.replace(/^location\s*[:\-]\s*/i, "").trim();
+  // Some ATS exports glue the "Location" label straight onto its value with
+  // no colon/hyphen at all ("Location Mountain View, California; Remote -
+  // Arizona - United States; ..."), often listing several offices on one
+  // line. Match that bare-space form too, and pull out just the first place
+  // named rather than keeping the whole multi-location string or letting it
+  // fall into the combined-line splitter below, which has no concept of a
+  // location-only line and would shred it into meaningless fragments
+  // ("Arizona", "United States; Atlanta, Georgia; Remote") that then look
+  // like plausible company-name candidates.
+  // \b after "location" matters: without it, the /i flag needed for
+  // case-insensitivity also lets [A-Z] match a lowercase letter, so a bare
+  // "locations" line (no value at all, its own header/label line on some
+  // ATS boards) would satisfy this on its trailing "s" and get mistaken for
+  // "Location" + value "s".
+  const labeledLocationLine = header.find(l => /^location\b\s*[:\-]?\s*[A-Z]/i.test(l));
+  if (labeledLocationLine){
+    const raw = labeledLocationLine.replace(/^location\b\s*[:\-]?\s*/i, "").trim();
+    const firstPlace = raw.match(/[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?(?:[A-Z]{2}(?:\s?\d{5})?|[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)/);
+    location = firstPlace ? firstPlace[0] : raw;
+  }
 
   // Combined "Company · Location · Full-time" style lines (skip salary lines —
-  // "$110,000 - $140,000" also matches the "·/-"-separated shape but isn't one)
+  // "$110,000 - $140,000" also matches the "·/-"-separated shape but isn't one,
+  // and skip the labeled Location line just handled above — it's already
+  // resolved and isn't a real Company/Location/Employment-type combo line)
   for (const line of header){
     if (/\$/.test(line)) continue;
+    if (line === labeledLocationLine || line === labeledCompany) continue;
     const hasBullet = /[·•]/.test(line);
     if (!hasBullet && !/\s-\s/.test(line)) continue;
     // A bare " - " (no real bullet) is a much weaker signal than "·"/"•" —
@@ -585,6 +606,21 @@ function parseFreeText(text){
     const m = text.match(/^About\s+([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3})\s*$/m);
     if (m && !/^us$/i.test(m[1])){
       company = m[1].trim();
+    }
+  }
+
+  // Other postings instead open with a "Company Overview" section header
+  // (filtered above as noise for the header/title scoring, since it's not
+  // a company name itself) whose very next line typically leads with the
+  // company's name ("Intuit is the global financial technology platform
+  // that powers..."). Look at the line right after that marker directly.
+  if (!company){
+    const lines = text.split("\n").map(l => l.trim());
+    const idx = lines.findIndex(l => /^(company|job|position|role)\s+overview$/i.test(l));
+    if (idx !== -1){
+      const nextLine = lines.slice(idx + 1).find(l => l);
+      const m = nextLine && nextLine.match(/^([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,2})\s+(?:is|was)\b/);
+      if (m) company = m[1].trim();
     }
   }
 
