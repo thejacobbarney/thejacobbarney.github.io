@@ -437,7 +437,7 @@ function parseSalaryToken(numStr, hasK){
    after, and both often combine them on one "Company · Location ·
    Full-time" line.
 ───────────────────────────────────────────────────────────── */
-const NOISE_LINE = /^(apply now|easy apply|apply|save job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*))$/i;
+const NOISE_LINE = /^(apply now|easy apply|apply|save job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*))$/i;
 
 const JOB_TITLE_WORDS = /\b(engineer|manager|analyst|director|coordinator|specialist|developer|designer|scientist|lead|associate|consultant|representative|administrator|officer|executive|intern|architect|technician|supervisor|strategist|recruiter|accountant|counsel|attorney|nurse|teacher|instructor|planner|advisor|president|controller|producer|editor|assistant|clerk|agent|buyer)\b/i;
 
@@ -457,6 +457,13 @@ function looksLikeLocation(segment){
   if (/^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z]{2}(\s?\d{5})?$/.test(s)) return true;
   if (/^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*$/.test(s)) return true;
   if (/\barea$/i.test(s)) return true;
+  // A multi-office posting often lists several "City, ST" locations joined by
+  // semicolons on one line ("New York, NY; San Francisco, CA; ...") — treat
+  // the whole line as location-shaped if every semicolon-separated part is.
+  if (/;/.test(s)){
+    const parts = s.split(/\s*;\s*/).filter(Boolean);
+    if (parts.length > 1 && parts.every(p => /^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z]{2}(\s?\d{5})?$/.test(p))) return true;
+  }
   return false;
 }
 
@@ -505,7 +512,13 @@ function parseFreeText(text){
   // "$110,000 - $140,000" also matches the "·/-"-separated shape but isn't one)
   for (const line of header){
     if (/\$/.test(line)) continue;
-    if (!/[·•]|\s-\s/.test(line)) continue;
+    const hasBullet = /[·•]/.test(line);
+    if (!hasBullet && !/\s-\s/.test(line)) continue;
+    // A bare " - " (no real bullet) is a much weaker signal than "·"/"•" —
+    // job titles themselves very commonly use one ("Manager, Team - Focus
+    // Area"), so don't treat the line as a combined header line if it looks
+    // like the title itself, or it'll get misread as Company - Location.
+    if (!hasBullet && JOB_TITLE_WORDS.test(line)) continue;
     const segments = splitHeaderSegments(line);
     let locSeg = segments.find(looksLikeLocation);
     if (!locSeg){
@@ -554,8 +567,22 @@ function parseFreeText(text){
   // seeking a Finance Lead...") anywhere in the body first, since that's a
   // much more reliable signal than guessing from line position.
   if (!company){
+    // The /i flag (needed for "seeking"/"Seeking"/"SEEKING" etc.) also makes
+    // [A-Z] match lowercase, so a real company name isn't guaranteed by the
+    // regex alone — re-check the capture is actually capitalized in code.
     const m = text.match(/\b([A-Z][\w&.'-]{1,40})\s+is\s+(?:seeking|looking for|hiring)\s+(?:an?|our new|the new|our)?\s*(.{3,70}?)(?:\s+to\b|[,.\n])/i);
-    if (m && JOB_TITLE_WORDS.test(m[2]) && !/^(this|it|they|we|he|she)$/i.test(m[1])){
+    if (m && /^[A-Z]/.test(m[1]) && JOB_TITLE_WORDS.test(m[2]) && !/^(this|it|they|we|he|she)$/i.test(m[1])){
+      company = m[1].trim();
+    }
+  }
+
+  // Many postings close with a boilerplate "About <Company>" section — a
+  // reliable company signal even when it sits far past the header (the
+  // generic "About the Team"/"About the Role"/"About Us" variants are
+  // filtered out above, so this only fires on an actual company name).
+  if (!company){
+    const m = text.match(/^About\s+([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3})\s*$/m);
+    if (m && !/^us$/i.test(m[1])){
       company = m[1].trim();
     }
   }
