@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Bark — Job Tracker &amp; AI Evaluator</title>
+<link rel="icon" type="image/svg+xml" href="assets/bark-icon.svg" />
 <meta name="description" content="Paste a job listing, get an instant AI match score, salary target, and career-move read — then track the whole pipeline in one dashboard." />
 <meta property="og:title" content="Bark — Job Tracker & AI Evaluator" />
 <meta property="og:description" content="Scrape job listings, score your fit, and track your pipeline — a bold, high-contrast job search dashboard." />
@@ -69,9 +70,9 @@
     text-decoration:none;
   }
   .nb-logo-mark{
-    width:30px;height:30px;background:var(--ink);color:var(--turq);
-    display:flex;align-items:center;justify-content:center;
-    font-size:1rem;font-weight:800;flex-shrink:0;
+    width:34px;height:34px;flex-shrink:0;
+    border:2px solid var(--ink);
+    display:block;
   }
   .nb-back{
     font-size:0.72rem;font-weight:700;letter-spacing:0.04em;
@@ -436,7 +437,7 @@ function parseSalaryToken(numStr, hasK){
    after, and both often combine them on one "Company · Location ·
    Full-time" line.
 ───────────────────────────────────────────────────────────── */
-const NOISE_LINE = /^(apply now|easy apply|save job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*))$/i;
+const NOISE_LINE = /^(apply now|easy apply|apply|save job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*))$/i;
 
 const JOB_TITLE_WORDS = /\b(engineer|manager|analyst|director|coordinator|specialist|developer|designer|scientist|lead|associate|consultant|representative|administrator|officer|executive|intern|architect|technician|supervisor|strategist|recruiter|accountant|counsel|attorney|nurse|teacher|instructor|planner|advisor|president|controller|producer|editor|assistant|clerk|agent|buyer)\b/i;
 
@@ -541,6 +542,22 @@ function parseFreeText(text){
       if (score > bestScore){ bestScore = score; bestLine = line; }
     });
     title = bestLine;
+  }
+
+  // Workday-style ATS postings (common with government/defense contractors)
+  // front-load a wall of metadata fields (requisition ID, clearance level,
+  // job family...) before the company name ever appears, so it can sit well
+  // past the first 15 non-noise header lines the fallback below searches —
+  // and the real header often has nothing but a bare "Apply" button next to
+  // the title, which the weak nearby-line guess picks up as if it were the
+  // company. Look for the company introducing itself directly ("GDIT is
+  // seeking a Finance Lead...") anywhere in the body first, since that's a
+  // much more reliable signal than guessing from line position.
+  if (!company){
+    const m = text.match(/\b([A-Z][\w&.'-]{1,40})\s+is\s+(?:seeking|looking for|hiring)\s+(?:an?|our new|the new|our)?\s*(.{3,70}?)(?:\s+to\b|[,.\n])/i);
+    if (m && JOB_TITLE_WORDS.test(m[2]) && !/^(this|it|they|we|he|she)$/i.test(m[1])){
+      company = m[1].trim();
+    }
   }
 
   if (!company){
@@ -2093,7 +2110,7 @@ function App(){
       <div className="nb-topbar">
         <div className="nb-topbar-inner">
           <div className="nb-logo">
-            <span className="nb-logo-mark">🐾</span>
+            <img className="nb-logo-mark" src="assets/bark-icon.svg" alt="Bark" />
             <span>BARK <span style={{color:"var(--purple)"}}>//</span> JOB TRACKER &amp; AI EVALUATOR</span>
           </div>
           <a className="nb-back" href="https://thejacobbarney.com/#personal">← thejacobbarney.com</a>
