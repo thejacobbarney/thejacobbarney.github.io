@@ -268,6 +268,7 @@
   .nb-callout-info{background:#E7F3FF;}
   .nb-callout-warn{background:#FFF3C4;}
   .nb-callout-ok{background:#D2FFD6;}
+  .nb-callout-error{background:#FFD6D6;}
   .nb-callout code{background:rgba(0,0,0,0.08);padding:0.05rem 0.3rem;font-size:0.78rem;}
 
   /* hero */
@@ -327,7 +328,7 @@ const STATUS_OPTIONS = ["In Progress","Applied","Interviewing","Dead End","Offer
 /* ─────────────────────────────────────────────────────────────
    PERSISTENCE
 ───────────────────────────────────────────────────────────── */
-const LS_KEYS = { jobs:"jt_jobs_v1", profile:"jt_profile_v1", settings:"jt_settings_v1" };
+const LS_KEYS = { jobs:"jt_jobs_v1", profile:"jt_profile_v1", settings:"jt_settings_v1", connectionStatus:"jt_conn_status_v1" };
 
 function loadLS(key, fallback){
   try {
@@ -1015,6 +1016,50 @@ function isUsableLiveBenchmark(live){
   const { min_salary, max_salary } = live;
   return typeof min_salary === "number" && typeof max_salary === "number" &&
     min_salary > 0 && max_salary >= min_salary;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   API CONNECTION TESTS — lightweight, on-demand checks the
+   Settings tab uses so a bad/expired/rate-limited key surfaces
+   immediately with the real provider error, instead of only
+   showing up later as a silent fallback to the offline heuristic
+   the next time a job is evaluated.
+───────────────────────────────────────────────────────────── */
+async function extractApiErrorMessage(res){
+  const body = await res.text().catch(() => "");
+  try {
+    const j = JSON.parse(body);
+    if (j.error && j.error.message) return j.error.message;
+    if (j.error && typeof j.error === "string") return j.error;
+    if (j.message) return j.message;
+  } catch(e){ /* not JSON, fall through */ }
+  return "HTTP " + res.status;
+}
+
+async function testGrokConnection(apiKey){
+  try {
+    const res = await fetch("https://api.x.ai/v1/models", {
+      headers: { "Authorization": "Bearer " + apiKey }
+    });
+    if (res.ok) return { ok: true };
+    return { ok: false, message: await extractApiErrorMessage(res) };
+  } catch(e){
+    return { ok: false, message: e.message || "Network error" };
+  }
+}
+
+async function testPerplexityConnection(apiKey){
+  try {
+    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+      body: JSON.stringify({ model: PERPLEXITY_MODEL, messages: [{ role: "user", content: "Reply with only the word: ok" }], max_tokens: 5 })
+    });
+    if (res.ok) return { ok: true };
+    return { ok: false, message: await extractApiErrorMessage(res) };
+  } catch(e){
+    return { ok: false, message: e.message || "Network error" };
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -2021,9 +2066,29 @@ function AnalyticsTab({jobs}){
 /* ─────────────────────────────────────────────────────────────
    SETTINGS TAB
 ───────────────────────────────────────────────────────────── */
-function SettingsTab({settings, onChange}){
+function ConnectionStatusBadge({state, testing}){
+  if (testing) return <Callout type="info"><span>Testing connection…</span></Callout>;
+  if (!state) return null;
+  const when = new Date(state.checkedAt).toLocaleString();
+  if (state.ok){
+    return <Callout type="ok"><span><strong>Connected</strong> — checked {when}.</span></Callout>;
+  }
+  return <Callout type="error"><span><strong>Failed:</strong> {state.message} — checked {when}.</span></Callout>;
+}
+
+function SettingsTab({settings, onChange, connectionStatus, onTestResult}){
   const [local, setLocal] = useState(settings);
   useEffect(() => setLocal(settings), [settings]);
+  const [testing, setTesting] = useState({ grok:false, perplexity:false });
+
+  async function handleTest(provider){
+    const key = provider === "grok" ? local.grokKey : local.perplexityKey;
+    if (!key.trim()) return;
+    setTesting(t => ({...t, [provider]: true}));
+    const result = provider === "grok" ? await testGrokConnection(key) : await testPerplexityConnection(key);
+    setTesting(t => ({...t, [provider]: false}));
+    onTestResult(provider, { ...result, checkedAt: Date.now() });
+  }
 
   return (
     <div className="nb-panel">
@@ -2043,16 +2108,28 @@ function SettingsTab({settings, onChange}){
 
       <div className="nb-field">
         <label className="nb-label">Grok API key (optional)</label>
-        <input className="nb-input" type="password" placeholder="xai-…" value={local.grokKey}
-          onChange={e => setLocal(l => ({...l, grokKey: e.target.value}))} />
+        <div className="nb-row" style={{alignItems:"flex-end"}}>
+          <input className="nb-input" style={{flex:1}} type="password" placeholder="xai-…" value={local.grokKey}
+            onChange={e => setLocal(l => ({...l, grokKey: e.target.value}))} />
+          <button className="nb-btn nb-btn-sm" disabled={!local.grokKey.trim() || testing.grok} onClick={() => handleTest("grok")}>
+            {testing.grok ? "Testing…" : "Test Connection"}
+          </button>
+        </div>
         <span className="nb-hint">When set, "Analyze &amp; Save" calls grok-4-fast (xAI) for the match score, salary target, and career analysis instead of the offline heuristic engine — also used for resume/LinkedIn PDF parsing on the Profile tab. Get a key at console.x.ai.</span>
+        <ConnectionStatusBadge state={connectionStatus.grok} testing={testing.grok} />
       </div>
 
       <div className="nb-field">
         <label className="nb-label">Perplexity API key (optional, for live salary benchmarks)</label>
-        <input className="nb-input" type="password" placeholder="pplx-…" value={local.perplexityKey}
-          onChange={e => setLocal(l => ({...l, perplexityKey: e.target.value}))} />
+        <div className="nb-row" style={{alignItems:"flex-end"}}>
+          <input className="nb-input" style={{flex:1}} type="password" placeholder="pplx-…" value={local.perplexityKey}
+            onChange={e => setLocal(l => ({...l, perplexityKey: e.target.value}))} />
+          <button className="nb-btn nb-btn-sm" disabled={!local.perplexityKey.trim() || testing.perplexity} onClick={() => handleTest("perplexity")}>
+            {testing.perplexity ? "Testing…" : "Test Connection"}
+          </button>
+        </div>
         <span className="nb-hint">When set and a listing has no posted salary, calls Perplexity's sonar model — web search is built into the model, so this pulls a live comparable-role range (min/median/max + confidence) with real source citations instead of the hardcoded benchmark table. Get a key at perplexity.ai/settings/api.</span>
+        <ConnectionStatusBadge state={connectionStatus.perplexity} testing={testing.perplexity} />
       </div>
 
       <div className="nb-field">
@@ -2075,12 +2152,14 @@ function App(){
   const [jobs, setJobs] = useState(() => loadLS(LS_KEYS.jobs, []));
   const [profile, setProfile] = useState(() => loadLS(LS_KEYS.profile, DEFAULT_PROFILE));
   const [settings, setSettings] = useState(() => loadLS(LS_KEYS.settings, DEFAULT_SETTINGS));
+  const [connectionStatus, setConnectionStatus] = useState(() => loadLS(LS_KEYS.connectionStatus, { grok:null, perplexity:null }));
 
   const [toast, setToast] = useState(null);
 
   useEffect(() => saveLS(LS_KEYS.jobs, jobs), [jobs]);
   useEffect(() => saveLS(LS_KEYS.profile, profile), [profile]);
   useEffect(() => saveLS(LS_KEYS.settings, settings), [settings]);
+  useEffect(() => saveLS(LS_KEYS.connectionStatus, connectionStatus), [connectionStatus]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 8000);
@@ -2172,7 +2251,8 @@ function App(){
         {tab === "add" && <AddJobTab profile={profile} settings={settings} onSave={addJob} />}
         {tab === "profile" && <ProfileTab profile={profile} settings={settings} onChange={setProfile} />}
         {tab === "analytics" && <AnalyticsTab jobs={jobs} />}
-        {tab === "settings" && <SettingsTab settings={settings} onChange={setSettings} />}
+        {tab === "settings" && <SettingsTab settings={settings} onChange={setSettings} connectionStatus={connectionStatus}
+          onTestResult={(provider, result) => setConnectionStatus(s => ({...s, [provider]: result}))} />}
       </div>
     </div>
   );
