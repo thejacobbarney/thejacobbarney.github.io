@@ -336,7 +336,7 @@ const STATUS_OPTIONS = ["In Progress","Applied","Interviewing","Dead End","Offer
 /* ─────────────────────────────────────────────────────────────
    PERSISTENCE
 ───────────────────────────────────────────────────────────── */
-const LS_KEYS = { jobs:"jt_jobs_v1", profile:"jt_profile_v1", settings:"jt_settings_v1", connectionStatus:"jt_conn_status_v1" };
+const LS_KEYS = { jobs:"jt_jobs_v1", profile:"jt_profile_v1", settings:"jt_settings_v1", connectionStatus:"jt_conn_status_v1", syncStatus:"jt_sync_status_v1" };
 
 function loadLS(key, fallback){
   try {
@@ -352,7 +352,7 @@ const DEFAULT_PROFILE = {
   name:"", yearsExp:3, targetRoles:"", skills:[], summary:"",
   currentSalary:"", targetSalary:""
 };
-const DEFAULT_SETTINGS = { grokKey:"", perplexityKey:"", googleClientId:"" };
+const DEFAULT_SETTINGS = { grokKey:"", perplexityKey:"", googleClientId:"", githubToken:"" };
 
 /* ─────────────────────────────────────────────────────────────
    EXTRACTION — JSON-LD (schema.org JobPosting), meta-tag
@@ -1417,6 +1417,77 @@ async function exportToGoogleSheets(jobs, clientId){
 }
 
 /* ─────────────────────────────────────────────────────────────
+   CROSS-DEVICE SYNC — a private GitHub Gist as the sync store, so
+   moving your profile/jobs to another device doesn't need a new
+   account: it reuses your own GitHub identity via a classic personal
+   access token scoped to "gist" only (fine-grained tokens can't use
+   the Gist API). The gist is found by a fixed filename rather than a
+   stored gist id, so entering the same token on a second device is
+   the entire setup — nothing to copy between devices.
+
+   API keys deliberately never go through this: a "secret" gist is
+   unlisted, not access-controlled — anyone with the URL can read it
+   without authenticating — so only profile + jobs are synced, never
+   your Grok/Perplexity/Google credentials.
+───────────────────────────────────────────────────────────── */
+const SYNC_GIST_FILENAME = "bark-sync-data.json";
+const SYNC_GIST_DESCRIPTION = "BARK app sync data — do not rename or delete this gist";
+
+async function githubRequest(token, path, options = {}){
+  const res = await fetch("https://api.github.com" + path, {
+    method: options.method || "GET",
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(options.body ? { "Content-Type": "application/json" } : {})
+    },
+    body: options.body
+  });
+  if (!res.ok){
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message || ("GitHub request failed (" + res.status + ")"));
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function testGithubConnection(token){
+  try {
+    const user = await githubRequest(token, "/user");
+    return { ok: true, message: "Connected as " + user.login };
+  } catch(e){
+    return { ok: false, message: e.message || "Network error" };
+  }
+}
+
+async function findSyncGist(token){
+  const gists = await githubRequest(token, "/gists?per_page=100");
+  return gists.find(g => g.files && g.files[SYNC_GIST_FILENAME]) || null;
+}
+
+async function pushSyncData(token, data){
+  const existing = await findSyncGist(token);
+  const payload = {
+    description: SYNC_GIST_DESCRIPTION,
+    public: false,
+    files: { [SYNC_GIST_FILENAME]: { content: JSON.stringify(data, null, 2) } }
+  };
+  if (existing){
+    return githubRequest(token, "/gists/" + existing.id, { method: "PATCH", body: JSON.stringify(payload) });
+  }
+  return githubRequest(token, "/gists", { method: "POST", body: JSON.stringify(payload) });
+}
+
+async function pullSyncData(token){
+  const existing = await findSyncGist(token);
+  if (!existing) throw new Error("No sync data found for this account yet — push from another device first.");
+  const full = await githubRequest(token, "/gists/" + existing.id);
+  const file = full.files[SYNC_GIST_FILENAME];
+  if (!file || !file.content) throw new Error("Sync gist exists but has no data.");
+  return JSON.parse(file.content);
+}
+
+/* ─────────────────────────────────────────────────────────────
    RESUME / LINKEDIN PDF IMPORT — extracts text from an uploaded
    PDF (resume or a LinkedIn "Save to PDF" profile export) via
    PDF.js, then builds a profile draft from it: an offline
@@ -2253,18 +2324,36 @@ function ConnectionStatusBadge({state, testing}){
   return <Callout type="error"><span><strong>Failed:</strong> {state.message} — checked {when}.</span></Callout>;
 }
 
-function SettingsTab({settings, onChange, connectionStatus, onTestResult}){
+function SettingsTab({settings, onChange, connectionStatus, onTestResult, onPush, onPull, syncStatus}){
   const [local, setLocal] = useState(settings);
   useEffect(() => setLocal(settings), [settings]);
-  const [testing, setTesting] = useState({ grok:false, perplexity:false });
+  const [testing, setTesting] = useState({ grok:false, perplexity:false, github:false });
+  const [syncBusy, setSyncBusy] = useState({ push:false, pull:false });
+  const [syncMessage, setSyncMessage] = useState(null);
 
   async function handleTest(provider){
-    const key = provider === "grok" ? local.grokKey : local.perplexityKey;
+    const key = provider === "grok" ? local.grokKey : provider === "perplexity" ? local.perplexityKey : local.githubToken;
     if (!key.trim()) return;
     setTesting(t => ({...t, [provider]: true}));
-    const result = provider === "grok" ? await testGrokConnection(key) : await testPerplexityConnection(key);
+    const result = provider === "grok" ? await testGrokConnection(key)
+      : provider === "perplexity" ? await testPerplexityConnection(key)
+      : await testGithubConnection(key);
     setTesting(t => ({...t, [provider]: false}));
     onTestResult(provider, { ...result, checkedAt: Date.now() });
+  }
+
+  async function handlePush(){
+    setSyncBusy(b => ({...b, push:true})); setSyncMessage(null);
+    try { await onPush(); setSyncMessage({type:"ok", text:"Pushed to cloud."}); }
+    catch(e){ setSyncMessage({type:"error", text: e.message || "Push failed."}); }
+    finally { setSyncBusy(b => ({...b, push:false})); }
+  }
+  async function handlePull(){
+    if (!window.confirm("This replaces your profile and job list on this device with whatever was last pushed from another device. Continue?")) return;
+    setSyncBusy(b => ({...b, pull:true})); setSyncMessage(null);
+    try { await onPull(); setSyncMessage({type:"ok", text:"Pulled from cloud."}); }
+    catch(e){ setSyncMessage({type:"error", text: e.message || "Pull failed."}); }
+    finally { setSyncBusy(b => ({...b, pull:false})); }
   }
 
   return (
@@ -2310,6 +2399,19 @@ function SettingsTab({settings, onChange, connectionStatus, onTestResult}){
       </div>
 
       <div className="nb-field">
+        <label className="nb-label">GitHub personal access token (optional, for cross-device sync)</label>
+        <div className="nb-row" style={{alignItems:"flex-end"}}>
+          <input className="nb-input" style={{flex:1}} type="password" placeholder="ghp_…" value={local.githubToken}
+            onChange={e => setLocal(l => ({...l, githubToken: e.target.value}))} />
+          <button className="nb-btn nb-btn-sm" disabled={!local.githubToken.trim() || testing.github} onClick={() => handleTest("github")}>
+            {testing.github ? "Testing…" : "Test Connection"}
+          </button>
+        </div>
+        <span className="nb-hint">Used only to push/pull your profile and job list to a private Gist on your own GitHub account, so you can pick them up on another device — never used for anything else. Create a <strong>classic</strong> token (fine-grained tokens can't access Gists) scoped to <strong>gist</strong> only at github.com/settings/tokens. A "secret" gist isn't truly private — anyone with the link can view it without logging in — so your Grok/Perplexity/Google keys above are deliberately never included in the sync; only your profile and jobs are.</span>
+        <ConnectionStatusBadge state={connectionStatus.github} testing={testing.github} />
+      </div>
+
+      <div className="nb-field">
         <label className="nb-label">Google OAuth Client ID (optional, for Sheets export)</label>
         <input className="nb-input" placeholder="xxxxxxxx.apps.googleusercontent.com" value={local.googleClientId}
           onChange={e => setLocal(l => ({...l, googleClientId: e.target.value}))} />
@@ -2317,6 +2419,27 @@ function SettingsTab({settings, onChange, connectionStatus, onTestResult}){
       </div>
 
       <button className="nb-btn nb-btn-purple" onClick={() => onChange(local)}>Save Settings</button>
+
+      <div className="nb-panel-head" style={{marginTop:"1.75rem"}}>
+        <div>
+          <div className="nb-eyebrow">Cross-device sync</div>
+          <div className="nb-title" style={{fontSize:"1.1rem"}}>Move your profile &amp; jobs to another device</div>
+        </div>
+      </div>
+      <p className="nb-hint" style={{marginBottom:"1.1rem"}}>Push uploads your current profile and job list to your private Gist, overwriting whatever's there. Pull downloads it and overwrites your profile and job list on this device. Save the same GitHub token above on each device — nothing else to copy between them.</p>
+      <div className="nb-row">
+        <button className="nb-btn nb-btn-sm nb-btn-purple" disabled={!settings.githubToken || syncBusy.push} onClick={handlePush}>
+          {syncBusy.push ? "Pushing…" : "Push to Cloud"}
+        </button>
+        <button className="nb-btn nb-btn-sm" disabled={!settings.githubToken || syncBusy.pull} onClick={handlePull}>
+          {syncBusy.pull ? "Pulling…" : "Pull from Cloud"}
+        </button>
+      </div>
+      <div style={{marginTop:"0.7rem", display:"flex", gap:"1.4rem", flexWrap:"wrap"}}>
+        <span className="nb-hint">Last pushed: {syncStatus.lastPushedAt ? new Date(syncStatus.lastPushedAt).toLocaleString() : "never"}</span>
+        <span className="nb-hint">Last pulled: {syncStatus.lastPulledAt ? new Date(syncStatus.lastPulledAt).toLocaleString() : "never"}</span>
+      </div>
+      {syncMessage && <Callout type={syncMessage.type === "ok" ? "ok" : "error"}><span>{syncMessage.text}</span></Callout>}
     </div>
   );
 }
@@ -2329,7 +2452,8 @@ function App(){
   const [jobs, setJobs] = useState(() => loadLS(LS_KEYS.jobs, []));
   const [profile, setProfile] = useState(() => loadLS(LS_KEYS.profile, DEFAULT_PROFILE));
   const [settings, setSettings] = useState(() => loadLS(LS_KEYS.settings, DEFAULT_SETTINGS));
-  const [connectionStatus, setConnectionStatus] = useState(() => loadLS(LS_KEYS.connectionStatus, { grok:null, perplexity:null }));
+  const [connectionStatus, setConnectionStatus] = useState(() => loadLS(LS_KEYS.connectionStatus, { grok:null, perplexity:null, github:null }));
+  const [syncStatus, setSyncStatus] = useState(() => loadLS(LS_KEYS.syncStatus, { lastPushedAt:null, lastPulledAt:null }));
 
   const [toast, setToast] = useState(null);
 
@@ -2337,6 +2461,7 @@ function App(){
   useEffect(() => saveLS(LS_KEYS.profile, profile), [profile]);
   useEffect(() => saveLS(LS_KEYS.settings, settings), [settings]);
   useEffect(() => saveLS(LS_KEYS.connectionStatus, connectionStatus), [connectionStatus]);
+  useEffect(() => saveLS(LS_KEYS.syncStatus, syncStatus), [syncStatus]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 8000);
@@ -2378,6 +2503,17 @@ function App(){
     }));
     const allNotes = results.flatMap(r => r.notes || []);
     if (allNotes.length) setToast(allNotes.slice(0, 3).join(" "));
+  }
+
+  async function pushToCloud(){
+    await pushSyncData(settings.githubToken, { version:1, profile, jobs, exportedAt: new Date().toISOString() });
+    setSyncStatus(s => ({...s, lastPushedAt: Date.now()}));
+  }
+  async function pullFromCloud(){
+    const data = await pullSyncData(settings.githubToken);
+    if (data.profile) setProfile(p => ({...DEFAULT_PROFILE, ...data.profile}));
+    if (Array.isArray(data.jobs)) setJobs(data.jobs);
+    setSyncStatus(s => ({...s, lastPulledAt: Date.now()}));
   }
 
   const tabs = [
@@ -2430,7 +2566,8 @@ function App(){
         {tab === "profile" && <ProfileTab profile={profile} settings={settings} onChange={setProfile} />}
         {tab === "analytics" && <AnalyticsTab jobs={jobs} />}
         {tab === "settings" && <SettingsTab settings={settings} onChange={setSettings} connectionStatus={connectionStatus}
-          onTestResult={(provider, result) => setConnectionStatus(s => ({...s, [provider]: result}))} />}
+          onTestResult={(provider, result) => setConnectionStatus(s => ({...s, [provider]: result}))}
+          onPush={pushToCloud} onPull={pullFromCloud} syncStatus={syncStatus} />}
       </div>
     </div>
   );
