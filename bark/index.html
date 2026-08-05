@@ -268,6 +268,7 @@
   .nb-callout-info{background:#E7F3FF;}
   .nb-callout-warn{background:#FFF3C4;}
   .nb-callout-ok{background:#D2FFD6;}
+  .nb-callout-error{background:#FFD6D6;}
   .nb-callout code{background:rgba(0,0,0,0.08);padding:0.05rem 0.3rem;font-size:0.78rem;}
 
   /* hero */
@@ -327,7 +328,7 @@ const STATUS_OPTIONS = ["In Progress","Applied","Interviewing","Dead End","Offer
 /* ─────────────────────────────────────────────────────────────
    PERSISTENCE
 ───────────────────────────────────────────────────────────── */
-const LS_KEYS = { jobs:"jt_jobs_v1", profile:"jt_profile_v1", settings:"jt_settings_v1" };
+const LS_KEYS = { jobs:"jt_jobs_v1", profile:"jt_profile_v1", settings:"jt_settings_v1", connectionStatus:"jt_conn_status_v1" };
 
 function loadLS(key, fallback){
   try {
@@ -437,7 +438,7 @@ function parseSalaryToken(numStr, hasK){
    after, and both often combine them on one "Company · Location ·
    Full-time" line.
 ───────────────────────────────────────────────────────────── */
-const NOISE_LINE = /^(apply now|easy apply|apply|save job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*))$/i;
+const NOISE_LINE = /^(apply now|easy apply|apply|save job|share job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|company overview|job overview|position overview|role overview|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*)|(category\s+.+)|(job id\s+.+)|(job requisition id\s*.*)|(requisition id\s*.*))$/i;
 
 const JOB_TITLE_WORDS = /\b(engineer|manager|analyst|director|coordinator|specialist|developer|designer|scientist|lead|associate|consultant|representative|administrator|officer|executive|intern|architect|technician|supervisor|strategist|recruiter|accountant|counsel|attorney|nurse|teacher|instructor|planner|advisor|president|controller|producer|editor|assistant|clerk|agent|buyer)\b/i;
 
@@ -457,6 +458,13 @@ function looksLikeLocation(segment){
   if (/^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z]{2}(\s?\d{5})?$/.test(s)) return true;
   if (/^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*$/.test(s)) return true;
   if (/\barea$/i.test(s)) return true;
+  // A multi-office posting often lists several "City, ST" locations joined by
+  // semicolons on one line ("New York, NY; San Francisco, CA; ...") — treat
+  // the whole line as location-shaped if every semicolon-separated part is.
+  if (/;/.test(s)){
+    const parts = s.split(/\s*;\s*/).filter(Boolean);
+    if (parts.length > 1 && parts.every(p => /^[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?[A-Z]{2}(\s?\d{5})?$/.test(p))) return true;
+  }
   return false;
 }
 
@@ -498,14 +506,41 @@ function parseFreeText(text){
   const labeledCompany = header.find(l => /^(company|employer|organization)\s*[:\-]/i.test(l));
   if (labeledCompany) company = labeledCompany.replace(/^(company|employer|organization)\s*[:\-]\s*/i, "").trim();
 
-  const labeledLocation = header.find(l => /^location\s*[:\-]/i.test(l));
-  if (labeledLocation) location = labeledLocation.replace(/^location\s*[:\-]\s*/i, "").trim();
+  // Some ATS exports glue the "Location" label straight onto its value with
+  // no colon/hyphen at all ("Location Mountain View, California; Remote -
+  // Arizona - United States; ..."), often listing several offices on one
+  // line. Match that bare-space form too, and pull out just the first place
+  // named rather than keeping the whole multi-location string or letting it
+  // fall into the combined-line splitter below, which has no concept of a
+  // location-only line and would shred it into meaningless fragments
+  // ("Arizona", "United States; Atlanta, Georgia; Remote") that then look
+  // like plausible company-name candidates.
+  // \b after "location" matters: without it, the /i flag needed for
+  // case-insensitivity also lets [A-Z] match a lowercase letter, so a bare
+  // "locations" line (no value at all, its own header/label line on some
+  // ATS boards) would satisfy this on its trailing "s" and get mistaken for
+  // "Location" + value "s".
+  const labeledLocationLine = header.find(l => /^location\b\s*[:\-]?\s*[A-Z]/i.test(l));
+  if (labeledLocationLine){
+    const raw = labeledLocationLine.replace(/^location\b\s*[:\-]?\s*/i, "").trim();
+    const firstPlace = raw.match(/[A-Z][a-zA-Z.\-]+(?:\s[A-Z][a-zA-Z.\-]+){0,2},\s?(?:[A-Z]{2}(?:\s?\d{5})?|[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*)/);
+    location = firstPlace ? firstPlace[0] : raw;
+  }
 
   // Combined "Company · Location · Full-time" style lines (skip salary lines —
-  // "$110,000 - $140,000" also matches the "·/-"-separated shape but isn't one)
+  // "$110,000 - $140,000" also matches the "·/-"-separated shape but isn't one,
+  // and skip the labeled Location line just handled above — it's already
+  // resolved and isn't a real Company/Location/Employment-type combo line)
   for (const line of header){
     if (/\$/.test(line)) continue;
-    if (!/[·•]|\s-\s/.test(line)) continue;
+    if (line === labeledLocationLine || line === labeledCompany) continue;
+    const hasBullet = /[·•]/.test(line);
+    if (!hasBullet && !/\s-\s/.test(line)) continue;
+    // A bare " - " (no real bullet) is a much weaker signal than "·"/"•" —
+    // job titles themselves very commonly use one ("Manager, Team - Focus
+    // Area"), so don't treat the line as a combined header line if it looks
+    // like the title itself, or it'll get misread as Company - Location.
+    if (!hasBullet && JOB_TITLE_WORDS.test(line)) continue;
     const segments = splitHeaderSegments(line);
     let locSeg = segments.find(looksLikeLocation);
     if (!locSeg){
@@ -554,9 +589,38 @@ function parseFreeText(text){
   // seeking a Finance Lead...") anywhere in the body first, since that's a
   // much more reliable signal than guessing from line position.
   if (!company){
+    // The /i flag (needed for "seeking"/"Seeking"/"SEEKING" etc.) also makes
+    // [A-Z] match lowercase, so a real company name isn't guaranteed by the
+    // regex alone — re-check the capture is actually capitalized in code.
     const m = text.match(/\b([A-Z][\w&.'-]{1,40})\s+is\s+(?:seeking|looking for|hiring)\s+(?:an?|our new|the new|our)?\s*(.{3,70}?)(?:\s+to\b|[,.\n])/i);
-    if (m && JOB_TITLE_WORDS.test(m[2]) && !/^(this|it|they|we|he|she)$/i.test(m[1])){
+    if (m && /^[A-Z]/.test(m[1]) && JOB_TITLE_WORDS.test(m[2]) && !/^(this|it|they|we|he|she)$/i.test(m[1])){
       company = m[1].trim();
+    }
+  }
+
+  // Many postings close with a boilerplate "About <Company>" section — a
+  // reliable company signal even when it sits far past the header (the
+  // generic "About the Team"/"About the Role"/"About Us" variants are
+  // filtered out above, so this only fires on an actual company name).
+  if (!company){
+    const m = text.match(/^About\s+([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3})\s*$/m);
+    if (m && !/^us$/i.test(m[1])){
+      company = m[1].trim();
+    }
+  }
+
+  // Other postings instead open with a "Company Overview" section header
+  // (filtered above as noise for the header/title scoring, since it's not
+  // a company name itself) whose very next line typically leads with the
+  // company's name ("Intuit is the global financial technology platform
+  // that powers..."). Look at the line right after that marker directly.
+  if (!company){
+    const lines = text.split("\n").map(l => l.trim());
+    const idx = lines.findIndex(l => /^(company|job|position|role)\s+overview$/i.test(l));
+    if (idx !== -1){
+      const nextLine = lines.slice(idx + 1).find(l => l);
+      const m = nextLine && nextLine.match(/^([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,2})\s+(?:is|was)\b/);
+      if (m) company = m[1].trim();
     }
   }
 
@@ -988,6 +1052,50 @@ function isUsableLiveBenchmark(live){
   const { min_salary, max_salary } = live;
   return typeof min_salary === "number" && typeof max_salary === "number" &&
     min_salary > 0 && max_salary >= min_salary;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   API CONNECTION TESTS — lightweight, on-demand checks the
+   Settings tab uses so a bad/expired/rate-limited key surfaces
+   immediately with the real provider error, instead of only
+   showing up later as a silent fallback to the offline heuristic
+   the next time a job is evaluated.
+───────────────────────────────────────────────────────────── */
+async function extractApiErrorMessage(res){
+  const body = await res.text().catch(() => "");
+  try {
+    const j = JSON.parse(body);
+    if (j.error && j.error.message) return j.error.message;
+    if (j.error && typeof j.error === "string") return j.error;
+    if (j.message) return j.message;
+  } catch(e){ /* not JSON, fall through */ }
+  return "HTTP " + res.status;
+}
+
+async function testGrokConnection(apiKey){
+  try {
+    const res = await fetch("https://api.x.ai/v1/models", {
+      headers: { "Authorization": "Bearer " + apiKey }
+    });
+    if (res.ok) return { ok: true };
+    return { ok: false, message: await extractApiErrorMessage(res) };
+  } catch(e){
+    return { ok: false, message: e.message || "Network error" };
+  }
+}
+
+async function testPerplexityConnection(apiKey){
+  try {
+    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+      body: JSON.stringify({ model: PERPLEXITY_MODEL, messages: [{ role: "user", content: "Reply with only the word: ok" }], max_tokens: 5 })
+    });
+    if (res.ok) return { ok: true };
+    return { ok: false, message: await extractApiErrorMessage(res) };
+  } catch(e){
+    return { ok: false, message: e.message || "Network error" };
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -1994,9 +2102,29 @@ function AnalyticsTab({jobs}){
 /* ─────────────────────────────────────────────────────────────
    SETTINGS TAB
 ───────────────────────────────────────────────────────────── */
-function SettingsTab({settings, onChange}){
+function ConnectionStatusBadge({state, testing}){
+  if (testing) return <Callout type="info"><span>Testing connection…</span></Callout>;
+  if (!state) return null;
+  const when = new Date(state.checkedAt).toLocaleString();
+  if (state.ok){
+    return <Callout type="ok"><span><strong>Connected</strong> — checked {when}.</span></Callout>;
+  }
+  return <Callout type="error"><span><strong>Failed:</strong> {state.message} — checked {when}.</span></Callout>;
+}
+
+function SettingsTab({settings, onChange, connectionStatus, onTestResult}){
   const [local, setLocal] = useState(settings);
   useEffect(() => setLocal(settings), [settings]);
+  const [testing, setTesting] = useState({ grok:false, perplexity:false });
+
+  async function handleTest(provider){
+    const key = provider === "grok" ? local.grokKey : local.perplexityKey;
+    if (!key.trim()) return;
+    setTesting(t => ({...t, [provider]: true}));
+    const result = provider === "grok" ? await testGrokConnection(key) : await testPerplexityConnection(key);
+    setTesting(t => ({...t, [provider]: false}));
+    onTestResult(provider, { ...result, checkedAt: Date.now() });
+  }
 
   return (
     <div className="nb-panel">
@@ -2016,16 +2144,28 @@ function SettingsTab({settings, onChange}){
 
       <div className="nb-field">
         <label className="nb-label">Grok API key (optional)</label>
-        <input className="nb-input" type="password" placeholder="xai-…" value={local.grokKey}
-          onChange={e => setLocal(l => ({...l, grokKey: e.target.value}))} />
+        <div className="nb-row" style={{alignItems:"flex-end"}}>
+          <input className="nb-input" style={{flex:1}} type="password" placeholder="xai-…" value={local.grokKey}
+            onChange={e => setLocal(l => ({...l, grokKey: e.target.value}))} />
+          <button className="nb-btn nb-btn-sm" disabled={!local.grokKey.trim() || testing.grok} onClick={() => handleTest("grok")}>
+            {testing.grok ? "Testing…" : "Test Connection"}
+          </button>
+        </div>
         <span className="nb-hint">When set, "Analyze &amp; Save" calls grok-4-fast (xAI) for the match score, salary target, and career analysis instead of the offline heuristic engine — also used for resume/LinkedIn PDF parsing on the Profile tab. Get a key at console.x.ai.</span>
+        <ConnectionStatusBadge state={connectionStatus.grok} testing={testing.grok} />
       </div>
 
       <div className="nb-field">
         <label className="nb-label">Perplexity API key (optional, for live salary benchmarks)</label>
-        <input className="nb-input" type="password" placeholder="pplx-…" value={local.perplexityKey}
-          onChange={e => setLocal(l => ({...l, perplexityKey: e.target.value}))} />
+        <div className="nb-row" style={{alignItems:"flex-end"}}>
+          <input className="nb-input" style={{flex:1}} type="password" placeholder="pplx-…" value={local.perplexityKey}
+            onChange={e => setLocal(l => ({...l, perplexityKey: e.target.value}))} />
+          <button className="nb-btn nb-btn-sm" disabled={!local.perplexityKey.trim() || testing.perplexity} onClick={() => handleTest("perplexity")}>
+            {testing.perplexity ? "Testing…" : "Test Connection"}
+          </button>
+        </div>
         <span className="nb-hint">When set and a listing has no posted salary, calls Perplexity's sonar model — web search is built into the model, so this pulls a live comparable-role range (min/median/max + confidence) with real source citations instead of the hardcoded benchmark table. Get a key at perplexity.ai/settings/api.</span>
+        <ConnectionStatusBadge state={connectionStatus.perplexity} testing={testing.perplexity} />
       </div>
 
       <div className="nb-field">
@@ -2048,12 +2188,14 @@ function App(){
   const [jobs, setJobs] = useState(() => loadLS(LS_KEYS.jobs, []));
   const [profile, setProfile] = useState(() => loadLS(LS_KEYS.profile, DEFAULT_PROFILE));
   const [settings, setSettings] = useState(() => loadLS(LS_KEYS.settings, DEFAULT_SETTINGS));
+  const [connectionStatus, setConnectionStatus] = useState(() => loadLS(LS_KEYS.connectionStatus, { grok:null, perplexity:null }));
 
   const [toast, setToast] = useState(null);
 
   useEffect(() => saveLS(LS_KEYS.jobs, jobs), [jobs]);
   useEffect(() => saveLS(LS_KEYS.profile, profile), [profile]);
   useEffect(() => saveLS(LS_KEYS.settings, settings), [settings]);
+  useEffect(() => saveLS(LS_KEYS.connectionStatus, connectionStatus), [connectionStatus]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 8000);
@@ -2145,7 +2287,8 @@ function App(){
         {tab === "add" && <AddJobTab profile={profile} settings={settings} onSave={addJob} />}
         {tab === "profile" && <ProfileTab profile={profile} settings={settings} onChange={setProfile} />}
         {tab === "analytics" && <AnalyticsTab jobs={jobs} />}
-        {tab === "settings" && <SettingsTab settings={settings} onChange={setSettings} />}
+        {tab === "settings" && <SettingsTab settings={settings} onChange={setSettings} connectionStatus={connectionStatus}
+          onTestResult={(provider, result) => setConnectionStatus(s => ({...s, [provider]: result}))} />}
       </div>
     </div>
   );
