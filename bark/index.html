@@ -438,7 +438,7 @@ function parseSalaryToken(numStr, hasK){
    after, and both often combine them on one "Company · Location ·
    Full-time" line.
 ───────────────────────────────────────────────────────────── */
-const NOISE_LINE = /^(apply now|easy apply|apply|save job|share job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|company overview|job overview|position overview|role overview|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*)|(category\s+.+)|(job id\s+.+)|(job requisition id\s*.*)|(requisition id\s*.*))$/i;
+const NOISE_LINE = /^(apply now|easy apply|apply|save job|share job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|company overview|job overview|position overview|role overview|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*)|(category\s+.+)|(job id\s+.+)|(job requisition id\s*.*)|(requisition id\s*.*)|(department\s*[:\-]\s*.+)|(reports?\s+to\s*[:\-]\s*.+)|(format\s*[:\-]\s*.+))$/i;
 
 const JOB_TITLE_WORDS = /\b(engineer|manager|analyst|director|coordinator|specialist|developer|designer|scientist|lead|associate|consultant|representative|administrator|officer|executive|intern|architect|technician|supervisor|strategist|recruiter|accountant|counsel|attorney|nurse|teacher|instructor|planner|advisor|president|controller|producer|editor|assistant|clerk|agent|buyer)\b/i;
 
@@ -486,6 +486,20 @@ function parseFreeText(text){
   const header = text.split("\n").map(l => l.trim()).filter(l => l && !isNoiseLine(l)).slice(0, 15);
 
   let title = "", company = "", location = "";
+  // Tracks which header line the title came from, when it's a stripped
+  // fragment of that line rather than the line verbatim — the company-
+  // guessing fallback below needs a real index to build its "nearby lines"
+  // window from, and header.indexOf(title) can't find a fragment.
+  let titleLineIdx = -1;
+
+  // Some postings label the title explicitly ("Position: Lead Accountant,
+  // Affiliates – Full Time/Exempt") — a stronger, more direct signal than
+  // any scoring heuristic, so honor it before anything else runs.
+  const labeledTitleIdx = header.findIndex(l => /^(position|job title|title|role)\s*[:\-]\s*\S/i.test(l));
+  if (labeledTitleIdx !== -1){
+    title = header[labeledTitleIdx].replace(/^(position|job title|title|role)\s*[:\-]\s*/i, "").trim();
+    titleLineIdx = labeledTitleIdx;
+  }
 
   // "Title at Company" / "Title @ Company" on one line
   for (const line of header.slice(0, 6)){
@@ -639,24 +653,28 @@ function parseFreeText(text){
     }
   }
 
-  // Other postings instead open with a "Company Overview" section header
-  // (filtered above as noise for the header/title scoring, since it's not
-  // a company name itself) whose very next line typically leads with the
-  // company's name ("Intuit is the global financial technology platform
-  // that powers..."). Look at the line right after that marker directly.
+  // Other postings instead open with a "Company Overview"-style section
+  // header (filtered above as noise for the header/title scoring, since
+  // it's not a company name itself) — sometimes with the org's own name
+  // tacked on the front ("Cardinals Organizational Summary") — whose very
+  // next line typically leads with the full company name ("The Arizona
+  // Cardinals Football Club is a professional football team...", "Intuit
+  // is the global financial technology platform that powers..."). Look at
+  // the line right after that marker directly.
   if (!company){
     const lines = text.split("\n").map(l => l.trim());
-    const idx = lines.findIndex(l => /^(company|job|position|role)\s+overview$/i.test(l));
+    const idx = lines.findIndex(l => /^(?:[A-Za-z]+\s+)?(?:company|organization(?:al)?|job|position|role)\s+(?:overview|summary):?$/i.test(l));
     if (idx !== -1){
       const nextLine = lines.slice(idx + 1).find(l => l);
-      const m = nextLine && nextLine.match(/^([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,2})\s+(?:is|was)\b/);
+      const m = nextLine && nextLine.match(/^([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,5})\s+(?:is|was)\b/);
       if (m) company = m[1].trim();
     }
   }
 
   if (!company){
-    const titleIdx = header.indexOf(title);
-    const nearby = [...header.slice(Math.max(0, titleIdx - 2), titleIdx), ...header.slice(titleIdx + 1, titleIdx + 4)];
+    const titleIdx = titleLineIdx !== -1 ? titleLineIdx : header.indexOf(title);
+    const nearby = titleIdx === -1 ? [] :
+      [...header.slice(Math.max(0, titleIdx - 2), titleIdx), ...header.slice(titleIdx + 1, titleIdx + 4)];
     company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l)) || "";
   }
 
