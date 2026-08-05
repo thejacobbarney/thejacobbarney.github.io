@@ -4,29 +4,29 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Bark — Job Tracker &amp; AI Evaluator</title>
-<link rel="icon" type="image/svg+xml" href="assets/bark-icon.svg" />
+<link rel="icon" type="image/svg+xml" href="assets/bark-wolf.svg" />
 <meta name="description" content="Paste a job listing, get an instant AI match score, salary target, and career-move read — then track the whole pipeline in one dashboard." />
 <meta property="og:title" content="Bark — Job Tracker & AI Evaluator" />
 <meta property="og:description" content="Scrape job listings, score your fit, and track your pipeline — a bold, high-contrast job search dashboard." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
   :root{
-    --ink:#111111;
-    --cream:#FBF3E3;
-    --cream-2:#F2E9D4;
-    --paper:#FFFDF8;
-    --turq:#00D9C0;
-    --turq-dark:#00A895;
-    --purple:#6C2BD9;
-    --purple-dark:#4C1D95;
+    --ink:#18151F;
+    --cream:#FAF9FC;
+    --cream-2:#ECE8F5;
+    --paper:#FFFFFF;
+    --turq:#0CC0B9;
+    --turq-dark:#098883;
+    --purple:#5223C6;
+    --purple-dark:#3B1690;
     --yellow:#FFCE3D;
     --pink:#FF5C8A;
     --green:#00C853;
-    --gray:#8A8A82;
+    --gray:#726C82;
     --shadow: 4px 4px 0 var(--ink);
     --shadow-sm: 2px 2px 0 var(--ink);
     --shadow-lg: 7px 7px 0 var(--ink);
@@ -40,11 +40,11 @@
       linear-gradient(90deg, var(--cream-2) 1px, transparent 1px);
     background-size: 28px 28px;
     color:var(--ink);
-    font-family:'Inter',system-ui,sans-serif;
+    font-family:'DM Sans',system-ui,sans-serif;
     min-height:100vh;
     line-height:1.5;
   }
-  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  h1,h2,h3,.display{font-family:'Bebas Neue',sans-serif;font-weight:400;text-transform:uppercase;letter-spacing:0.015em;}
   a{color:inherit;}
   button{font-family:inherit;}
   ::selection{background:var(--yellow);color:var(--ink);}
@@ -64,15 +64,21 @@
     height:64px; gap:1rem; flex-wrap:wrap;
   }
   .nb-logo{
-    display:flex;align-items:center;gap:0.6rem;
-    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.05rem;
-    letter-spacing:-0.01em;
+    display:flex;align-items:center;gap:0.55rem;
     text-decoration:none;
   }
   .nb-logo-mark{
-    width:34px;height:34px;flex-shrink:0;
-    border:2px solid var(--ink);
+    width:42px;height:42px;flex-shrink:0;
     display:block;
+    object-fit:contain;
+  }
+  .nb-logo-word{
+    font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:0.02em;
+  }
+  .nb-logo-sub{
+    font-family:'JetBrains Mono',monospace;font-size:0.68rem;font-weight:500;
+    letter-spacing:0.04em;text-transform:uppercase;color:var(--gray);
+    margin-left:0.5rem;
   }
   .nb-back{
     font-size:0.72rem;font-weight:700;letter-spacing:0.04em;
@@ -141,15 +147,16 @@
     border-bottom:3px solid var(--ink);
   }
   .nb-eyebrow{
-    font-size:0.68rem;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.68rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;
     color:var(--purple-dark);
   }
   .nb-title{font-size:1.5rem;font-weight:700;letter-spacing:-0.01em;}
-  .nb-sub{font-size:0.85rem;color:#4a4a44;max-width:640px;}
+  .nb-sub{font-size:0.85rem;color:#5C5568;max-width:640px;}
 
   /* ── form elements ──────────────────────────── */
   .nb-field{display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1.1rem;}
-  .nb-label{font-size:0.72rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;}
+  .nb-label{font-family:'JetBrains Mono',monospace;font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;}
   .nb-hint{font-size:0.74rem;color:var(--gray);}
   .nb-input, .nb-textarea, .nb-select{
     border:3px solid var(--ink);
@@ -172,7 +179,8 @@
     display:inline-flex;align-items:center;gap:0.3rem;
     border:2.5px solid var(--ink);
     padding:0.18rem 0.55rem;
-    font-size:0.68rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.68rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
     background:var(--paper);
   }
   .nb-skill-pill{
@@ -190,12 +198,12 @@
     width:74px;height:74px;flex-shrink:0;
     border:3px solid var(--ink);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    font-family:'Space Grotesk',sans-serif;
+    font-family:'Bebas Neue',sans-serif;
     box-shadow:var(--shadow-sm);
   }
-  .nb-score .num{font-size:1.4rem;font-weight:700;line-height:1;}
-  .nb-score .num .denom{font-size:0.68rem;font-weight:700;opacity:0.65;}
-  .nb-score .lbl{font-size:0.55rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;}
+  .nb-score .num{font-size:1.7rem;line-height:1;}
+  .nb-score .num .denom{font-size:0.8rem;opacity:0.65;}
+  .nb-score .lbl{font-family:'JetBrains Mono',monospace;font-size:0.55rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;}
   .score-high{background:var(--green);}
   .score-mid{background:var(--yellow);}
   .score-low{background:#FF5C5C;}
@@ -228,7 +236,7 @@
     border:2.5px solid var(--ink);
     font-size:0.85rem;line-height:1.7;
   }
-  .job-analysis-label{font-size:0.65rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:var(--purple-dark);margin-bottom:0.35rem;}
+  .job-analysis-label{font-family:'JetBrains Mono',monospace;font-size:0.65rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--purple-dark);margin-bottom:0.35rem;}
 
   .status-select{border-width:2.5px; font-weight:700; font-size:0.75rem; padding:0.4rem 0.5rem; width:auto;}
   .status-In\ Progress{background:#FFF3C4;}
@@ -249,8 +257,8 @@
     border:3px solid var(--ink);background:var(--paper);
     padding:1.1rem 1.2rem;box-shadow:var(--shadow-sm);
   }
-  .stat-tile .n{font-family:'Space Grotesk',sans-serif;font-size:1.9rem;font-weight:700;line-height:1;}
-  .stat-tile .l{font-size:0.7rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--gray);margin-top:0.35rem;}
+  .stat-tile .n{font-family:'Bebas Neue',sans-serif;font-size:2.3rem;line-height:1;}
+  .stat-tile .l{font-family:'JetBrains Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--gray);margin-top:0.35rem;}
   .bar-row{display:flex;align-items:center;gap:0.7rem;margin-bottom:0.6rem;}
   .bar-label{width:150px;flex-shrink:0;font-size:0.78rem;font-weight:700;}
   .bar-track{flex:1;height:20px;border:2.5px solid var(--ink);background:var(--cream-2);position:relative;}
@@ -281,9 +289,9 @@
     display:flex;justify-content:space-between;align-items:center;gap:1.5rem;flex-wrap:wrap;
     box-shadow:var(--shadow-lg);
   }
-  .hero-strip h1{font-size:1.7rem;font-weight:700;margin-bottom:0.4rem;}
+  .hero-strip h1{font-size:2.3rem;margin-bottom:0.4rem;}
   .hero-strip p{font-size:0.88rem;opacity:0.85;max-width:480px;}
-  .hero-strip .accent{color:var(--yellow);}
+  .hero-strip .accent{color:var(--turq);}
 
   select.nb-select{appearance:none;background-image:linear-gradient(45deg,transparent 50%, var(--ink) 50%),linear-gradient(135deg, var(--ink) 50%,transparent 50%);background-position:calc(100% - 18px) calc(1.1em),calc(100% - 13px) calc(1.1em);background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:2rem;}
 
@@ -2376,8 +2384,9 @@ function App(){
       <div className="nb-topbar">
         <div className="nb-topbar-inner">
           <div className="nb-logo">
-            <img className="nb-logo-mark" src="assets/bark-icon.svg" alt="Bark" />
-            <span>BARK <span style={{color:"var(--purple)"}}>//</span> JOB TRACKER &amp; AI EVALUATOR</span>
+            <img className="nb-logo-mark" src="assets/bark-wolf.svg" alt="Bark" />
+            <span className="nb-logo-word">BARK</span>
+            <span className="nb-logo-sub">// JOB TRACKER &amp; AI EVALUATOR</span>
           </div>
           <a className="nb-back" href="https://thejacobbarney.com/#personal">← thejacobbarney.com</a>
         </div>
