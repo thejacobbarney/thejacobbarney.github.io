@@ -328,7 +328,36 @@ const SKILL_DICTIONARY = [
   "Spanish","French","Mandarin","HR","Recruiting","Talent Acquisition","Onboarding",
   "Employee Relations","Legal","Contract Management","Healthcare","Clinical Research","Nursing",
   "Teaching","Curriculum Development","Research","Statistics","R","MATLAB","Cybersecurity",
-  "Network Administration","DevOps","QA Testing","Mobile Development","iOS","Android","Blockchain"
+  "Network Administration","DevOps","QA Testing","Mobile Development","iOS","Android","Blockchain",
+  "Financial Reporting","Financial Analysis","Financial Planning","Internal Controls",
+  "Client Reporting","Customer Service","Advanced Computer Skills","Business Analysis",
+  "Process Improvement"
+];
+
+// Some real-world skill mentions show up as a verb or gerund in a posting's
+// prose ("mentors, trains and shares knowledge") rather than the noun-phrase
+// form used for display ("Mentoring" / "Training") — a plain literal-phrase
+// match, like SKILL_DICTIONARY above uses, would miss those entirely. Match
+// the shared word root/phrase instead (each kept as tight as the underlying
+// concept allows, to avoid flagging every posting that merely mentions
+// "team" or "process") and display the canonical label regardless of which
+// inflected form actually matched.
+const SKILL_STEM_PATTERNS = [
+  [/\bmentor(?:s|ed|ing|ship)?\b/i, "Mentoring"],
+  [/\btrain(?:s|ed|ing)?\b/i, "Training"],
+  [/\bcommunicat\w*/i, "Communication"],
+  [/\b(?:orally|verbal(?:ly)?)\b.{0,25}communicat\w*|\bcommunicat\w*.{0,25}\b(?:orally|verbal(?:ly)?)\b/i, "Oral Communication"],
+  [/\b(?:in writing|written)\b.{0,25}communicat\w*|\bcommunicat\w*.{0,25}\b(?:in writing|written)\b/i, "Written Communication"],
+  [/\borganizational\b/i, "Organizational Skills"],
+  [/\bprioriti[sz](?:e|es|ed|ing|ation)?\b/i, "Prioritization"],
+  [/\bmulti[\s-]?task\w*\b|\bhandle multiple\b|\bmanage multiple\b/i, "Multitasking"],
+  [/\bdecision[\s-]making\b|\bmak\w*\s+(?:\w+\s+){0,2}decisions?\b/i, "Decision Making"],
+  [/\bproblem[\s-]solving\b|\bsolv\w*\s+(?:\w+\s+){0,3}problems?\b/i, "Problem Solving"],
+  [/\bstaff\s+management\b|\bmanag\w*\s+staff\b|\bstaff\s+manag\w*/i, "Staff Management"],
+  [/\bsupervis\w*/i, "Supervisory Experience"],
+  [/\btrend(?:s|ing)?\b/i, "Trend Analysis"],
+  [/\bextract\w*\s+(?:\w+\s+){0,3}data\b|\bdata\s+(?:\w+\s+){0,3}extract\w*/i, "Data Extraction"],
+  [/\bteamwork\b|\bteam[\s-]player\b|\bwithin a team\b|\bas a team\b/i, "Teamwork"],
 ];
 
 const STATUS_OPTIONS = ["In Progress","Applied","Interviewing","Dead End","Offer"];
@@ -366,11 +395,20 @@ function stripHtml(html){
 
 function extractSkillsFromText(text){
   const lower = " " + (text || "").toLowerCase() + " ";
-  return SKILL_DICTIONARY.filter(skill => {
+  const literal = SKILL_DICTIONARY.filter(skill => {
     const esc = skill.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp("(?:^|[^a-z0-9+#.])" + esc + "(?:$|[^a-z0-9+#.])", "i");
+    // A trailing "." is excluded from the plain non-word-char class (same as
+    // a leading one) so a skill immediately before a real abbreviation/domain
+    // continuation ("Node" in "Node.js") doesn't falsely match as standalone
+    // — but that also blocked the far more common case of a skill sitting
+    // right before a sentence-ending period ("...internal controls."), since
+    // a real end-of-sentence period is never followed by another word
+    // character. Allow that one specific shape back in via a lookahead.
+    const re = new RegExp("(?:^|[^a-z0-9+#.])" + esc + "(?:$|[^a-z0-9+#.]|\\.(?!\\w))", "i");
     return re.test(lower);
   });
+  const stemmed = SKILL_STEM_PATTERNS.filter(([re]) => re.test(lower)).map(([, label]) => label);
+  return [...new Set([...literal, ...stemmed])];
 }
 
 function mapJsonLdJobPosting(jp){
