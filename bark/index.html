@@ -685,9 +685,16 @@ function parseFreeText(text){
     header.forEach((line, i) => {
       if (titleExcluded.has(i) || line.length > 100 || line.length < 3) return;
       let score = -i * 0.15;
-      if (JOB_TITLE_WORDS.test(line)) score += 3;
+      const hasTitleWord = JOB_TITLE_WORDS.test(line);
+      if (hasTitleWord) score += 3;
       if (COMPANY_SUFFIX.test(line)) score -= 4;
-      if (looksLikeLocation(line)) score -= 4;
+      // A comma-separated "Role, Qualifier" title ("Associate, Operational
+      // Forecasting", "Lead Accountant, Affiliates") satisfies the same
+      // "Capitalized Word(s), Capitalized Word(s)" shape looksLikeLocation
+      // checks for a spelled-out region ("Scottsdale, Arizona") purely by
+      // coincidence — don't let that false-positive penalty cancel out a
+      // real job-title keyword, which is the stronger, more reliable signal.
+      if (!hasTitleWord && looksLikeLocation(line)) score -= 4;
       if (/[.:]$/.test(line)) score -= 1;
       if (score > bestScore){ bestScore = score; bestLine = line; }
     });
