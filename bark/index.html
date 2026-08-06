@@ -57,11 +57,12 @@
     border-bottom:3px solid var(--ink);
     background:var(--paper);
     position:sticky; top:0; z-index:50;
+    padding-top:env(safe-area-inset-top);
   }
   .nb-topbar-inner{
     max-width:1180px;margin:0 auto;padding:0 1.5rem;
     display:flex;align-items:center;justify-content:space-between;
-    height:64px; gap:1rem; flex-wrap:wrap;
+    min-height:64px; gap:1rem; flex-wrap:wrap;
   }
   .nb-logo{
     display:flex;align-items:center;gap:0.55rem;
@@ -299,6 +300,19 @@
     .nb-grid-2,.nb-grid-3{grid-template-columns:1fr;}
     .job-card-top{flex-direction:column;}
     .hero-strip{flex-direction:column;align-items:flex-start;}
+  }
+
+  /* ── mobile header/hero tightening ───────────── */
+  @media (max-width:768px){
+    .nb-topbar-inner{
+      min-height:0;
+      padding:0.6rem 1.25rem;
+    }
+    .nb-logo-mark{width:32px;height:32px;}
+    .nb-logo-word{font-size:1.15rem;}
+    .nb-logo-sub{font-size:0.6rem;margin-left:0.4rem;}
+    .nb-back{font-size:0.66rem;}
+    .hero-strip{margin-top:0;padding:1.5rem 1.25rem;}
   }
 </style>
 </head>
@@ -2694,7 +2708,7 @@ function App(){
           <div className="nb-logo">
             <img className="nb-logo-mark" src="assets/bark-wolf.svg" alt="Bark" />
             <span className="nb-logo-word">BARK</span>
-            <span className="nb-logo-sub">// JOB TRACKER &amp; AI EVALUATOR</span>
+            <span className="nb-logo-sub">Paste. Score. Track.</span>
           </div>
           <a className="nb-back" href="https://thejacobbarney.com/#personal">← thejacobbarney.com</a>
         </div>
