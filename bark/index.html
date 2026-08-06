@@ -479,6 +479,18 @@ const CITY_REGION_RE = new RegExp("^" + CITY_REGION_CORE + "$");
 // exactly one place with nothing else around it.
 const PLACE_MATCH_CORE = "[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?(?:" + US_STATE_CODE + "(?:\\s?\\d{5})?|[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*(?:,\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*)?)";
 
+// "COMPANY is seeking/looking for/hiring a ROLE to join..." — one of the
+// most common headerless-posting openers, so shared by both the early
+// title+company extraction below and the later company-only fallback that
+// runs when title was already resolved some other way. The company capture
+// allows multiple capitalized words plus a parenthetical abbreviation
+// ("Northrop Grumman Defense Systems (NGDS)"). The role capture deliberately
+// does *not* stop on a bare "." — real role names routinely contain one
+// mid-abbreviation ("Sr. Principal ... Analyst"), which would otherwise
+// truncate the match right after "Sr." — so it stops only on a comma,
+// newline, or the "to join/support/..." that almost always follows.
+const SEEKING_ROLE_RE = /\b([A-Z][\w&.()'-]*(?:\s[A-Z(][\w&.()'-]*){0,6})\s+is\s+(?:seeking|looking for|hiring)\s+(?:an?|our new|the new|our)?\s*(.{3,140}?)(?:\s+to\b|[,\n])/i;
+
 function isNoiseLine(line){
   return !line || NOISE_LINE.test(line.trim());
 }
@@ -570,6 +582,34 @@ function parseFreeText(text){
         title = m[1].trim();
         break;
       }
+    }
+  }
+
+  // The single most common headerless opener of all: "COMPANY is seeking a
+  // ROLE to join our team...". This sentence is almost always well over 100
+  // chars, so — like the patterns above — it never reaches the title-scoring
+  // fallback below, and without catching it here first, that fallback picks
+  // whatever short line elsewhere happens to contain a job-title keyword,
+  // even a responsibility bullet describing a *different* role in passing
+  // ("Supports the Pricing and Estimating Analyst..."). Must run before that
+  // fallback, not after — once scoring has already (wrongly) set a title,
+  // nothing downstream revisits it.
+  //
+  // Only do this when header[0] ISN'T already a clean, title-shaped line —
+  // otherwise this pattern can steal a worse-phrased role from later in the
+  // body ("GDIT is seeking a Finance Lead...") when the real title ("Healthcare
+  // Finance Lead") was already sitting right there as the first line, and the
+  // scoring fallback below would have found it correctly on its own.
+  const firstLineLooksLikeTitle = header[0] && header[0].length <= 100 &&
+    JOB_TITLE_WORDS.test(header[0]) && !looksLikeLocation(header[0]) && !COMPANY_SUFFIX.test(header[0]);
+  if (!title && !firstLineLooksLikeTitle){
+    // The /i flag (needed for "seeking"/"Seeking"/"SEEKING" etc.) also makes
+    // [A-Z] match lowercase, so a real company name isn't guaranteed by the
+    // regex alone — re-check the capture is actually capitalized in code.
+    const m = text.match(SEEKING_ROLE_RE);
+    if (m && /^[A-Z]/.test(m[1]) && JOB_TITLE_WORDS.test(m[2]) && !/^(this|it|they|we|he|she)$/i.test(m[1])){
+      title = m[2].trim();
+      if (!company) company = m[1].trim();
     }
   }
 
@@ -714,7 +754,7 @@ function parseFreeText(text){
     // The /i flag (needed for "seeking"/"Seeking"/"SEEKING" etc.) also makes
     // [A-Z] match lowercase, so a real company name isn't guaranteed by the
     // regex alone — re-check the capture is actually capitalized in code.
-    const m = text.match(/\b([A-Z][\w&.'-]{1,40})\s+is\s+(?:seeking|looking for|hiring)\s+(?:an?|our new|the new|our)?\s*(.{3,70}?)(?:\s+to\b|[,.\n])/i);
+    const m = text.match(SEEKING_ROLE_RE);
     if (m && /^[A-Z]/.test(m[1]) && JOB_TITLE_WORDS.test(m[2]) && !/^(this|it|they|we|he|she)$/i.test(m[1])){
       company = m[1].trim();
     }
