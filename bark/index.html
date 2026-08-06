@@ -817,6 +817,22 @@ function parseFreeText(text){
     company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l)) || "";
   }
 
+  // Last resort: many postings open their "About <Company>" boilerplate
+  // paragraph with the company introducing itself directly ("GitLab is the
+  // intelligent orchestration platform...", "Qualcomm is an American
+  // multinational...") rather than a labeled field or section heading any of
+  // the fallbacks above look for. Restricted to a single-token capture (no
+  // spaces) — a multi-word match of this same shape ("The role is a...",
+  // "This position is an...") is far more often a generic description than a
+  // real (usually one-word) brand name, and getting this wrong is worse than
+  // leaving company blank.
+  if (!company){
+    const m = text.match(/^([A-Z][\w&.'-]{1,30})\s+is\s+(?:a|an|the)\s+/m);
+    if (m && !/^(this|it|they|we|he|she|our|the|i)$/i.test(m[1])){
+      company = m[1].trim();
+    }
+  }
+
   if (!location){
     for (let i = 0; i < header.length; i++){
       const line = header[i];
