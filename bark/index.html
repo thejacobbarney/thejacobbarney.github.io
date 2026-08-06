@@ -507,7 +507,14 @@ function splitHeaderSegments(line){
 }
 
 function parseFreeText(text){
-  const header = text.split("\n").map(l => l.trim()).filter(l => l && !isNoiseLine(l)).slice(0, 15);
+  // Some ATS exports render list items with a literal "*" or "-" marker
+  // rather than a real bullet glyph ("* Phoenix, Arizona") — left in place,
+  // that leading character breaks every regex anchored to the start of the
+  // line (a "City, ST"/"City, Region" shape has to begin with a capital
+  // letter), so a perfectly good candidate value silently stops matching
+  // anything. Strip it once here rather than special-casing every pattern
+  // downstream that assumes a line starts with its actual content.
+  const header = text.split("\n").map(l => l.trim().replace(/^[•·*-]\s+/, "")).filter(l => l && !isNoiseLine(l)).slice(0, 15);
 
   let title = "", company = "", location = "";
   // Tracks which header line the title came from, when it's a stripped
@@ -630,7 +637,14 @@ function parseFreeText(text){
     // job titles themselves very commonly use one ("Manager, Team - Focus
     // Area"), so don't treat the line as a combined header line if it looks
     // like the title itself, or it'll get misread as Company - Location.
-    if (!hasBullet && JOB_TITLE_WORDS.test(line)) continue;
+    // It's just as easily an ordinary sentence with an unrelated hyphenated
+    // aside ("...office Tuesday - Thursday.", describing a hybrid schedule,
+    // nothing to do with company/location at all) — a real combined header
+    // line is always a short, compact meta-line, never a full sentence, so
+    // skip anything long enough to clearly be prose instead of a header
+    // field (same >100 cutoff the title-scoring fallback below uses for
+    // the same reason).
+    if (!hasBullet && (JOB_TITLE_WORDS.test(line) || line.length > 100)) continue;
     const segments = splitHeaderSegments(line);
     let locSeg = segments.find(looksLikeLocation);
     if (!locSeg){
@@ -741,7 +755,11 @@ function parseFreeText(text){
     // the company name instead of being left for the real answer (often
     // buried in prose too far away for any of the fallbacks above to reach).
     const NEARBY_FIELD_LABEL = /^(locations?|time type)$/i;
-    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l)) || "";
+    // A bare requisition/job ID ("371611") sitting right next to the title
+    // is just as plausible-looking to every other check here (short, no
+    // title words, not location-shaped, no trailing punctuation) as a real
+    // company name — but a company name is never purely digits.
+    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !/^\d+$/.test(l)) || "";
   }
 
   if (!location){
