@@ -75,6 +75,11 @@
   }
   .nb-logo-word{
     font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:0.02em;
+    /* Bebas Neue ships as a single weight — font-weight alone does nothing on
+       most platforms, so fake the extra heft with a matching text-stroke on
+       top of it (browsers that do synthesize bold get it twice, which is
+       harmless here). */
+    font-weight:700;-webkit-text-stroke:0.6px var(--ink);
   }
   .nb-logo-sub{
     font-family:'JetBrains Mono',monospace;font-size:0.68rem;font-weight:500;
