@@ -454,7 +454,22 @@ const COMPANY_SUFFIX = /\b(inc\.?|llc|l\.l\.c\.?|corp\.?|corporation|co\.?|ltd\.
 
 const WORK_FORM_WORD = /\b(remote|hybrid|on-?site)\b/i;
 
-const EMPLOYMENT_META = /^(full-time|part-time|contract|internship|temporary|seasonal|volunteer|entry level|associate|mid-senior level|director level|executive level)$/i;
+const EMPLOYMENT_META = /^(full[\s-]time|part[\s-]time|contract|internship|temporary|seasonal|volunteer|entry level|associate|mid-senior level|director level|executive level)$/i;
+
+// A bare department/job-family tag ("Finance", "Engineering", "Marketing")
+// sitting next to the title with no label of its own — common in ATS
+// breadcrumb-style metadata blocks (Title / Employment Type / Department /
+// Location, each its own short unlabeled line) — is just as plausible-looking
+// to the nearby-line company guess below as a real company name, but a
+// one-word functional-area tag is never actually the company.
+const JOB_FAMILY_WORD = /^(finance|financial|accounting|engineering|marketing|sales|operations|product|design|legal|human resources|hr|information technology|it|customer (?:support|service)|research|data|administration|administrative)$/i;
+
+// Some ATS postings give only a bare country name for location ("United
+// States", no city) rather than the "City, Region" shape everything above
+// looks for — common enough (and common enough to be mistaken for a company
+// or department tag sitting right next to the title with no label) to
+// recognize by name rather than leave unhandled.
+const BARE_COUNTRY_RE = /^(united states(?: of america)?|usa|united kingdom|uk|canada|ireland|australia|germany|france|india|netherlands|spain|italy|mexico|brazil|japan|singapore|new zealand|switzerland|sweden|poland|philippines|south africa)$/i;
 
 // A bare [A-Z]{2} is too easy to satisfy by coincidence — a product/business
 // unit acronym next to a comma-separated list ("Mobile, Compute, XR, ...")
@@ -511,6 +526,7 @@ function looksLikeLocation(segment){
     const parts = s.split(/\s*;\s*/).filter(Boolean);
     if (parts.length > 1 && parts.every(p => CITY_STATE_RE.test(p))) return true;
   }
+  if (BARE_COUNTRY_RE.test(s)) return true;
   return false;
 }
 
@@ -813,8 +829,14 @@ function parseFreeText(text){
     // remote/hybrid/onsite value ("Remote (USA)") once its own "remote type"
     // label is excluded above — the value is just as much a non-answer as
     // the label was, for the same reason the combined-line fallback already
-    // excludes it (WORK_FORM_WORD) from being read as a company there.
-    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l)) || "";
+    // excludes it (WORK_FORM_WORD) from being read as a company there. Same
+    // logic again for a bare employment-type value ("Full Time") or a bare
+    // department tag ("Finance") that sits right next to the title with no
+    // label of its own at all — a real Transamerica posting had exactly this
+    // shape (Title / "Full Time" / "Finance" / "United States", each its own
+    // unlabeled line) and without these guards picked up first one and then
+    // the other as the "company" in turn.
+    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l)) || "";
   }
 
   // Last resort: many postings open their "About <Company>" boilerplate
@@ -853,6 +875,11 @@ function parseFreeText(text){
       if (i < 4 && line.length <= 60 && !JOB_TITLE_WORDS.test(line) && !COMPANY_SUFFIX.test(line)){
         const cityRegion = line.match(new RegExp(CITY_REGION_CORE));
         if (cityRegion){ location = cityRegion[0]; break; }
+        // Weakest signal of all — a country name with no city attached at
+        // all ("United States" alone on its own line) — so only trust it
+        // among the first few header lines, same as the city/region check
+        // just above.
+        if (BARE_COUNTRY_RE.test(line)){ location = line.trim(); break; }
       }
     }
   }
