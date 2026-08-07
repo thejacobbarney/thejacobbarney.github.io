@@ -321,9 +321,9 @@
   }
 </style>
 </head>
-<!-- redeploy trigger #2: run #40 also stalled (build job waited 15min for a
-     runner, then got auto-cancelled) and its rerun never spawned any new
-     jobs at all, mirroring run #39's stuck state -->
+<!-- redeploy trigger #3: run #41 (the previous attempt) also timed out the
+     same way — build job never got a runner, cancelled at ~15min. Trying
+     again in case runner availability has recovered. -->
 <body>
 <div id="root"></div>
 
