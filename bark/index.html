@@ -321,9 +321,6 @@
   }
 </style>
 </head>
-<!-- redeploy trigger #3: run #41 (the previous attempt) also timed out the
-     same way — build job never got a runner, cancelled at ~15min. Trying
-     again in case runner availability has recovered. -->
 <body>
 <div id="root"></div>
 
@@ -335,7 +332,7 @@ const { useState, useEffect, useMemo, useRef } = React;
    and to score overlap against the user's profile.
 ───────────────────────────────────────────────────────────── */
 const SKILL_DICTIONARY = [
-  "JavaScript","TypeScript","Python","Java","C++","C#","Go","Rust","Ruby","PHP","Swift","Kotlin",
+  "JavaScript","TypeScript","Python","Java","C++","C#","Rust","Ruby","PHP","Swift","Kotlin",
   "SQL","NoSQL","React","Angular","Vue","Node.js","Next.js","Django","Flask","Spring",".NET",
   "AWS","Azure","GCP","Docker","Kubernetes","Terraform","CI/CD","Git","Linux","REST API","GraphQL",
   "Microservices","Machine Learning","Deep Learning","NLP","Data Analysis","Data Engineering","ETL",
@@ -349,12 +346,28 @@ const SKILL_DICTIONARY = [
   "Cross-functional Collaboration","Stakeholder Management","Communication","Public Speaking",
   "Spanish","French","Mandarin","HR","Recruiting","Talent Acquisition","Onboarding",
   "Employee Relations","Legal","Contract Management","Healthcare","Clinical Research","Nursing",
-  "Teaching","Curriculum Development","Research","Statistics","R","MATLAB","Cybersecurity",
+  "Teaching","Curriculum Development","Research","Statistics","MATLAB","Cybersecurity",
   "Network Administration","DevOps","QA Testing","Mobile Development","iOS","Android","Blockchain",
   "Financial Reporting","Financial Analysis","Financial Planning","Internal Controls",
   "Client Reporting","Customer Service","Advanced Computer Skills","Business Analysis",
   "Process Improvement"
 ];
+
+// Precompiled once at module load instead of rebuilding a RegExp per
+// dictionary entry on every extractSkillsFromText call — this list never
+// changes at runtime, so there's no reason to re-escape and re-compile all
+// ~100 patterns on every posting parsed.
+// A trailing "." is excluded from the plain non-word-char class (same as a
+// leading one) so a skill immediately before a real abbreviation/domain
+// continuation ("Node" in "Node.js") doesn't falsely match as standalone —
+// but that also blocked the far more common case of a skill sitting right
+// before a sentence-ending period ("...internal controls."), since a real
+// end-of-sentence period is never followed by another word character. Allow
+// that one specific shape back in via a lookahead.
+const SKILL_DICTIONARY_PATTERNS = SKILL_DICTIONARY.map(skill => {
+  const esc = skill.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [skill, new RegExp("(?:^|[^a-z0-9+#.])" + esc + "(?:$|[^a-z0-9+#.]|\\.(?!\\w))", "i")];
+});
 
 // Some real-world skill mentions show up as a verb or gerund in a posting's
 // prose ("mentors, trains and shares knowledge") rather than the noun-phrase
@@ -380,6 +393,25 @@ const SKILL_STEM_PATTERNS = [
   [/\btrend(?:s|ing)?\b/i, "Trend Analysis"],
   [/\bextract\w*\s+(?:\w+\s+){0,3}data\b|\bdata\s+(?:\w+\s+){0,3}extract\w*/i, "Data Extraction"],
   [/\bteamwork\b|\bteam[\s-]player\b|\bwithin a team\b|\bas a team\b/i, "Teamwork"],
+  [/\bfinancial\s+model\w*\b|\bmodel(?:s|ing)?\b.{0,25}\bforecast\w*|\bforecast\w*.{0,25}\bmodel(?:s|ing)?\b/i, "Financial Modeling"],
+  [/\bprocess(?:es)?\b.{0,25}\bimprov\w*|\bimprov\w*.{0,25}\bprocess(?:es)?\b/i, "Process Improvement"],
+  // "R" the language collides with "R&D" ("Research & Development") under
+  // the same case-insensitive boundary match every other dictionary entry
+  // uses — both are capitalized in real postings, so case-sensitivity alone
+  // can't tell them apart. Exclude the one specific shape that's actually a
+  // false positive instead.
+  [/\br\b(?!&d)/i, "R"],
+];
+
+// Skills whose name collides with an ordinary lowercase English word ("go"
+// the common verb) when matched case-insensitively — real fixtures showed
+// "go" from "go-to-market", "go into", "go from a company to..." all
+// falsely matching the "Go" programming language. A genuine mention of the
+// language is virtually always capitalized ("Go", "Golang"), so these are
+// matched case-sensitively against the original (non-lowercased) text
+// instead of the shared lowercase pass every other pattern uses.
+const SKILL_CASE_SENSITIVE_PATTERNS = [
+  [/\bGo\b/, "Go"],
 ];
 
 const STATUS_OPTIONS = ["In Progress","Applied","Interviewing","Dead End","Offer"];
@@ -416,21 +448,12 @@ function stripHtml(html){
 }
 
 function extractSkillsFromText(text){
-  const lower = " " + (text || "").toLowerCase() + " ";
-  const literal = SKILL_DICTIONARY.filter(skill => {
-    const esc = skill.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // A trailing "." is excluded from the plain non-word-char class (same as
-    // a leading one) so a skill immediately before a real abbreviation/domain
-    // continuation ("Node" in "Node.js") doesn't falsely match as standalone
-    // — but that also blocked the far more common case of a skill sitting
-    // right before a sentence-ending period ("...internal controls."), since
-    // a real end-of-sentence period is never followed by another word
-    // character. Allow that one specific shape back in via a lookahead.
-    const re = new RegExp("(?:^|[^a-z0-9+#.])" + esc + "(?:$|[^a-z0-9+#.]|\\.(?!\\w))", "i");
-    return re.test(lower);
-  });
+  const raw = text || "";
+  const lower = " " + raw.toLowerCase() + " ";
+  const literal = SKILL_DICTIONARY_PATTERNS.filter(([, re]) => re.test(lower)).map(([skill]) => skill);
   const stemmed = SKILL_STEM_PATTERNS.filter(([re]) => re.test(lower)).map(([, label]) => label);
-  return [...new Set([...literal, ...stemmed])];
+  const caseSensitive = SKILL_CASE_SENSITIVE_PATTERNS.filter(([re]) => re.test(raw)).map(([, label]) => label);
+  return [...new Set([...literal, ...stemmed, ...caseSensitive])];
 }
 
 function mapJsonLdJobPosting(jp){
