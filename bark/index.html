@@ -780,17 +780,34 @@ function parseFreeText(text){
   // "locations" line (no value at all, its own header/label line on some
   // ATS boards) would satisfy this on its trailing "s" and get mistaken for
   // "Location" + value "s".
-  const labeledLocationLine = header.find(l => /^location\b\s*[:\-]?\s*[A-Z]/i.test(l));
+  // Some ATS pages render the place name in visually-capitalized text via
+  // CSS (text-transform: capitalize) while the underlying DOM text is all
+  // lowercase ("Location  phoenix, Arizona, United States of America") — a
+  // copy-paste of that page carries the lowercase text straight through, so
+  // require only a letter (not specifically a capital) right after the
+  // label; the \b after "location" already rules out a bare "locations"
+  // line matching on its own trailing "s".
+  const labeledLocationLine = header.find(l => /^location\b\s*[:\-]?\s*[A-Za-z]/i.test(l));
   if (labeledLocationLine){
     const raw = labeledLocationLine.replace(/^location\b\s*[:\-]?\s*/i, "").trim();
-    const firstPlace = raw.match(new RegExp(PLACE_MATCH_CORE));
+    // Lowercase-tolerant version of PLACE_MATCH_CORE for the same
+    // lowercase-city reason as above — built with explicit [A-Za-z] classes
+    // rather than an "i" flag on PLACE_MATCH_CORE itself, because an "i"
+    // flag would also case-fold the two-letter US_STATE_CODE alternation,
+    // letting it match just the first two letters of a spelled-out region
+    // ("Ar" satisfying "AR" inside "Arizona") and truncate the real value.
+    // The capture itself is re-capitalized below since everything else in
+    // the app (and the location field's display) expects "Phoenix", not
+    // "phoenix".
+    const placeMatchLenient = PLACE_MATCH_CORE.replace(/\[A-Z\]/g, "[A-Za-z]");
+    const firstPlace = raw.match(new RegExp(placeMatchLenient));
     // Trust the match only when it's right at the front of the value — a
     // real "Location: City, ST; City, ST; ..." list starts with a place
     // immediately, whereas "Onsite 4x/week (Tuesday-Friday) at an Axon Hub
     // (Seattle, San Francisco-Presidio, ...)" only *contains* city-shaped
     // text deep inside a work-schedule description that isn't the answer.
     if (firstPlace && firstPlace.index <= 2){
-      location = firstPlace[0];
+      location = firstPlace[0].replace(/^[a-z]/, c => c.toUpperCase());
     } else if (WORK_FORM_WORD.test(raw) && raw.length <= 20){
       // A bare "Remote"/"Hybrid"/"Onsite" value is a legitimate location
       // stand-in even with no city attached.
@@ -1045,6 +1062,20 @@ function parseFreeText(text){
         const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
         salaryMin = v;
         salaryMax = singleMatch[3] ? null : v;
+      } else {
+        // Some postings (again, common among government/defense contractors)
+        // state the range with a trailing currency code instead of a "$"
+        // sign at all ("The salary range for this role is 86,800 USD -
+        // 165,200 USD."). No single-sided "123,000 USD" fallback here —
+        // unlike a bare number, "USD" alone appears constantly in benefits
+        // boilerplate ("eligible for USD-denominated...") with no salary
+        // figure attached, so only trust it as a genuine signal in the
+        // two-sided range shape.
+        const usdRangeMatch = text.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\s*(?:-|to|–|—)\s*([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\b/i);
+        if (usdRangeMatch){
+          salaryMin = parseSalaryToken(usdRangeMatch[1], !!usdRangeMatch[2]);
+          salaryMax = parseSalaryToken(usdRangeMatch[3], !!usdRangeMatch[4]);
+        }
       }
     }
   }
@@ -1060,8 +1091,17 @@ function parseFreeText(text){
     const val = workFormLabelMatch[1];
     workForm = /\bhybrid\b/i.test(val) ? "Hybrid" : /\bon-?site\b/i.test(val) ? "Onsite" : "Remote";
   } else {
-    if (/\bremote\b/i.test(text)) workForm = "Remote";
-    if (/\bhybrid\b/i.test(text)) workForm = "Hybrid";
+    // Many postings (especially government/defense contractors) carry a
+    // generic disclaimer listing all three work forms together ("...regardless
+    // of whether the role is designated as on-site, hybrid or remote") —
+    // that's boilerplate covering every posting on the site, not a real
+    // declaration of *this* role's work form, so strip that shape out before
+    // scanning; otherwise it always wins as "the" hybrid mention regardless
+    // of what the posting actually says elsewhere (e.g. "Position Role
+    // Type:\n\nRemote").
+    const scanText = text.replace(/\b(?:on-?site|hybrid|remote)\b(?:\s*,\s*(?:on-?site|hybrid|remote)\b)*\s*,?\s*(?:or|and)\s*(?:on-?site|hybrid|remote)\b/gi, "");
+    if (/\bremote\b/i.test(scanText)) workForm = "Remote";
+    if (/\bhybrid\b/i.test(scanText)) workForm = "Hybrid";
   }
 
   if (!location && workForm === "Remote") location = "Remote";
