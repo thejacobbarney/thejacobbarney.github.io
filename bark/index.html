@@ -353,7 +353,8 @@ const SKILL_DICTIONARY = [
   "Process Improvement","Financial Forecasting","Annual Operating Plan","Long-Range Planning",
   "Market Analysis","Growth Analysis","Reporting Automation","Dashboard Development",
   "Analysis for Office","Microsoft PowerPoint","Microsoft Word","Power Query",
-  "SAP Business Systems","SAP BW","RPlan","Business Intelligence"
+  "SAP Business Systems","SAP BW","RPlan","Business Intelligence",
+  "Operational Analysis","SG&A","Cost Accounting","Management Reporting"
 ];
 
 // Precompiled once at module load instead of rebuilding a RegExp per
@@ -406,6 +407,30 @@ const SKILL_STEM_PATTERNS = [
   [/\bteamwork\b|\bteam[\s-]player\b|\bwithin a team\b|\bas a team\b/i, "Teamwork"],
   [/\bfinancial\s+model\w*\b|\bmodel(?:s|ing)?\b.{0,25}\bforecast\w*|\bforecast\w*.{0,25}\bmodel(?:s|ing)?\b/i, "Financial Modeling"],
   [/\bprocess(?:es)?\b.{0,25}\bimprov\w*|\bimprov\w*.{0,25}\bprocess(?:es)?\b/i, "Process Improvement"],
+  // Catches "cash flow forecasts"/"forecasting cash flow" — the dictionary's
+  // "Forecasting" entry already covers the bare verb, but the specific
+  // "cash flow" pairing is a distinct, more specific skill worth its own tag.
+  [/\bcash flow\b.{0,30}\bforecast\w*|\bforecast\w*.{0,30}\bcash flow\b/i, "Cash Flow Forecasting"],
+  // "Review and analyze company financial statements and reports" — the
+  // dictionary has no "financial statement analysis" literal entry, and the
+  // real posting phrasing (verb some distance from "financial statements")
+  // wouldn't satisfy an exact-phrase match anyway.
+  [/\b(?:review\w*|analy\w*)\b.{0,30}\bfinancial statements?\b|\bfinancial statements?\b.{0,30}\b(?:review\w*|analy\w*)\b/i, "Financial Statement Analysis"],
+  // "month end close" (no hyphens) is just as common a real phrasing as
+  // "month-end close" — match both.
+  [/\bmonth[\s-]?end close\b/i, "Month-End Close"],
+  // Complements the dictionary's exact-phrase "Variance Analysis" entry —
+  // postings often only ever say "variances" ("prepare commentary for
+  // significant variances") without ever pairing it with the word
+  // "analysis" at all.
+  [/\bvariances?\b/i, "Variance Analysis"],
+  // "KPI"/"KPIs" — the dictionary matcher's boundary check requires a
+  // non-word character immediately after a literal match, which a trailing
+  // "s" on the plural fails, so a literal "KPI" dictionary entry would miss
+  // "KPIs" entirely.
+  [/\bkpis?\b/i, "KPI Tracking"],
+  [/\bdetail[\s-]oriented\b|\battention to detail\b/i, "Attention to Detail"],
+  [/\banalytical\b/i, "Analytical Skills"],
   // "R" the language collides with "R&D" ("Research & Development") under
   // the same case-insensitive boundary match every other dictionary entry
   // uses — both are capitalized in real postings, so case-sensitivity alone
@@ -857,9 +882,19 @@ function parseFreeText(text){
     }
     if (locSeg && !location) location = locSeg;
     if (!company){
+      // A bare two-letter state code ("AZ - Scottsdale Corporate Office: ...")
+      // isn't location-shaped enough for looksLikeLocation to catch on its
+      // own (no comma, no city attached) — it's a multi-office listing's
+      // state prefix, split off by the same " - " this loop treats as a
+      // Company/Location separator, not a company name. Exclude it
+      // explicitly rather than widen looksLikeLocation itself, which other
+      // callers rely on NOT matching a bare state code (it would otherwise
+      // preempt a better, fuller location match found elsewhere).
+      const BARE_STATE_CODE_RE = new RegExp("^" + US_STATE_CODE + "$");
       const companySeg = segments.find(s =>
         s !== locSeg && s.length < 60 && !JOB_TITLE_WORDS.test(s) &&
-        !looksLikeLocation(s) && !EMPLOYMENT_META.test(s) && !WORK_FORM_WORD.test(s)
+        !looksLikeLocation(s) && !EMPLOYMENT_META.test(s) && !WORK_FORM_WORD.test(s) &&
+        !BARE_STATE_CODE_RE.test(s)
       );
       if (companySeg) company = companySeg;
     }
@@ -924,7 +959,29 @@ function parseFreeText(text){
   // generic "About the Team"/"About the Role"/"About Us" variants are
   // filtered out above, so this only fires on an actual company name).
   if (!company){
-    const m = text.match(/^About\s+([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3})\s*$/m);
+    // [ \t] rather than \s for the repeated-word separator — \s also
+    // matches a newline, which could otherwise let this run onto the next
+    // line's opening word(s) whenever the real company name is short enough
+    // to leave room in the {0,3} budget (the same bug found and fixed below
+    // for the "Working With/At <Company>" pattern).
+    const m = text.match(/^About[ \t]+([A-Z][\w&.'-]*(?:[ \t]+[A-Z][\w&.'-]*){0,3})[ \t]*$/m);
+    if (m && !/^us$/i.test(m[1])){
+      company = m[1].trim();
+    }
+  }
+
+  // Same tier, different boilerplate: a "Benefits of Working With/At
+  // <Company>" section header (common in the benefits section that closes
+  // out many ATS postings). Not anchored to the start of the line — unlike
+  // "About <Company>" this phrase is usually the tail end of a longer
+  // section title ("Benefits of Working With Taylor Morrison"), not the
+  // whole line by itself.
+  if (!company){
+    // [ \t] rather than \s for the repeated-word separator — \s also
+    // matches a newline, which let this run onto the *next* line's opening
+    // words ("Taylor Morrison\nWe are looking for...") when the company
+    // name sits right at the end of its line, as it usually does here.
+    const m = text.match(/\bWorking (?:With|At)[ \t]+([A-Z][\w&.'-]*(?:[ \t]+[A-Z][\w&.'-]*){0,3})/);
     if (m && !/^us$/i.test(m[1])){
       company = m[1].trim();
     }
