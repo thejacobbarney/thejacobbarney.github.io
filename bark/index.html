@@ -350,7 +350,10 @@ const SKILL_DICTIONARY = [
   "Network Administration","DevOps","QA Testing","Mobile Development","iOS","Android","Blockchain",
   "Financial Reporting","Financial Analysis","Financial Planning","Internal Controls",
   "Client Reporting","Customer Service","Advanced Computer Skills","Business Analysis",
-  "Process Improvement"
+  "Process Improvement","Financial Forecasting","Annual Operating Plan","Long-Range Planning",
+  "Market Analysis","Growth Analysis","Reporting Automation","Dashboard Development",
+  "Analysis for Office","Microsoft PowerPoint","Microsoft Word","Power Query",
+  "SAP Business Systems","SAP BW","RPlan","Business Intelligence"
 ];
 
 // Precompiled once at module load instead of rebuilding a RegExp per
@@ -384,8 +387,16 @@ const SKILL_STEM_PATTERNS = [
   [/\b(?:orally|verbal(?:ly)?)\b.{0,25}communicat\w*|\bcommunicat\w*.{0,25}\b(?:orally|verbal(?:ly)?)\b/i, "Oral Communication"],
   [/\b(?:in writing|written)\b.{0,25}communicat\w*|\bcommunicat\w*.{0,25}\b(?:in writing|written)\b/i, "Written Communication"],
   [/\borganizational\b/i, "Organizational Skills"],
-  [/\bprioriti[sz](?:e|es|ed|ing|ation)?\b/i, "Prioritization"],
+  // Covers the noun form ("priorities", "priority") as well as the verb —
+  // the previous pattern only matched prioriti[sz]e/-ing/-ation and missed
+  // "coordinating multiple priorities" entirely.
+  [/\bpriorit(?:y|ies|ize|ise|izing|ising|ization)\b/i, "Prioritization"],
+  [/\btime\s+management\b|\bmeeting\b.{0,20}\bdeadlines?\b|\bmultiple\s+(?:priorities|deadlines)\b/i, "Time Management"],
   [/\bmulti[\s-]?task\w*\b|\bhandle multiple\b|\bmanage multiple\b/i, "Multitasking"],
+  [/\bcross[\s-]functional(?:ly)?\b/i, "Cross-functional Collaboration"],
+  [/\brisk\s+(?:and\s+opportunity\s+)?assessment/i, "Risk Assessment"],
+  [/\bpresentations?\b/i, "Presentation Skills"],
+  [/\btemplate(?:s)?\b.{0,25}\b(?:financial|reporting)\b|\b(?:financial|reporting)\b.{0,25}\btemplate(?:s)?\b/i, "Financial Template Creation"],
   [/\bdecision[\s-]making\b|\bmak\w*\s+(?:\w+\s+){0,2}decisions?\b/i, "Decision Making"],
   [/\bproblem[\s-]solving\b|\bsolv\w*\s+(?:\w+\s+){0,3}problems?\b/i, "Problem Solving"],
   [/\bstaff\s+management\b|\bmanag\w*\s+staff\b|\bstaff\s+manag\w*/i, "Staff Management"],
@@ -595,7 +606,24 @@ const PLACE_MATCH_CORE = "[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?(
 // mid-abbreviation ("Sr. Principal ... Analyst"), which would otherwise
 // truncate the match right after "Sr." — so it stops only on a comma,
 // newline, or the "to join/support/..." that almost always follows.
-const SEEKING_ROLE_RE = /\b([A-Z][\w&.()'-]*(?:\s[A-Z(][\w&.()'-]*){0,6})\s+is\s+(?:seeking|looking for|hiring)\s+(?:an?|our new|the new|our)?\s*(.{3,140}?)(?:\s+to\b|[,\n])/i;
+// No blanket /i flag: it would also case-fold every [A-Z]/[A-Z(] token in
+// the company capture, letting ordinary lowercase words ("within the")
+// several tokens deep get swept into the match as if they were capitalized
+// — a real bug seen on a real RTX/Raytheon posting ("...Finance Team within
+// the APS organization is seeking..." matched "within the" straight into
+// the "company"). Each case-insensitive keyword is spelled out explicitly
+// instead, so the capture groups stay genuinely case-sensitive.
+const SEEKING_ROLE_RE = /\b([A-Z][\w&.()'-]*(?:\s[A-Z(][\w&.()'-]*){0,6})\s+[Ii]s\s+(?:[Ss]eeking|[Ll]ooking [Ff]or|[Hh]iring)\s+(?:[Aa]n?|[Oo]ur new|[Tt]he new|[Oo]ur)?\s*(.{3,140}?)(?:\s+[Tt]o\b|[,\n])/;
+
+// Same "is seeking/looking for/hiring a ROLE" opener as SEEKING_ROLE_RE, but
+// without requiring a clean capitalized company name immediately before it —
+// for postings that phrase the lead-in as an internal team/org description
+// rather than an actual company ("...within the APS organization is seeking
+// an FP&A Analyst..."), where SEEKING_ROLE_RE correctly refuses to guess a
+// company out of that mess, but the role itself is still perfectly
+// extractable on its own. Case-insensitive is safe here since there's no
+// capitalized-token capture to accidentally case-fold.
+const SEEKING_ROLE_ONLY_RE = /\bis\s+(?:seeking|looking for|hiring)\s+(?:an?|our new|the new|our)?\s*(.{3,140}?)(?:\s+to\b|[,\n])/i;
 
 function isNoiseLine(line){
   return !line || NOISE_LINE.test(line.trim());
@@ -710,13 +738,19 @@ function parseFreeText(text){
   const firstLineLooksLikeTitle = header[0] && header[0].length <= 100 &&
     JOB_TITLE_WORDS.test(header[0]) && !looksLikeLocation(header[0]) && !COMPANY_SUFFIX.test(header[0]);
   if (!title && !firstLineLooksLikeTitle){
-    // The /i flag (needed for "seeking"/"Seeking"/"SEEKING" etc.) also makes
-    // [A-Z] match lowercase, so a real company name isn't guaranteed by the
-    // regex alone — re-check the capture is actually capitalized in code.
+    // SEEKING_ROLE_RE's own capture groups are case-sensitive, but a
+    // capture starting with a pronoun ("This", "It") is still structurally
+    // possible — screen those out explicitly rather than trust capitalization
+    // alone to mean "real company name".
     const m = text.match(SEEKING_ROLE_RE);
     if (m && /^[A-Z]/.test(m[1]) && JOB_TITLE_WORDS.test(m[2]) && !/^(this|it|they|we|he|she)$/i.test(m[1])){
       title = m[2].trim();
       if (!company) company = m[1].trim();
+    } else {
+      const m2 = text.match(SEEKING_ROLE_ONLY_RE);
+      if (m2 && JOB_TITLE_WORDS.test(m2[1])){
+        title = m2[1].trim();
+      }
     }
   }
 
@@ -858,9 +892,10 @@ function parseFreeText(text){
   // seeking a Finance Lead...") anywhere in the body first, since that's a
   // much more reliable signal than guessing from line position.
   if (!company){
-    // The /i flag (needed for "seeking"/"Seeking"/"SEEKING" etc.) also makes
-    // [A-Z] match lowercase, so a real company name isn't guaranteed by the
-    // regex alone — re-check the capture is actually capitalized in code.
+    // SEEKING_ROLE_RE's own capture groups are case-sensitive, but a
+    // capture starting with a pronoun ("This", "It") is still structurally
+    // possible — screen those out explicitly rather than trust capitalization
+    // alone to mean "real company name".
     const m = text.match(SEEKING_ROLE_RE);
     if (m && /^[A-Z]/.test(m[1]) && JOB_TITLE_WORDS.test(m[2]) && !/^(this|it|they|we|he|she)$/i.test(m[1])){
       company = m[1].trim();
@@ -944,6 +979,16 @@ function parseFreeText(text){
     if (m && !/^(this|it|they|we|he|she|our|the|i)$/i.test(m[1])){
       company = m[1].trim();
     }
+  }
+
+  // Same last-resort tier as above, different boilerplate opener: "At
+  // <Company>, we/our/the ..." — just as common as the "<Company> is a..."
+  // shape, and by the same logic (real company names are usually short, so
+  // cap the capture at a few words rather than risk swallowing a whole
+  // sentence when the line doesn't actually name a company at all).
+  if (!company){
+    const m = text.match(/^At\s+([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3}),/m);
+    if (m) company = m[1].trim();
   }
 
   if (!location){
