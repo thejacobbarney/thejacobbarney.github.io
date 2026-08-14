@@ -529,7 +529,15 @@ function parseSalaryToken(numStr, hasK){
    after, and both often combine them on one "Company · Location ·
    Full-time" line.
 ───────────────────────────────────────────────────────────── */
-const NOISE_LINE = /^(apply now|easy apply|apply|save job|share job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|company overview|job overview|position overview|role overview|job description|full job description|job details|report this job|overview|responsibilities|requirements|qualifications|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\d+(\.\d+)?\s*(out of 5 stars?))|★+☆*|(\d+(\.\d+)?)|(\d[\d,]*\+?\s*(applicants|people clicked apply|reviews|employees))|(posted\s.*)|(reposted\s.*)|(category\s+.+)|(job id\s+.+)|(job requisition id\s*.*)|(requisition id\s*.*)|(department\s*[:\-]\s*.+)|(reports?\s+to\s*[:\-]\s*.+)|(format\s*[:\-]\s*.+))$/i;
+// "Responsibilities"/"Requirements"/"Qualifications"/"Duties" section headers
+// almost always carry a qualifying prefix ("Key Responsibilities", "Basic
+// Qualifications", "Preferred Requirements") rather than appearing bare —
+// match that shape generally instead of only the bare noun, or a prefixed
+// header slips through as ordinary content (and, worse, as plausible-looking
+// "company" text to the nearby-line fallback later, since section headers
+// are short, title-case, and unpunctuated just like a real company name).
+const SECTION_HEADER_PREFIX = "(?:key|core|primary|essential|main|general|basic|minimum|preferred|required|additional|other)\\s+";
+const NOISE_LINE = new RegExp("^(apply now|easy apply|apply|save job|share job|save|share|show more|show less|show more options|skip to (main )?content|sign in|join now|see more jobs|similar jobs|people also viewed|about the job|about this job|about the team|about the role|about us|who we are|our team|the team|the role|company overview|job overview|position overview|role overview|job description|full job description|job details|report this job|overview|" + SECTION_HEADER_PREFIX + "?(?:responsibilities|requirements|qualifications|duties)|benefits|linkedin|indeed|glassdoor|sponsored|promoted|actively hiring|new|(\\d+(\\.\\d+)?\\s*(out of 5 stars?))|★+☆*|(\\d+(\\.\\d+)?)|(\\d[\\d,]*\\+?\\s*(applicants|people clicked apply|reviews|employees))|(posted\\s.*)|(reposted\\s.*)|(category\\s+.+)|(job id\\s+.+)|(job requisition id\\s*.*)|(requisition id\\s*.*)|(department\\s*[:\\-]\\s*.+)|(reports?\\s+to\\s*[:\\-]\\s*.+)|(format\\s*[:\\-]\\s*.+))$", "i");
 
 const JOB_TITLE_WORDS = /\b(engineer|manager|analyst|director|coordinator|specialist|developer|designer|scientist|lead|associate|consultant|representative|administrator|officer|executive|intern|architect|technician|supervisor|strategist|recruiter|accountant|counsel|attorney|nurse|teacher|instructor|planner|advisor|president|controller|producer|editor|assistant|clerk|agent|buyer)\b/i;
 
@@ -996,9 +1004,20 @@ function parseFreeText(text){
     }
   }
 
+  // Prefer an explicit "Remote Status:"/"Work Type:"/"Work Location:" labeled
+  // field over the naive whole-text keyword scan below — a posting can name
+  // that label using a WORK_FORM_WORD itself ("Remote Status: On-Site"),
+  // which a bare /remote/ scan over the whole text can't tell apart from the
+  // label's actual value and would misread as a remote posting.
+  const workFormLabelMatch = text.match(/\b(?:remote status|work(?:place)? type|work location(?:\s*type)?|location type)\s*[:\-]\s*([a-z][a-z\s\/-]{0,20})/i);
   let workForm = "Onsite";
-  if (/\bremote\b/i.test(text)) workForm = "Remote";
-  if (/\bhybrid\b/i.test(text)) workForm = "Hybrid";
+  if (workFormLabelMatch && WORK_FORM_WORD.test(workFormLabelMatch[1])){
+    const val = workFormLabelMatch[1];
+    workForm = /\bhybrid\b/i.test(val) ? "Hybrid" : /\bon-?site\b/i.test(val) ? "Onsite" : "Remote";
+  } else {
+    if (/\bremote\b/i.test(text)) workForm = "Remote";
+    if (/\bhybrid\b/i.test(text)) workForm = "Hybrid";
+  }
 
   if (!location && workForm === "Remote") location = "Remote";
 
