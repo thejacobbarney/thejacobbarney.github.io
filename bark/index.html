@@ -1760,6 +1760,26 @@ function exportEvalJSONL(jobs){
   triggerDownload("bark-eval-data.jsonl", lines.join("\n"), "application/x-ndjson");
 }
 
+// Same records as exportEvalJSONL, flattened to CSV columns — for pasting or
+// uploading into a chat LLM's UI, where a single well-formed CSV clears
+// upload-type gates that reject JSONL's multi-document shape (every line is
+// its own top-level JSON value, not one valid document). extracted.* fields
+// get their own columns since CSV has no nested-object concept, and skills
+// is joined with ";" since CSV has no array concept either. Run_eval.js-style
+// batch tooling should still use the JSONL export — this one is for humans
+// pasting into a UI, not code parsing per-record.
+function exportEvalCSV(jobs){
+  const headers = ["ID","Date Added","Description","Title","Company","Location","Work Form","Salary Min","Salary Max","Skills"];
+  const rows = jobs
+    .filter(j => (j.description || "").trim())
+    .map(j => [
+      j.id, j.dateAdded, j.description, j.title, j.company, j.location, j.workForm,
+      j.salaryMin || "", j.salaryMax || "", (j.skills || []).join("; ")
+    ]);
+  const csv = [headers, ...rows].map(r => r.map(csvEscape).join(",")).join("\n");
+  triggerDownload("bark-eval-data.csv", csv, "text/csv");
+}
+
 function ensureGoogleIdentity(){
   return new Promise((resolve, reject) => {
     if (window.google && window.google.accounts) return resolve();
@@ -2836,8 +2856,11 @@ function SettingsTab({settings, onChange, connectionStatus, onTestResult, onPush
           <div className="nb-title" style={{fontSize:"1.1rem"}}>Data export</div>
         </div>
       </div>
-      <p className="nb-hint" style={{marginBottom:"1.1rem"}}>Raw posting text plus Bark's own parsed fields, one JSON object per line — for evaluating extraction accuracy against another LLM.</p>
-      <button className="nb-btn nb-btn-sm" onClick={() => exportEvalJSONL(jobs)} disabled={!jobs.length}>Export Eval Data</button>
+      <p className="nb-hint" style={{marginBottom:"1.1rem"}}>Raw posting text plus Bark's own parsed fields — for evaluating extraction accuracy against another LLM. CSV pastes or uploads cleanly into a chat UI; JSONL is for scripts that parse it programmatically (e.g. a batch eval runner calling the API directly) — most chat apps reject JSONL as an upload since each line is its own document rather than one valid file.</p>
+      <div className="nb-row">
+        <button className="nb-btn nb-btn-sm" onClick={() => exportEvalCSV(jobs)} disabled={!jobs.length}>Export Eval Data (CSV)</button>
+        <button className="nb-btn nb-btn-sm" onClick={() => exportEvalJSONL(jobs)} disabled={!jobs.length}>Export Eval Data (JSONL)</button>
+      </div>
     </div>
   );
 }
