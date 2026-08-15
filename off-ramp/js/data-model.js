@@ -70,6 +70,7 @@ export function createExperience(overrides = {}) {
     tags: [],
     notes: '',
     linkedToResume: false,
+    source: 'manual',
     createdAt: now,
     updatedAt: now,
     ...overrides,

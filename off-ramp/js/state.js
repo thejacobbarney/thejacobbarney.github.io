@@ -85,9 +85,19 @@ export function getAllSkills() {
   return data.skills;
 }
 
-/** Creates a skill (or updates one if `fields.id` matches an existing record). */
+/**
+ * Creates a skill, or updates one if it already exists — matched by `id`
+ * when given, otherwise by a case-insensitive name match. The name-match
+ * fallback means "add" is idempotent by name: tagging/importing a skill
+ * that's already in the inventory updates it in place instead of creating
+ * a duplicate entry.
+ */
 export function upsertSkill(fields) {
-  const existing = fields.id ? data.skills.find((s) => s.id === fields.id) : null;
+  const existing = fields.id
+    ? data.skills.find((s) => s.id === fields.id)
+    : fields.name
+      ? data.skills.find((s) => s.name.toLowerCase() === fields.name.toLowerCase())
+      : null;
   if (existing) {
     Object.assign(existing, fields);
   } else {

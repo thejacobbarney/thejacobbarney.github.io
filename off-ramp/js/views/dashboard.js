@@ -106,7 +106,7 @@ export function render(root) {
         <div class="experience-card-header">
           <div>
             <h3>${escapeHtml(exp.title) || '(untitled)'}</h3>
-            <p class="muted">${escapeHtml(exp.organization)} · ${escapeHtml(formatDateRange(exp))} · ${escapeHtml(typeLabel(exp.type))}${exp.linkedToResume ? ' · on resume' : ''}</p>
+            <p class="muted">${escapeHtml(exp.organization)} · ${escapeHtml(formatDateRange(exp))} · ${escapeHtml(typeLabel(exp.type))}${exp.linkedToResume ? ' · on resume' : ''}${exp.source === 'imported' ? ' · imported' : ''}</p>
           </div>
           <div class="experience-card-actions">
             <a href="#edit-${exp.id}">Edit</a>

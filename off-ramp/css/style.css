@@ -321,6 +321,90 @@ legend {
   color: var(--danger);
 }
 
+/* ── AI settings panel (shared component) ─────────────────── */
+
+.ai-settings-panel {
+  margin: 0.75rem 0;
+  background: var(--bg-alt);
+}
+.ai-settings-panel .ai-fields {
+  margin-top: 0.5rem;
+}
+
+/* ── Import view ───────────────────────────────────────────── */
+
+#file-input {
+  width: auto;
+  margin-bottom: 0.75rem;
+}
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+.file-row-name {
+  flex: 1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-row-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.file-row-status.status-error {
+  color: var(--danger);
+}
+.file-row-status.status-parsed {
+  color: var(--text);
+}
+.file-row button {
+  font-size: 0.8rem;
+}
+
+#parse-btn {
+  margin-bottom: 1.5rem;
+}
+
+.candidate-card {
+  border-color: var(--accent);
+}
+.raw-text {
+  max-height: 220px;
+  overflow: auto;
+  font-size: 0.78rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+details summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.skill-chip-toggle {
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  background: var(--bg-alt);
+}
+.skill-chip-toggle.excluded {
+  border-color: var(--border);
+  color: var(--muted);
+  text-decoration: line-through;
+  background: var(--bg);
+}
+
 /* ── Match view ────────────────────────────────────────────── */
 
 #job-text {
