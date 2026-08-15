@@ -22,6 +22,14 @@
  * TO EXTEND: this view only depends on `extractTextFromFile()` (raw text
  * out) and whichever parser is selected (candidates out) — swap either for
  * a smarter implementation later without touching the review/commit UI.
+ *
+ * Cross-file dedup: uploading a resume alongside a LinkedIn export routinely
+ * describes the same job twice. Each newly parsed candidate is checked
+ * against candidates already collected (from this file or an earlier one)
+ * via `findMatchingCandidate()` — same organization, same title, compatible
+ * dates — and merged into the existing card instead of added as a new one,
+ * via `mergeCandidateInto()`. This is the same mechanism whether the
+ * duplicate came from the same file or a different one.
  */
 
 import { addExperience, upsertSkill } from '../state.js';
@@ -33,6 +41,53 @@ import { renderAiSettingsPanel } from '../components/aiSettingsPanel.js';
 import { escapeHtml } from '../utils.js';
 
 let nextFileId = 1;
+
+function normalizeForMatch(str) {
+  return (str || '')
+    .toLowerCase()
+    .replace(/[.,]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function fuzzyMatch(a, b) {
+  const na = normalizeForMatch(a);
+  const nb = normalizeForMatch(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function datesCompatible(a, b) {
+  if (!a.startDate || !b.startDate) return true;
+  const diffDays = Math.abs(new Date(a.startDate) - new Date(b.startDate)) / 86400000;
+  return Number.isFinite(diffDays) && diffDays <= 45;
+}
+
+function findMatchingCandidate(candidate, existingCandidates) {
+  return existingCandidates.find(
+    (e) => fuzzyMatch(e.organization, candidate.organization) && fuzzyMatch(e.title, candidate.title) && datesCompatible(e, candidate)
+  );
+}
+
+function mergeUniqueLines(base, addition) {
+  const lines = base.split('\n').map((l) => l.trim()).filter(Boolean);
+  const seen = new Set(lines.map((l) => l.toLowerCase()));
+  for (const line of addition.split('\n').map((l) => l.trim()).filter(Boolean)) {
+    if (!seen.has(line.toLowerCase())) {
+      lines.push(line);
+      seen.add(line.toLowerCase());
+    }
+  }
+  return lines.join('\n');
+}
+
+function mergeCandidateInto(existing, incoming) {
+  existing.originalDescription = mergeUniqueLines(existing.originalDescription, incoming.originalDescription);
+  if (!existing.sourceLabels.includes(incoming.sourceLabel)) existing.sourceLabels.push(incoming.sourceLabel);
+  existing.sourceTexts.push({ label: incoming.sourceLabel, text: incoming.sourceText });
+  if (!existing.startDate && incoming.startDate) existing.startDate = incoming.startDate;
+  if (!existing.endDate && incoming.endDate) existing.endDate = incoming.endDate;
+}
 
 function statusLabel(f) {
   if (f.status === 'pending') return 'Ready to parse';
@@ -120,7 +175,18 @@ export function render(root) {
         const parsed = aiConfig.enabled
           ? await parseResumeTextWithAI(text, f.file.name, aiConfig)
           : parseResumeText(text, f.file.name);
-        candidateExperiences.push(...parsed.candidateExperiences);
+        for (const c of parsed.candidateExperiences) {
+          const existing = findMatchingCandidate(c, candidateExperiences);
+          if (existing) {
+            mergeCandidateInto(existing, c);
+          } else {
+            candidateExperiences.push({
+              ...c,
+              sourceLabels: [c.sourceLabel],
+              sourceTexts: [{ label: c.sourceLabel, text: c.sourceText }],
+            });
+          }
+        }
         for (const skill of parsed.candidateSkills) {
           if (!candidateSkills.some((existing) => existing.toLowerCase() === skill.toLowerCase())) {
             candidateSkills.push(skill);
@@ -185,11 +251,20 @@ export function render(root) {
           </label>
         </div>
         <label>Description <textarea class="c-desc" rows="3">${escapeHtml(c.originalDescription)}</textarea></label>
-        <details>
-          <summary>Show raw extracted text</summary>
-          <pre class="raw-text">${escapeHtml(c.sourceText)}</pre>
-        </details>
-        <p class="muted">Source: ${escapeHtml(c.sourceLabel)}</p>
+        ${
+          c.sourceTexts.length > 1
+            ? `<p class="muted">Found in ${c.sourceTexts.length} files and merged automatically — review the combined description above.</p>`
+            : ''
+        }
+        ${c.sourceTexts
+          .map(
+            (s) => `<details>
+          <summary>Show raw extracted text (${escapeHtml(s.label)})</summary>
+          <pre class="raw-text">${escapeHtml(s.text)}</pre>
+        </details>`
+          )
+          .join('')}
+        <p class="muted">Source: ${escapeHtml(c.sourceLabels.join(', '))}</p>
       `;
       listEl.appendChild(card);
     });
@@ -219,7 +294,7 @@ export function render(root) {
       let addedExperiences = 0;
       listEl.querySelectorAll('.candidate-card').forEach((card) => {
         if (!card.querySelector('.c-toggle').checked) return;
-        const sourceLabel = candidateExperiences[Number(card.dataset.index)].sourceLabel;
+        const sourceLabel = candidateExperiences[Number(card.dataset.index)].sourceLabels.join(', ');
         addExperience({
           title: card.querySelector('.c-title').value.trim(),
           organization: card.querySelector('.c-org').value.trim(),

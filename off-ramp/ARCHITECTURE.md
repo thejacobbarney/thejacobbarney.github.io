@@ -152,11 +152,24 @@ importResume.js` picks one based on a checkbox and otherwise treats them identic
   source document rather than a per-block excerpt, since an LLM's own extraction isn't reliably
   traceable back to an exact substring the way the heuristic parser's anchor-based blocks are.
 
+**Cross-file dedup.** Uploading a resume alongside a LinkedIn export routinely describes the same
+job twice — without merging, every overlapping role would appear as a separate review card. As each
+file is parsed, every candidate it produces is checked against candidates already collected (from
+this file or an earlier one) via `findMatchingCandidate()`: same organization, same title (fuzzy,
+case/punctuation-insensitive substring match), and compatible dates (within ~45 days, or one side
+missing a date). A match merges into the existing card via `mergeCandidateInto()` — unique
+description lines from both are combined, source labels/raw text accumulate as arrays, and any
+missing start/end date is backfilled — instead of appending a duplicate. The review card shows
+"Found in N files and merged automatically" whenever this happens, with one "Show raw extracted
+text" block per contributing file, so the merge is visible and reversible (the user can still edit
+or uncheck the card). This runs identically for the offline and AI-assisted parsers, since it
+operates on the parser's output shape, not on how a candidate was produced.
+
 **Review and commit** happens entirely in `views/importResume.js`, regardless of which parser
 produced the candidates: nothing reaches `state.js` until the user reviews/edits each candidate
 experience (pre-checked, but every field is a live editable input) and toggles which candidate
 skills to keep, then clicks "Add Selected." Imported experiences are tagged `source: 'imported'`
-and get a note recording which file they came from, so they're distinguishable from hand-entered
+and get a note recording which file(s) they came from, so they're distinguishable from hand-entered
 ones later.
 
 ## 6. AI assistance (opt-in, bring-your-own-key)
