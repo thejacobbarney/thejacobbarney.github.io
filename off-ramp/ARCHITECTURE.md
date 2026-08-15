@@ -23,10 +23,12 @@ off-ramp/
     storage.js                localStorage read/write + JSON export/import serialization
     state.js                   In-memory store, CRUD operations, pub/sub — the only module views touch
     utils.js                    IDs, HTML escaping, date formatting, keyword search/matching
+    aiConfig.js                  localStorage read/write for the optional bring-your-own-key AI settings
     app.js                       Hash-based router: URL hash → view module
     parsers/
       textExtraction.js           File → raw text, dispatched by extension (PDF/DOCX/TXT)
-      resumeParser.js              Raw text → candidate Experience/Skill records (heuristic)
+      resumeParser.js              Raw text → candidate Experience/Skill records (offline heuristic)
+      aiResumeParser.js             Same contract as resumeParser.js, via the Anthropic API (opt-in, BYOK)
     views/
       dashboard.js               Timeline/list, search + filters
       experienceForm.js           Add/edit form + "Strengthen this experience" (STAR) flow
@@ -110,9 +112,10 @@ coupled:
 
 ```
 File (PDF/DOCX/TXT)
-  → parsers/textExtraction.js   (extractTextFromFile)   → raw text string
-  → parsers/resumeParser.js     (parseResumeText)        → { candidateExperiences, candidateSkills }
-  → views/importResume.js       (review UI)              → state.js: addExperience() / upsertSkill()
+  → parsers/textExtraction.js   (extractTextFromFile)     → raw text string
+  → parsers/resumeParser.js       (parseResumeText)          ⎫
+    or parsers/aiResumeParser.js  (parseResumeTextWithAI)    ⎬→ { candidateExperiences, candidateSkills }
+  → views/importResume.js       (review UI)                → state.js: addExperience() / upsertSkill()
 ```
 
 **Text extraction** (`parsers/textExtraction.js`) dispatches on file extension: PDF via a
@@ -123,21 +126,40 @@ heuristic, since PDF has no real concept of "lines"), DOCX via a self-hosted cop
 a third party at runtime; both are loaded lazily on first use so they don't add to initial page
 weight.
 
-**Resume parsing** (`parsers/resumeParser.js`) is a pure function, `parseResumeText(rawText,
-sourceLabel)`, with no DOM or I/O — text in, candidates out. It splits lines into sections by
-matching common resume headers (Experience, Skills, Projects, etc.), then within the
-Experience/Projects sections finds date-range lines (e.g. "Sept 2025 – Present") as anchors and
-groups the surrounding lines into one candidate Experience per anchor. The Skills section is
-split into a de-duplicated list of candidate names. **This is a heuristic, not an AI** — resume and
-LinkedIn-export layouts vary too much to parse perfectly offline, so "good first draft" is the
-design target, not "correct." Every candidate is provenance-tagged with `sourceLabel` (the
-filename) and its raw source block, both shown in the review UI.
+**Resume parsing — two interchangeable backends, same contract.** Both take `(rawText,
+sourceLabel[, config])` and resolve to `{ candidateExperiences, candidateSkills }`; `views/
+importResume.js` picks one based on a checkbox and otherwise treats them identically.
 
-**Review and commit** happens entirely in `views/importResume.js`: nothing from a parsed file
-reaches `state.js` until the user reviews/edits each candidate experience (pre-checked, but every
-field is a live editable input) and toggles which candidate skills to keep, then clicks "Add
-Selected." Imported experiences are tagged `source: 'imported'` and get a note recording which
-file they came from, so they're distinguishable from hand-entered ones later.
+- **Offline heuristic** (`parsers/resumeParser.js`, the default) — a pure function, no DOM or I/O,
+  no network, no cost. It splits lines into sections by matching common resume headers (Experience,
+  Skills, Projects, etc.), then within the Experience/Projects sections finds date-range lines (e.g.
+  "Sept 2025 – Present") as anchors and groups the surrounding lines into one candidate Experience
+  per anchor. The Skills section is split into a de-duplicated list of candidate names. **This is a
+  heuristic, not an AI** — resume and LinkedIn-export layouts vary too much to parse perfectly
+  offline, so "good first draft" is the design target, not "correct." Every candidate is
+  provenance-tagged with `sourceLabel` (the filename) and its raw source block, both shown in the
+  review UI.
+
+- **AI-assisted, bring-your-own-key** (`parsers/aiResumeParser.js`, opt-in) — calls the Anthropic
+  Messages API (`claude-opus-5` by default) directly from the browser with an API key the user
+  supplies via the view's settings panel and `aiConfig.js` persists to `localStorage`. There is no
+  backend to hold a secret server-side (see "Persistence" above), so this is a deliberately
+  prototype-grade integration: the request carries Anthropic's `anthropic-dangerous-direct-browser-
+  access` header (its documented opt-in for exactly this shape of client-only tool), and the key
+  never leaves the browser except in requests sent straight to `api.anthropic.com`. It uses
+  structured outputs (`output_config.format` with a JSON Schema) so the response is guaranteed
+  valid JSON matching the candidate shape — no markdown-fence stripping needed — and generally
+  produces more accurate candidates on documents whose layout confuses the positional heuristic
+  parser (e.g. company-before-title ordering). `sourceText` on AI-produced candidates is the full
+  source document rather than a per-block excerpt, since an LLM's own extraction isn't reliably
+  traceable back to an exact substring the way the heuristic parser's anchor-based blocks are.
+
+**Review and commit** happens entirely in `views/importResume.js`, regardless of which parser
+produced the candidates: nothing reaches `state.js` until the user reviews/edits each candidate
+experience (pre-checked, but every field is a live editable input) and toggles which candidate
+skills to keep, then clicks "Add Selected." Imported experiences are tagged `source: 'imported'`
+and get a note recording which file they came from, so they're distinguishable from hand-entered
+ones later.
 
 ## 6. Expandability notes (from the brief)
 
@@ -145,10 +167,11 @@ file they came from, so they're distinguishable from hand-entered ones later.
   pure, synchronous function that assembles the STAR fields into text. Replace its call site with
   an `await` on an AI API call (keep the same input shape, return a string) and nothing else in the
   form changes.
-- **AI-assisted resume parsing** — `parsers/resumeParser.js: parseResumeText()` is a heuristic,
-  offline text parser today. Replace it with an `await` on an AI API call that takes the same raw
-  text + `sourceLabel` and resolves to the same `{ candidateExperiences, candidateSkills }` shape;
-  `views/importResume.js` doesn't know or care how the candidates were produced.
+- **AI-assisted resume parsing** — implemented as an opt-in, bring-your-own-key path
+  (`parsers/aiResumeParser.js`) alongside the offline heuristic; see §5 above. To point it at a
+  different provider or a proxied backend later, only `aiResumeParser.js`'s internals need to
+  change — it's the only module that knows the request shape, and `views/importResume.js` only
+  depends on the shared `{ candidateExperiences, candidateSkills }` return contract.
 - **More sophisticated matching/scoring** — `utils.js: scoreExperienceAgainstText()` is the single
   function `views/match.js` calls. Swap keyword overlap for an embeddings/AI call there; the return
   contract (`{ score, matched }`) is the only thing callers depend on.

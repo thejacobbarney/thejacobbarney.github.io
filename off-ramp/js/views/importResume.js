@@ -5,19 +5,31 @@
  * export, an older resume version, plain text) and Off-ramp extracts
  * candidate Experience entries and candidate skills/tools for review.
  * Nothing touches the database until the user reviews, edits, and clicks
- * "Add Selected to Career Database" — the parser (resumeParser.js) is a
- * heuristic, not an AI, so review-before-commit is the safety net that
- * makes an imperfect parser useful instead of just noisy.
+ * "Add Selected to Career Database" — review-before-commit is the safety
+ * net that makes an imperfect parser useful instead of just noisy, for
+ * either parsing path below.
+ *
+ * Two interchangeable parsing backends, both implementing the same
+ * `(rawText, sourceLabel) -> { candidateExperiences, candidateSkills }`
+ * contract (see resumeParser.js and aiResumeParser.js):
+ *   - Offline heuristic (default) — parsers/resumeParser.js. No setup, no
+ *     cost, works without network access.
+ *   - AI-assisted, bring-your-own-key (opt-in) — parsers/aiResumeParser.js.
+ *     Calls the Anthropic API directly from the browser with a key the
+ *     user supplies and aiConfig.js persists to localStorage. More
+ *     accurate on unusual layouts; costs the user's own API usage.
  *
  * TO EXTEND: this view only depends on `extractTextFromFile()` (raw text
- * out) and `parseResumeText()` (candidates out) — swap either for a
- * smarter implementation later without touching the review/commit UI here.
+ * out) and whichever parser is selected (candidates out) — swap either for
+ * a smarter implementation later without touching the review/commit UI.
  */
 
 import { addExperience, upsertSkill } from '../state.js';
 import { EXPERIENCE_TYPES } from '../data-model.js';
 import { extractTextFromFile } from '../parsers/textExtraction.js';
 import { parseResumeText } from '../parsers/resumeParser.js';
+import { parseResumeTextWithAI } from '../parsers/aiResumeParser.js';
+import { loadAiConfig, saveAiConfig } from '../aiConfig.js';
 import { escapeHtml } from '../utils.js';
 
 let nextFileId = 1;
@@ -35,6 +47,7 @@ export function render(root) {
   let candidateExperiences = [];
   let candidateSkills = [];
   const excludedSkills = new Set();
+  const aiConfig = loadAiConfig();
 
   const wrap = document.createElement('div');
   wrap.className = 'view';
@@ -43,6 +56,24 @@ export function render(root) {
       <h1>Import from Resume / LinkedIn</h1>
     </div>
     <p class="muted">Upload a resume (PDF or DOCX), a LinkedIn "Save to PDF" export, or an old resume version — upload as many as you have. Off-ramp pulls out candidate roles and skills for you to review, edit, and add. Nothing is saved to your database until you approve it below.</p>
+
+    <fieldset>
+      <legend>AI-assisted parsing (optional)</legend>
+      <p class="muted">By default Off-ramp uses a fast, offline heuristic parser — no setup, no cost. Turning this on sends the extracted document text straight from this browser to Anthropic's API using your own key, for more accurate extraction on documents with unusual layouts. Your key is stored only in this browser's local storage — never on any server of ours — and Anthropic bills your account for usage at standard rates. Local storage isn't encrypted, so don't enable this on a shared computer.</p>
+      <label class="checkbox-label">
+        <input type="checkbox" id="ai-enabled" ${aiConfig.enabled ? 'checked' : ''} /> Use AI-assisted parsing
+      </label>
+      <div id="ai-fields" style="${aiConfig.enabled ? '' : 'display:none;'}">
+        <label>Anthropic API key
+          <input type="password" id="ai-api-key" value="${escapeHtml(aiConfig.apiKey)}" placeholder="sk-ant-…" autocomplete="off" />
+        </label>
+        <label>Model (advanced, optional)
+          <input type="text" id="ai-model" value="${escapeHtml(aiConfig.model)}" />
+        </label>
+        <button type="button" id="ai-save-btn" class="btn">Save AI settings</button>
+        <span class="muted" id="ai-save-status"></span>
+      </div>
+    </fieldset>
 
     <input type="file" id="file-input" accept=".pdf,.docx,.txt,.md" multiple />
     <div id="file-list"></div>
@@ -57,6 +88,27 @@ export function render(root) {
   const parseBtn = wrap.querySelector('#parse-btn');
   const reviewEl = wrap.querySelector('#review-section');
 
+  const aiEnabledCheckbox = wrap.querySelector('#ai-enabled');
+  const aiFieldsEl = wrap.querySelector('#ai-fields');
+  const aiApiKeyInput = wrap.querySelector('#ai-api-key');
+  const aiModelInput = wrap.querySelector('#ai-model');
+  const aiSaveStatus = wrap.querySelector('#ai-save-status');
+
+  aiEnabledCheckbox.addEventListener('change', () => {
+    aiConfig.enabled = aiEnabledCheckbox.checked;
+    aiFieldsEl.style.display = aiConfig.enabled ? '' : 'none';
+    saveAiConfig(aiConfig);
+    drawFileList();
+  });
+
+  wrap.querySelector('#ai-save-btn').addEventListener('click', () => {
+    aiConfig.apiKey = aiApiKeyInput.value.trim();
+    aiConfig.model = aiModelInput.value.trim() || 'claude-opus-5';
+    saveAiConfig(aiConfig);
+    aiSaveStatus.textContent = 'Saved.';
+    drawFileList();
+  });
+
   function drawFileList() {
     fileListEl.innerHTML = '';
     for (const f of files) {
@@ -69,7 +121,9 @@ export function render(root) {
       `;
       fileListEl.appendChild(row);
     }
-    parseBtn.disabled = files.length === 0 || !files.some((f) => f.status === 'pending');
+    const aiBlocked = aiConfig.enabled && !aiConfig.apiKey;
+    parseBtn.disabled = aiBlocked || files.length === 0 || !files.some((f) => f.status === 'pending');
+    parseBtn.title = aiBlocked ? 'Add and save an Anthropic API key above, or turn off AI-assisted parsing.' : '';
   }
 
   fileInput.addEventListener('change', () => {
@@ -97,7 +151,9 @@ export function render(root) {
       drawFileList();
       try {
         const text = await extractTextFromFile(f.file);
-        const parsed = parseResumeText(text, f.file.name);
+        const parsed = aiConfig.enabled
+          ? await parseResumeTextWithAI(text, f.file.name, aiConfig)
+          : parseResumeText(text, f.file.name);
         candidateExperiences.push(...parsed.candidateExperiences);
         for (const skill of parsed.candidateSkills) {
           if (!candidateSkills.some((existing) => existing.toLowerCase() === skill.toLowerCase())) {
