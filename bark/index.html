@@ -1740,6 +1740,26 @@ function exportCSV(jobs){
   triggerDownload("bark-export.csv", csv, "text/csv");
 }
 
+// One JSON object per line (JSONL) pairing each job's raw pasted posting
+// text with Bark's own parsed fields — built for feeding into another LLM
+// as eval data, not for spreadsheet viewing. Skips jobs with no saved
+// description (added by hand, never parsed from pasted text) since there's
+// no raw text to evaluate extraction against.
+function exportEvalJSONL(jobs){
+  const lines = jobs
+    .filter(j => (j.description || "").trim())
+    .map(j => JSON.stringify({
+      id: j.id,
+      dateAdded: j.dateAdded,
+      description: j.description,
+      extracted: {
+        title: j.title, company: j.company, location: j.location, workForm: j.workForm,
+        salaryMin: j.salaryMin || null, salaryMax: j.salaryMax || null, skills: j.skills || []
+      }
+    }));
+  triggerDownload("bark-eval-data.jsonl", lines.join("\n"), "application/x-ndjson");
+}
+
 function ensureGoogleIdentity(){
   return new Promise((resolve, reject) => {
     if (window.google && window.google.accounts) return resolve();
@@ -2415,6 +2435,7 @@ function DashboardTab({jobs, onStatusChange, onDelete, onRefresh, onRefreshAll, 
           <button className="nb-btn nb-btn-sm nb-btn-primary" onClick={handleSheetsExport} disabled={!jobs.length || sheetsBusy}>
             {sheetsBusy ? "Exporting…" : "Export to Sheets"}
           </button>
+          <button className="nb-btn nb-btn-sm" onClick={() => exportEvalJSONL(jobs)} disabled={!jobs.length} title="Raw posting text + Bark's own parsed fields, one JSON object per line — for evaluating extraction accuracy with another LLM">Export Eval Data</button>
         </div>
       </div>
 
