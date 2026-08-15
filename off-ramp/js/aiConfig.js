@@ -17,7 +17,7 @@ const STORAGE_KEY = 'offramp:ai-config:v1';
 const DEFAULTS = {
   enabled: false,
   apiKey: '',
-  model: 'claude-opus-5',
+  model: 'claude-sonnet-5',
 };
 
 export function loadAiConfig() {

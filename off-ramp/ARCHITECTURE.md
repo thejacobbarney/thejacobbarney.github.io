@@ -25,10 +25,13 @@ off-ramp/
     utils.js                    IDs, HTML escaping, date formatting, keyword search/matching
     aiConfig.js                  localStorage read/write for the optional bring-your-own-key AI settings
     app.js                       Hash-based router: URL hash → view module
+    components/
+      aiSettingsPanel.js           Shared enable/key/model UI — every AI-assisted feature reuses this
     parsers/
       textExtraction.js           File → raw text, dispatched by extension (PDF/DOCX/TXT)
       resumeParser.js              Raw text → candidate Experience/Skill records (offline heuristic)
       aiResumeParser.js             Same contract as resumeParser.js, via the Anthropic API (opt-in, BYOK)
+      aiRefine.js                    STAR notes → polished description, via the Anthropic API (opt-in, BYOK)
     views/
       dashboard.js               Timeline/list, search + filters
       experienceForm.js           Add/edit form + "Strengthen this experience" (STAR) flow
@@ -141,12 +144,7 @@ importResume.js` picks one based on a checkbox and otherwise treats them identic
   review UI.
 
 - **AI-assisted, bring-your-own-key** (`parsers/aiResumeParser.js`, opt-in) — calls the Anthropic
-  Messages API (`claude-opus-5` by default) directly from the browser with an API key the user
-  supplies via the view's settings panel and `aiConfig.js` persists to `localStorage`. There is no
-  backend to hold a secret server-side (see "Persistence" above), so this is a deliberately
-  prototype-grade integration: the request carries Anthropic's `anthropic-dangerous-direct-browser-
-  access` header (its documented opt-in for exactly this shape of client-only tool), and the key
-  never leaves the browser except in requests sent straight to `api.anthropic.com`. It uses
+  Messages API directly from the browser with an API key the user supplies (see §6 below). It uses
   structured outputs (`output_config.format` with a JSON Schema) so the response is guaranteed
   valid JSON matching the candidate shape — no markdown-fence stripping needed — and generally
   produces more accurate candidates on documents whose layout confuses the positional heuristic
@@ -161,17 +159,42 @@ skills to keep, then clicks "Add Selected." Imported experiences are tagged `sou
 and get a note recording which file they came from, so they're distinguishable from hand-entered
 ones later.
 
-## 6. Expandability notes (from the brief)
+## 6. AI assistance (opt-in, bring-your-own-key)
 
-- **AI-assisted expansion of experiences** — `experienceForm.js: buildRefinedDescription()` is a
-  pure, synchronous function that assembles the STAR fields into text. Replace its call site with
-  an `await` on an AI API call (keep the same input shape, return a string) and nothing else in the
-  form changes.
-- **AI-assisted resume parsing** — implemented as an opt-in, bring-your-own-key path
-  (`parsers/aiResumeParser.js`) alongside the offline heuristic; see §5 above. To point it at a
-  different provider or a proxied backend later, only `aiResumeParser.js`'s internals need to
-  change — it's the only module that knows the request shape, and `views/importResume.js` only
-  depends on the shared `{ candidateExperiences, candidateSkills }` return contract.
+Off-ramp works fully offline by default — everything in §§1–5 above requires no network access. Two
+features additionally offer an AI-assisted path that's off unless the user turns it on:
+
+| Feature | Offline default | AI-assisted alternative |
+|---|---|---|
+| Resume/LinkedIn parsing (§5) | `parsers/resumeParser.js` | `parsers/aiResumeParser.js` |
+| STAR refinement (Add/Edit Experience form) | `experienceForm.js: buildRefinedDescription()` | `parsers/aiRefine.js: refineExperienceWithAI()` |
+
+Both AI modules call the Anthropic Messages API (`claude-sonnet-5` by default — configurable)
+directly from the browser with a key the user supplies. There is no backend to hold a secret
+server-side (see §3), so this is a deliberately prototype-grade integration: the request carries
+Anthropic's `anthropic-dangerous-direct-browser-access` header (its documented opt-in for exactly
+this shape of client-only, single-user tool), and the key never leaves the browser except in
+requests sent straight to `api.anthropic.com`.
+
+**One config, one settings UI, reused everywhere.** `aiConfig.js` is the single localStorage-backed
+source of truth for `{ enabled, apiKey, model }`, and `components/aiSettingsPanel.js` is the one
+piece of UI that reads/writes it — `renderAiSettingsPanel(container, { onChange })` renders into any
+container and returns the live config object, which the caller reads at the moment it's needed
+(e.g. when a "Parse" or "AI-refine" button is clicked). Both `views/importResume.js` and
+`views/experienceForm.js` call this same function rather than building their own key-entry UI, so
+enabling AI assistance and saving a key in one place makes it available everywhere else too.
+
+**Adding a third AI-assisted feature** later means: write a module following the `aiResumeParser.js`
+/ `aiRefine.js` pattern (a `fetch` to `api.anthropic.com/v1/messages` with the two headers above,
+`thinking: {type: "disabled"}` for a straightforward single-call task, structured outputs when the
+result needs to be parsed back into typed fields), call `renderAiSettingsPanel()` in the view that
+needs it, and add a button that awaits the new module's function — no changes needed to `aiConfig.js`
+or the settings component itself.
+
+## 7. Expandability notes (from the brief)
+
+- **AI-assisted expansion of experiences** — implemented; see §6 above.
+- **AI-assisted resume parsing** — implemented; see §5 and §6 above.
 - **More sophisticated matching/scoring** — `utils.js: scoreExperienceAgainstText()` is the single
   function `views/match.js` calls. Swap keyword overlap for an embeddings/AI call there; the return
   contract (`{ score, matched }`) is the only thing callers depend on.

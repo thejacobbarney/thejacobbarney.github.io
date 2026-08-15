@@ -321,6 +321,16 @@ legend {
   color: var(--danger);
 }
 
+/* ── AI settings panel (shared component) ─────────────────── */
+
+.ai-settings-panel {
+  margin: 0.75rem 0;
+  background: var(--bg-alt);
+}
+.ai-settings-panel .ai-fields {
+  margin-top: 0.5rem;
+}
+
 /* ── Import view ───────────────────────────────────────────── */
 
 #file-input {

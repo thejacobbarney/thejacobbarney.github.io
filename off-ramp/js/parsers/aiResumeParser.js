@@ -77,7 +77,7 @@ export async function parseResumeTextWithAI(rawText, sourceLabel, config) {
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: config.model || 'claude-opus-5',
+      model: config.model || 'claude-sonnet-5',
       max_tokens: 8192,
       thinking: { type: 'disabled' },
       system: SYSTEM_PROMPT,

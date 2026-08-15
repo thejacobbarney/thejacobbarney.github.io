@@ -29,7 +29,7 @@ import { EXPERIENCE_TYPES } from '../data-model.js';
 import { extractTextFromFile } from '../parsers/textExtraction.js';
 import { parseResumeText } from '../parsers/resumeParser.js';
 import { parseResumeTextWithAI } from '../parsers/aiResumeParser.js';
-import { loadAiConfig, saveAiConfig } from '../aiConfig.js';
+import { renderAiSettingsPanel } from '../components/aiSettingsPanel.js';
 import { escapeHtml } from '../utils.js';
 
 let nextFileId = 1;
@@ -47,7 +47,6 @@ export function render(root) {
   let candidateExperiences = [];
   let candidateSkills = [];
   const excludedSkills = new Set();
-  const aiConfig = loadAiConfig();
 
   const wrap = document.createElement('div');
   wrap.className = 'view';
@@ -57,23 +56,7 @@ export function render(root) {
     </div>
     <p class="muted">Upload a resume (PDF or DOCX), a LinkedIn "Save to PDF" export, or an old resume version — upload as many as you have. Off-ramp pulls out candidate roles and skills for you to review, edit, and add. Nothing is saved to your database until you approve it below.</p>
 
-    <fieldset>
-      <legend>AI-assisted parsing (optional)</legend>
-      <p class="muted">By default Off-ramp uses a fast, offline heuristic parser — no setup, no cost. Turning this on sends the extracted document text straight from this browser to Anthropic's API using your own key, for more accurate extraction on documents with unusual layouts. Your key is stored only in this browser's local storage — never on any server of ours — and Anthropic bills your account for usage at standard rates. Local storage isn't encrypted, so don't enable this on a shared computer.</p>
-      <label class="checkbox-label">
-        <input type="checkbox" id="ai-enabled" ${aiConfig.enabled ? 'checked' : ''} /> Use AI-assisted parsing
-      </label>
-      <div id="ai-fields" style="${aiConfig.enabled ? '' : 'display:none;'}">
-        <label>Anthropic API key
-          <input type="password" id="ai-api-key" value="${escapeHtml(aiConfig.apiKey)}" placeholder="sk-ant-…" autocomplete="off" />
-        </label>
-        <label>Model (advanced, optional)
-          <input type="text" id="ai-model" value="${escapeHtml(aiConfig.model)}" />
-        </label>
-        <button type="button" id="ai-save-btn" class="btn">Save AI settings</button>
-        <span class="muted" id="ai-save-status"></span>
-      </div>
-    </fieldset>
+    <div id="ai-settings-container"></div>
 
     <input type="file" id="file-input" accept=".pdf,.docx,.txt,.md" multiple />
     <div id="file-list"></div>
@@ -88,25 +71,8 @@ export function render(root) {
   const parseBtn = wrap.querySelector('#parse-btn');
   const reviewEl = wrap.querySelector('#review-section');
 
-  const aiEnabledCheckbox = wrap.querySelector('#ai-enabled');
-  const aiFieldsEl = wrap.querySelector('#ai-fields');
-  const aiApiKeyInput = wrap.querySelector('#ai-api-key');
-  const aiModelInput = wrap.querySelector('#ai-model');
-  const aiSaveStatus = wrap.querySelector('#ai-save-status');
-
-  aiEnabledCheckbox.addEventListener('change', () => {
-    aiConfig.enabled = aiEnabledCheckbox.checked;
-    aiFieldsEl.style.display = aiConfig.enabled ? '' : 'none';
-    saveAiConfig(aiConfig);
-    drawFileList();
-  });
-
-  wrap.querySelector('#ai-save-btn').addEventListener('click', () => {
-    aiConfig.apiKey = aiApiKeyInput.value.trim();
-    aiConfig.model = aiModelInput.value.trim() || 'claude-opus-5';
-    saveAiConfig(aiConfig);
-    aiSaveStatus.textContent = 'Saved.';
-    drawFileList();
+  const aiConfig = renderAiSettingsPanel(wrap.querySelector('#ai-settings-container'), {
+    onChange: () => drawFileList(),
   });
 
   function drawFileList() {

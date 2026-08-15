@@ -3,17 +3,18 @@
  * -------------------------------------
  * One form handles both "add new" (no id in the route) and "edit existing"
  * (#edit-<id>). It also hosts the "Strengthen this experience" flow: a
- * STAR-prompt panel that assembles Situation/Task/Action/Result + metrics
- * into a fuller, impact-focused refined description.
- *
- * TO EXTEND: to swap the STAR assembly for a real AI call later, replace
- * `buildRefinedDescription()` with an async function, await its result in
- * the button handler below, and write it into the textarea — nothing else
- * in this form (or the data model) needs to change.
+ * STAR-prompt panel offering two ways to turn Situation/Task/Action/Result
+ * + metrics into a fuller, impact-focused refined description —
+ * `buildRefinedDescription()` (instant, offline, plain concatenation) and
+ * `refineExperienceWithAI()` (optional, bring-your-own-key — see
+ * parsers/aiRefine.js and components/aiSettingsPanel.js) side by side, the
+ * same "offline default, AI opt-in" pattern used in views/importResume.js.
  */
 
 import { getExperience, addExperience, updateExperience } from '../state.js';
 import { createExperience, EXPERIENCE_TYPES } from '../data-model.js';
+import { refineExperienceWithAI } from '../parsers/aiRefine.js';
+import { renderAiSettingsPanel } from '../components/aiSettingsPanel.js';
 import { parseListInput, escapeHtml } from '../utils.js';
 
 function buildRefinedDescription({ starSituation, starTask, starAction, starResult, metrics }) {
@@ -94,7 +95,12 @@ export function render(root, params) {
         <label>Quantifiable results / metrics
           <input name="metrics" value="${e(exp.metrics)}" placeholder="e.g. cut cycle time 30%, saved $2M annually" />
         </label>
-        <button type="button" id="assemble-btn">Assemble refined description &darr;</button>
+        <div id="ai-settings-container"></div>
+        <div class="row">
+          <button type="button" id="assemble-btn">Assemble refined description &darr;</button>
+          <button type="button" id="ai-refine-btn">AI-refine description &darr;</button>
+          <span class="muted" id="ai-refine-status"></span>
+        </div>
         <label>Refined / impact-focused description
           <textarea name="refinedDescription" rows="4">${e(exp.refinedDescription)}</textarea>
         </label>
@@ -136,6 +142,8 @@ export function render(root, params) {
 
   const form = wrap.querySelector('#exp-form');
 
+  const aiConfig = renderAiSettingsPanel(wrap.querySelector('#ai-settings-container'));
+
   wrap.querySelector('#assemble-btn').addEventListener('click', () => {
     const fd = new FormData(form);
     const refined = buildRefinedDescription({
@@ -146,6 +154,35 @@ export function render(root, params) {
       metrics: fd.get('metrics'),
     });
     form.querySelector('[name="refinedDescription"]').value = refined;
+  });
+
+  const aiRefineBtn = wrap.querySelector('#ai-refine-btn');
+  const aiRefineStatus = wrap.querySelector('#ai-refine-status');
+
+  aiRefineBtn.addEventListener('click', async () => {
+    const fd = new FormData(form);
+    aiRefineBtn.disabled = true;
+    aiRefineStatus.textContent = 'Refining…';
+    try {
+      const refined = await refineExperienceWithAI(
+        {
+          title: fd.get('title'),
+          organization: fd.get('organization'),
+          starSituation: fd.get('starSituation'),
+          starTask: fd.get('starTask'),
+          starAction: fd.get('starAction'),
+          starResult: fd.get('starResult'),
+          metrics: fd.get('metrics'),
+        },
+        aiConfig
+      );
+      form.querySelector('[name="refinedDescription"]').value = refined;
+      aiRefineStatus.textContent = '';
+    } catch (err) {
+      aiRefineStatus.textContent = `Error: ${err.message}`;
+    } finally {
+      aiRefineBtn.disabled = false;
+    }
   });
 
   form.addEventListener('submit', (evt) => {
