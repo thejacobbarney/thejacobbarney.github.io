@@ -1,0 +1,340 @@
+/*
+ * Off-ramp — minimal, content-first styling.
+ * Intentionally plain: readability and layout only, no design system,
+ * no color palette, no animation. Safe to restyle later without
+ * touching any JS — every view builds semantic HTML with stable
+ * class names for exactly this reason.
+ */
+
+:root {
+  --border: #d0d0d0;
+  --text: #1a1a1a;
+  --muted: #666;
+  --bg: #fff;
+  --bg-alt: #f7f7f7;
+  --accent: #1a1a1a;
+  --danger: #a3231b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.5;
+}
+
+/* ── Header / nav ─────────────────────────────────────────── */
+
+.site-header {
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+}
+.site-header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.site-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.site-subtitle {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.main-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.nav-link {
+  color: var(--text);
+  text-decoration: none;
+  padding: 0.25rem 0;
+  border-bottom: 2px solid transparent;
+  font-size: 0.95rem;
+}
+.nav-link:hover {
+  border-bottom-color: var(--border);
+}
+.nav-link.active {
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Layout ────────────────────────────────────────────────── */
+
+.app-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.site-footer {
+  max-width: 960px;
+  margin: 2rem auto 1.5rem;
+  padding: 0 1.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.view-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+h2 {
+  font-size: 1.1rem;
+  margin: 1.5rem 0 0.5rem;
+}
+h3 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ── Buttons & form controls ──────────────────────────────── */
+
+.btn,
+button {
+  font: inherit;
+  cursor: pointer;
+}
+.btn,
+.btn-link {
+  display: inline-block;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.btn-link {
+  background: none;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  border-radius: 4px;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+label > input,
+label > select,
+label > textarea {
+  margin-top: 0.25rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.checkbox-label input {
+  width: auto;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+.row > label {
+  flex: 1;
+  min-width: 160px;
+}
+
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 0 0 1rem;
+}
+legend {
+  padding: 0 0.4rem;
+  font-weight: 600;
+}
+
+.form-actions {
+  margin-top: 1rem;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.filter-bar input,
+.filter-bar select {
+  width: auto;
+  flex: 1;
+  min-width: 160px;
+}
+
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.inline-form input,
+.inline-form select {
+  width: auto;
+}
+
+/* ── Experience cards ─────────────────────────────────────── */
+
+.experience-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: var(--bg);
+}
+.experience-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+.experience-card-actions {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.experience-card-actions button {
+  background: none;
+  border: none;
+  color: var(--danger);
+  text-decoration: underline;
+  padding: 0;
+}
+
+.metrics {
+  font-weight: 600;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.tag {
+  font-size: 0.75rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+}
+.tag-match {
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.empty-state {
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+/* ── Skills inventory ─────────────────────────────────────── */
+
+.skill-group {
+  margin-bottom: 1.5rem;
+}
+.skill-table {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.skill-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 110px 2fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.skill-row:last-child {
+  border-bottom: none;
+}
+.skill-row-name {
+  font-weight: 600;
+}
+.skill-row-links a {
+  margin-right: 0.4rem;
+}
+.skill-row button {
+  color: var(--danger);
+}
+
+/* ── Match view ────────────────────────────────────────────── */
+
+#job-text {
+  margin-bottom: 0.75rem;
+}
+.tailored-bullet {
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .skill-row {
+    grid-template-columns: 1fr;
+  }
+  .experience-card-header {
+    flex-direction: column;
+  }
+}
