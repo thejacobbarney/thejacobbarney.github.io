@@ -5,7 +5,10 @@
  * backed by aiConfig.js (the single source of truth). Used by every
  * AI-assisted feature in the app (Import Resume, Strengthen This
  * Experience, ...) so the key/model only need to be entered once and every
- * feature shares the same on/off switch.
+ * feature shares the same on/off switch. Also renders a "Test connection"
+ * button (see aiVerify.js) that makes a minimal live API call against
+ * whatever key/model is currently typed — independent of Save, so a bad
+ * key can be caught before it's relied on inside a real parse/refine call.
  *
  * TO EXTEND: a new AI-assisted feature should call `renderAiSettingsPanel`
  * the same way rather than building its own key-entry UI — see
@@ -13,6 +16,7 @@
  */
 
 import { loadAiConfig, saveAiConfig } from '../aiConfig.js';
+import { verifyAiConnection } from '../aiVerify.js';
 import { escapeHtml } from '../utils.js';
 
 /**
@@ -43,8 +47,12 @@ export function renderAiSettingsPanel(container, { onChange } = {}) {
         <label>Model (advanced, optional)
           <input type="text" class="ai-model" value="${escapeHtml(config.model)}" />
         </label>
-        <button type="button" class="btn ai-save-btn">Save AI settings</button>
+        <div class="row">
+          <button type="button" class="btn ai-save-btn">Save AI settings</button>
+          <button type="button" class="ai-test-btn">Test connection</button>
+        </div>
         <span class="muted ai-save-status"></span>
+        <span class="muted ai-test-status"></span>
       </div>
     </fieldset>
   `;
@@ -55,6 +63,8 @@ export function renderAiSettingsPanel(container, { onChange } = {}) {
   const modelInput = container.querySelector('.ai-model');
   const saveStatus = container.querySelector('.ai-save-status');
   const saveBtn = container.querySelector('.ai-save-btn');
+  const testBtn = container.querySelector('.ai-test-btn');
+  const testStatus = container.querySelector('.ai-test-status');
 
   function notify() {
     if (onChange) onChange(config);
@@ -72,7 +82,29 @@ export function renderAiSettingsPanel(container, { onChange } = {}) {
     config.model = modelInput.value.trim() || 'claude-sonnet-5';
     saveAiConfig(config);
     saveStatus.textContent = 'Saved.';
+    testStatus.textContent = '';
+    testStatus.className = 'muted ai-test-status';
     notify();
+  });
+
+  testBtn.addEventListener('click', async () => {
+    const testConfig = {
+      apiKey: apiKeyInput.value.trim(),
+      model: modelInput.value.trim() || 'claude-sonnet-5',
+    };
+    testBtn.disabled = true;
+    testStatus.textContent = 'Testing…';
+    testStatus.className = 'muted ai-test-status';
+    try {
+      await verifyAiConnection(testConfig);
+      testStatus.textContent = '✓ Connected';
+      testStatus.className = 'muted ai-test-status status-success';
+    } catch (err) {
+      testStatus.textContent = `✗ ${err.message}`;
+      testStatus.className = 'muted ai-test-status status-error';
+    } finally {
+      testBtn.disabled = false;
+    }
   });
 
   return config;
