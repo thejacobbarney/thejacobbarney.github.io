@@ -184,6 +184,13 @@ container and returns the live config object, which the caller reads at the mome
 `views/experienceForm.js` call this same function rather than building their own key-entry UI, so
 enabling AI assistance and saving a key in one place makes it available everywhere else too.
 
+**Verifying a key works.** The settings panel also has a "Test connection" button, backed by
+`aiVerify.js: verifyAiConnection(config)`. It sends the smallest possible request to
+`api.anthropic.com/v1/messages` (`max_tokens: 1`, `thinking: {type: "disabled"}`) against whatever
+key/model is currently typed — independent of Save — and reports "✓ Connected" or a specific error
+(invalid key, unknown model, network failure). This lets a user confirm their key works before
+relying on it inside a real parse or refine call.
+
 **Adding a third AI-assisted feature** later means: write a module following the `aiResumeParser.js`
 / `aiRefine.js` pattern (a `fetch` to `api.anthropic.com/v1/messages` with the two headers above,
 `thinking: {type: "disabled"}` for a straightforward single-call task, structured outputs when the

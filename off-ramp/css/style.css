@@ -14,6 +14,7 @@
   --bg-alt: #f7f7f7;
   --accent: #1a1a1a;
   --danger: #a3231b;
+  --success: #1a7a1a;
 }
 
 * {
@@ -329,6 +330,14 @@ legend {
 }
 .ai-settings-panel .ai-fields {
   margin-top: 0.5rem;
+}
+.ai-settings-panel .ai-test-status.status-success {
+  color: var(--success);
+  font-weight: 600;
+}
+.ai-settings-panel .ai-test-status.status-error {
+  color: var(--danger);
+  font-weight: 600;
 }
 
 /* ── Import view ───────────────────────────────────────────── */
