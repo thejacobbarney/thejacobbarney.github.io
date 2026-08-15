@@ -2435,7 +2435,6 @@ function DashboardTab({jobs, onStatusChange, onDelete, onRefresh, onRefreshAll, 
           <button className="nb-btn nb-btn-sm nb-btn-primary" onClick={handleSheetsExport} disabled={!jobs.length || sheetsBusy}>
             {sheetsBusy ? "Exporting…" : "Export to Sheets"}
           </button>
-          <button className="nb-btn nb-btn-sm" onClick={() => exportEvalJSONL(jobs)} disabled={!jobs.length} title="Raw posting text + Bark's own parsed fields, one JSON object per line — for evaluating extraction accuracy with another LLM">Export Eval Data</button>
         </div>
       </div>
 
@@ -2714,7 +2713,7 @@ function ConnectionStatusBadge({state, testing}){
   return <Callout type="error"><span><strong>Failed:</strong> {state.message} — checked {when}.</span></Callout>;
 }
 
-function SettingsTab({settings, onChange, connectionStatus, onTestResult, onPush, onPull, syncStatus}){
+function SettingsTab({settings, onChange, connectionStatus, onTestResult, onPush, onPull, syncStatus, jobs}){
   const [local, setLocal] = useState(settings);
   useEffect(() => setLocal(settings), [settings]);
   const [testing, setTesting] = useState({ grok:false, perplexity:false, github:false });
@@ -2830,6 +2829,15 @@ function SettingsTab({settings, onChange, connectionStatus, onTestResult, onPush
         <span className="nb-hint">Last pulled: {syncStatus.lastPulledAt ? new Date(syncStatus.lastPulledAt).toLocaleString() : "never"}</span>
       </div>
       {syncMessage && <Callout type={syncMessage.type === "ok" ? "ok" : "error"}><span>{syncMessage.text}</span></Callout>}
+
+      <div className="nb-panel-head" style={{marginTop:"1.75rem"}}>
+        <div>
+          <div className="nb-eyebrow">Optional</div>
+          <div className="nb-title" style={{fontSize:"1.1rem"}}>Data export</div>
+        </div>
+      </div>
+      <p className="nb-hint" style={{marginBottom:"1.1rem"}}>Raw posting text plus Bark's own parsed fields, one JSON object per line — for evaluating extraction accuracy against another LLM.</p>
+      <button className="nb-btn nb-btn-sm" onClick={() => exportEvalJSONL(jobs)} disabled={!jobs.length}>Export Eval Data</button>
     </div>
   );
 }
@@ -2957,7 +2965,7 @@ function App(){
         {tab === "analytics" && <AnalyticsTab jobs={jobs} />}
         {tab === "settings" && <SettingsTab settings={settings} onChange={setSettings} connectionStatus={connectionStatus}
           onTestResult={(provider, result) => setConnectionStatus(s => ({...s, [provider]: result}))}
-          onPush={pushToCloud} onPull={pullFromCloud} syncStatus={syncStatus} />}
+          onPush={pushToCloud} onPull={pullFromCloud} syncStatus={syncStatus} jobs={jobs} />}
       </div>
     </div>
   );
