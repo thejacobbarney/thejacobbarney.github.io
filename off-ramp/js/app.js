@@ -15,6 +15,7 @@ import { render as renderDashboard } from './views/dashboard.js';
 import { render as renderExperienceForm } from './views/experienceForm.js';
 import { render as renderSkills } from './views/skills.js';
 import { render as renderMatch } from './views/match.js';
+import { render as renderImportResume } from './views/importResume.js';
 import { render as renderExportImport } from './views/exportImport.js';
 
 const root = document.getElementById('view-root');
@@ -31,6 +32,8 @@ function parseRoute(hash) {
       return { view: renderSkills, params: {} };
     case 'match':
       return { view: renderMatch, params: {} };
+    case 'import':
+      return { view: renderImportResume, params: {} };
     case 'export':
       return { view: renderExportImport, params: {} };
     case 'dashboard':

@@ -15,17 +15,24 @@ this is deliberate: the brief asked for content and structure first, styled and 
 off-ramp/
   index.html              Page shell: header/nav + an empty #view-root the router fills in
   css/style.css            Minimal, readability-only styling
+  vendor/                  Self-hosted third-party libraries (see vendor/VERSIONS.md)
+    pdfjs/                   PDF text extraction (Apache-2.0)
+    mammoth/                 DOCX text extraction (BSD-2-Clause)
   js/
     data-model.js           Entity shapes + factories (Experience, Skill) — the source of truth
     storage.js                localStorage read/write + JSON export/import serialization
     state.js                   In-memory store, CRUD operations, pub/sub — the only module views touch
     utils.js                    IDs, HTML escaping, date formatting, keyword search/matching
     app.js                       Hash-based router: URL hash → view module
+    parsers/
+      textExtraction.js           File → raw text, dispatched by extension (PDF/DOCX/TXT)
+      resumeParser.js              Raw text → candidate Experience/Skill records (heuristic)
     views/
       dashboard.js               Timeline/list, search + filters
       experienceForm.js           Add/edit form + "Strengthen this experience" (STAR) flow
       skills.js                    Skills & Tools inventory, grouped by category
       match.js                      Paste a job description → ranked relevant experiences
+      importResume.js               Upload resume/LinkedIn PDF/DOCX → review → bulk-add
       exportImport.js               Download/restore the full dataset as JSON
 ```
 
@@ -58,6 +65,7 @@ below a localized change instead of a rewrite.
 | `skillsHard`, `skillsSoft`, `tools`, `tags` | Arrays of strings; each is auto-registered as a Skill record |
 | `notes` | Context / lessons learned |
 | `linkedToResume` | Boolean flag |
+| `source` | `'manual'` or `'imported'` — provenance flag set by the resume-import flow |
 | `createdAt`, `updatedAt` | ISO timestamps |
 
 ### Skill / Tool (`data-model.js: createSkill`)
@@ -94,12 +102,53 @@ job text, then checks each experience's skills/tools/tags (weight 3), title/orga
 2), and description/metrics (weight 1) for overlapping tokens. Higher weight fields count more
 because a listed skill is a stronger signal of relevance than words that happen to appear in prose.
 
-## 5. Expandability notes (from the brief)
+## 5. Importing from a resume / LinkedIn export
+
+`views/importResume.js` lets a user bootstrap their database from documents they already have,
+instead of starting from a blank form. The pipeline is three independent stages, chained but not
+coupled:
+
+```
+File (PDF/DOCX/TXT)
+  → parsers/textExtraction.js   (extractTextFromFile)   → raw text string
+  → parsers/resumeParser.js     (parseResumeText)        → { candidateExperiences, candidateSkills }
+  → views/importResume.js       (review UI)              → state.js: addExperience() / upsertSkill()
+```
+
+**Text extraction** (`parsers/textExtraction.js`) dispatches on file extension: PDF via a
+self-hosted copy of pdf.js (clusters each page's text items into lines by baseline position — a
+heuristic, since PDF has no real concept of "lines"), DOCX via a self-hosted copy of mammoth.js
+(`extractRawText`), and TXT/MD by reading the file directly. Both libraries live under `vendor/`
+(see `vendor/VERSIONS.md`) rather than a CDN, so imports work offline and the page never depends on
+a third party at runtime; both are loaded lazily on first use so they don't add to initial page
+weight.
+
+**Resume parsing** (`parsers/resumeParser.js`) is a pure function, `parseResumeText(rawText,
+sourceLabel)`, with no DOM or I/O — text in, candidates out. It splits lines into sections by
+matching common resume headers (Experience, Skills, Projects, etc.), then within the
+Experience/Projects sections finds date-range lines (e.g. "Sept 2025 – Present") as anchors and
+groups the surrounding lines into one candidate Experience per anchor. The Skills section is
+split into a de-duplicated list of candidate names. **This is a heuristic, not an AI** — resume and
+LinkedIn-export layouts vary too much to parse perfectly offline, so "good first draft" is the
+design target, not "correct." Every candidate is provenance-tagged with `sourceLabel` (the
+filename) and its raw source block, both shown in the review UI.
+
+**Review and commit** happens entirely in `views/importResume.js`: nothing from a parsed file
+reaches `state.js` until the user reviews/edits each candidate experience (pre-checked, but every
+field is a live editable input) and toggles which candidate skills to keep, then clicks "Add
+Selected." Imported experiences are tagged `source: 'imported'` and get a note recording which
+file they came from, so they're distinguishable from hand-entered ones later.
+
+## 6. Expandability notes (from the brief)
 
 - **AI-assisted expansion of experiences** — `experienceForm.js: buildRefinedDescription()` is a
   pure, synchronous function that assembles the STAR fields into text. Replace its call site with
   an `await` on an AI API call (keep the same input shape, return a string) and nothing else in the
   form changes.
+- **AI-assisted resume parsing** — `parsers/resumeParser.js: parseResumeText()` is a heuristic,
+  offline text parser today. Replace it with an `await` on an AI API call that takes the same raw
+  text + `sourceLabel` and resolves to the same `{ candidateExperiences, candidateSkills }` shape;
+  `views/importResume.js` doesn't know or care how the candidates were produced.
 - **More sophisticated matching/scoring** — `utils.js: scoreExperienceAgainstText()` is the single
   function `views/match.js` calls. Swap keyword overlap for an embeddings/AI call there; the return
   contract (`{ score, matched }`) is the only thing callers depend on.
