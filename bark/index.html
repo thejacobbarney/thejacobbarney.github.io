@@ -847,6 +847,27 @@ function parseFreeText(text){
     // found elsewhere (often right after the title) wins instead.
   }
 
+  // Same bare-label-then-next-line shape as the company fallback above, but
+  // for location — Workday exports commonly render a plural "locations"
+  // label completely alone on its own line, with the actual value ("Remote
+  // (US)") on the next line. The same-line labeledLocationLine check above
+  // can never catch this: it's anchored to singular "location", and even
+  // loosened to "locations" it would still require the value on the same
+  // line, which isn't the shape here.
+  if (!location){
+    const idx = header.findIndex(l => /^locations?\s*[:\-]?\s*$/i.test(l));
+    if (idx !== -1 && idx + 1 < header.length){
+      const raw = header[idx + 1].trim();
+      const placeMatchLenient = PLACE_MATCH_CORE.replace(/\[A-Z\]/g, "[A-Za-z]");
+      const firstPlace = raw.match(new RegExp(placeMatchLenient));
+      if (firstPlace && firstPlace.index <= 2){
+        location = firstPlace[0].replace(/^[a-z]/, c => c.toUpperCase());
+      } else if (WORK_FORM_WORD.test(raw) && raw.length <= 20){
+        location = raw;
+      }
+    }
+  }
+
   // Combined "Company · Location · Full-time" style lines (skip salary lines —
   // "$110,000 - $140,000" also matches the "·/-"-separated shape but isn't one,
   // and skip the labeled Location line just handled above — it's already
@@ -1111,27 +1132,43 @@ function parseFreeText(text){
       salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
       salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
     } else {
-      // A trailing "+" ("$120,000+") states an open-ended floor, not a real
-      // two-sided range — leave salaryMax unset so downstream logic (target
-      // clamping, the salary badge) doesn't treat the floor as a hard ceiling.
-      const singleMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?(\+)?/i);
-      if (singleMatch){
-        const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
-        salaryMin = v;
-        salaryMax = singleMatch[3] ? null : v;
+      // Some postings label the two bounds separately instead of writing a
+      // single "$X - $Y" range ("Minimum:\n$76,800.00\nMaximum:\n$186,200.00")
+      // — rangeMatch above requires a dash/to/– connector directly between
+      // the two dollar amounts, so it can't see these as related at all.
+      // Without this tier they'd fall straight to the single-value fallback
+      // below and come out as salaryMin=salaryMax=the minimum figure, losing
+      // the real maximum entirely. Require a literal "$" close to the label
+      // so a generic "minimum of 5 years of experience" sentence elsewhere
+      // in the posting doesn't get mistaken for a salary figure.
+      const minLabelMatch = text.match(/\bminimum\b[\s\S]{0,15}?\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+      const maxLabelMatch = text.match(/\bmaximum\b[\s\S]{0,15}?\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+      if (minLabelMatch && maxLabelMatch){
+        salaryMin = parseSalaryToken(minLabelMatch[1], !!minLabelMatch[2]);
+        salaryMax = parseSalaryToken(maxLabelMatch[1], !!maxLabelMatch[2]);
       } else {
-        // Some postings (again, common among government/defense contractors)
-        // state the range with a trailing currency code instead of a "$"
-        // sign at all ("The salary range for this role is 86,800 USD -
-        // 165,200 USD."). No single-sided "123,000 USD" fallback here —
-        // unlike a bare number, "USD" alone appears constantly in benefits
-        // boilerplate ("eligible for USD-denominated...") with no salary
-        // figure attached, so only trust it as a genuine signal in the
-        // two-sided range shape.
-        const usdRangeMatch = text.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\s*(?:-|to|–|—)\s*([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\b/i);
-        if (usdRangeMatch){
-          salaryMin = parseSalaryToken(usdRangeMatch[1], !!usdRangeMatch[2]);
-          salaryMax = parseSalaryToken(usdRangeMatch[3], !!usdRangeMatch[4]);
+        // A trailing "+" ("$120,000+") states an open-ended floor, not a real
+        // two-sided range — leave salaryMax unset so downstream logic (target
+        // clamping, the salary badge) doesn't treat the floor as a hard ceiling.
+        const singleMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?(\+)?/i);
+        if (singleMatch){
+          const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
+          salaryMin = v;
+          salaryMax = singleMatch[3] ? null : v;
+        } else {
+          // Some postings (again, common among government/defense contractors)
+          // state the range with a trailing currency code instead of a "$"
+          // sign at all ("The salary range for this role is 86,800 USD -
+          // 165,200 USD."). No single-sided "123,000 USD" fallback here —
+          // unlike a bare number, "USD" alone appears constantly in benefits
+          // boilerplate ("eligible for USD-denominated...") with no salary
+          // figure attached, so only trust it as a genuine signal in the
+          // two-sided range shape.
+          const usdRangeMatch = text.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\s*(?:-|to|–|—)\s*([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\b/i);
+          if (usdRangeMatch){
+            salaryMin = parseSalaryToken(usdRangeMatch[1], !!usdRangeMatch[2]);
+            salaryMax = parseSalaryToken(usdRangeMatch[3], !!usdRangeMatch[4]);
+          }
         }
       }
     }
@@ -1147,6 +1184,19 @@ function parseFreeText(text){
   if (workFormLabelMatch && WORK_FORM_WORD.test(workFormLabelMatch[1])){
     const val = workFormLabelMatch[1];
     workForm = /\bhybrid\b/i.test(val) ? "Hybrid" : /\bon-?site\b/i.test(val) ? "Onsite" : "Remote";
+  } else if (location && WORK_FORM_WORD.test(location)){
+    // The location resolved above is itself often the real work-form signal
+    // on Workday-style postings (a bare "locations" label whose value is
+    // "Remote (US)") — a far more reliable, structurally-anchored source
+    // than scanning the entire prose body, which regularly carries "hybrid"
+    // and "remote" in ways that have nothing to do with this specific
+    // role's designation: a generic "Ways of Working" paragraph describing
+    // the company's overall policy ("Our structured hybrid approach..."),
+    // or a disjunctive disclaimer listing every possible designation. Both
+    // can defeat the disjunctive-listing strip in the naive-scan branch
+    // below, since neither is phrased as a clean "X, Y, or Z" list of only
+    // the three recognized words.
+    workForm = /\bhybrid\b/i.test(location) ? "Hybrid" : /\bon-?site\b/i.test(location) ? "Onsite" : "Remote";
   } else {
     // Many postings (especially government/defense contractors) carry a
     // generic disclaimer listing all three work forms together ("...regardless
