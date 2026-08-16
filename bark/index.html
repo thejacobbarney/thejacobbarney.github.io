@@ -801,6 +801,22 @@ function parseFreeText(text){
     if (idx !== -1 && idx + 1 < header.length) company = header[idx + 1].trim();
   }
 
+  // Amazon's own careers site renders a "Job ID: 10501195 | Amazon.com
+  // Services LLC" meta line right under the title — with no dedicated
+  // detector for it, the whole line (ID label included) looks just as
+  // plausible as any other short "nearby" candidate to the generic
+  // nearby-line company guess further down, and gets taken as the company
+  // verbatim, ID prefix and all. Strip the label and keep just the name.
+  // [ \t] rather than \s for the repeated-word separator — \s also matches a
+  // newline, which would otherwise let this run onto the next line(s)
+  // whenever the real company name is short enough to leave room in the
+  // {0,6} budget (the same bug found and fixed for the "About <Company>" and
+  // "Working With/At <Company>" patterns above).
+  if (!company){
+    const m = text.match(/\bJob\s*ID\s*:?\s*\d+\s*\|[ \t]*([A-Z][\w.,&'-]*(?:[ \t]+[A-Z][\w.,&'-]*){0,6})/);
+    if (m) company = m[1].trim();
+  }
+
   // Some ATS exports glue the "Location" label straight onto its value with
   // no colon/hyphen at all ("Location Mountain View, California; Remote -
   // Arizona - United States; ..."), often listing several offices on one
@@ -1129,6 +1145,17 @@ function parseFreeText(text){
     }
   }
 
+  // Amazon's own careers site closes every posting with one "<Country>, <ST>,
+  // <City> - <min> - <max> USD annually" line per office (often several, one
+  // per location the role is open in) — always well past the first 15
+  // header lines everything above is restricted to, so none of it ever ran
+  // against this. Take the first such line as the primary location, "<City>,
+  // <ST>" to match the shape everything else here produces.
+  if (!location){
+    const m = text.match(/\b[A-Z]{2,3},\s*([A-Z]{2}),\s*([A-Za-z][A-Za-z .'-]*?)\s*-\s*[\d,]{2,7}(?:\.\d{1,2})?\s*-\s*[\d,]{2,7}(?:\.\d{1,2})?\s*USD\s+annually\b/i);
+    if (m) location = m[2].trim() + ", " + m[1];
+  }
+
   // Optional ".00" cents suffix: "$88,000.00 - $132,000.00" is a common
   // pay-scale format (this dollar figure never needs sub-dollar precision,
   // so parseSalaryToken's parseFloat+round just discards it).
@@ -1188,6 +1215,18 @@ function parseFreeText(text){
           if (usdRangeMatch){
             salaryMin = parseSalaryToken(usdRangeMatch[1], !!usdRangeMatch[2]);
             salaryMax = parseSalaryToken(usdRangeMatch[3], !!usdRangeMatch[4]);
+          } else {
+            // Amazon's own careers site states each office's range with a
+            // single trailing currency code instead of one per side ("USA,
+            // AZ, Tempe - 66,900.00 - 117,100.00 USD annually") — require the
+            // "annually" that always follows here too, for the same reason
+            // usdRangeMatch's double "USD" requirement exists above: a bare
+            // "X - Y USD" is too easy to coincide with unrelated numbers.
+            const annualUsdRangeMatch = text.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)\s*-\s*([\d,]{2,7}(?:\.\d{1,2})?)\s*USD\s+annually\b/i);
+            if (annualUsdRangeMatch){
+              salaryMin = parseSalaryToken(annualUsdRangeMatch[1], false);
+              salaryMax = parseSalaryToken(annualUsdRangeMatch[2], false);
+            }
           }
         }
       }
