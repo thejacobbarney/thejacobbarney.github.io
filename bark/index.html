@@ -671,6 +671,16 @@ function looksLikeLocation(segment){
     if (parts.length > 1 && parts.every(p => CITY_STATE_RE.test(p))) return true;
   }
   if (BARE_COUNTRY_RE.test(s)) return true;
+  // A full street address ("14636 N Scottsdale Rd, Scottsdale, Arizona,
+  // United States") starts with a house number, which breaks every check
+  // above — they all anchor to a capitalized city name at the very start of
+  // the string. Everything after that leading street segment is still
+  // unambiguously location text, so strip up to the first comma (the street
+  // line) and test what's left the normal way.
+  if (/^\d/.test(s)){
+    const afterStreet = s.slice(s.indexOf(",") + 1).trim();
+    if (afterStreet && (CITY_STATE_RE.test(afterStreet) || CITY_REGION_RE.test(afterStreet))) return true;
+  }
   return false;
 }
 
@@ -1081,8 +1091,12 @@ function parseFreeText(text){
   // shape, and by the same logic (real company names are usually short, so
   // cap the capture at a few words rather than risk swallowing a whole
   // sentence when the line doesn't actually name a company at all).
+  // Each extra word normally has to start capitalized, but a real company
+  // name routinely has a lowercase connector in the middle ("Bank of
+  // America") — allow that small closed set of connectors too, rather than
+  // require every word be capitalized and silently fail on names like it.
   if (!company){
-    const m = text.match(/^At\s+([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3}),/m);
+    const m = text.match(/^At\s+([A-Z][\w&.'-]*(?:\s(?:[A-Z][\w&.'-]*|of|and|for|the)){0,3}),/m);
     if (m) company = m[1].trim();
   }
 
