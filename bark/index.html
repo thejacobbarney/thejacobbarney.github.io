@@ -1141,7 +1141,13 @@ function parseFreeText(text){
   // Leave it blank rather than mislabel it.
   const isHourlyRate = /\$\s?[\d,]+(?:\.\d{1,2})?\s*(?:\/\s*(?:hr|hour)\b|per\s+hour\b|hourly\b)/i.test(text);
   if (!isHourlyRate){
-    const rangeMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:-|to|–|—)\s*\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+    // The second bound sometimes repeats a currency code right before its own
+    // "$" ("USD $79,000.00 - USD $103,000.00") — allow an optional 3-letter
+    // code (case-insensitive via the outer /i) ahead of the optional "$" so
+    // that repeated prefix doesn't sit between the connector and the second
+    // number and break the match, falling through to the single-value
+    // fallback and wrongly setting min and max to the same figure.
+    const rangeMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:-|to|–|—)\s*(?:[A-Z]{3}\s*)?\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
     if (rangeMatch){
       salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
       salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
