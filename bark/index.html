@@ -1069,6 +1069,21 @@ function parseFreeText(text){
     // remote-type fields), so match that shape generally rather than
     // hardcoding each one as a new posting happens to surface it.
     const NEARBY_FIELD_LABEL = /^(locations?|\w+\s+type)$/i;
+    // Unlike NEARBY_FIELD_LABEL above, some ATS metadata fields put both the
+    // label AND its value on the same line ("Job Category: Professional",
+    // "Requisition Number: SRFIN004703") — nothing else here excludes that
+    // shape, so the whole line (colon and all) looks just as plausible as
+    // any other short nearby candidate and gets taken as the company
+    // verbatim. Name the specific labels seen so far rather than excluding
+    // every "Word: value" line, which would also throw out a real
+    // "Company: Acme Inc" line some other posting might have right here.
+    const NEARBY_NON_COMPANY_LABELED_LINE = /^(job category|requisition (?:number|id|#)|req(?:uisition)?\.?\s*(?:number|id|#)|job (?:number|id|#)|department|business unit|cost center|posting date)\s*:/i;
+    // A bare ATS section heading with no label/value shape at all ("Posting
+    // Details", "Job Details") is just as short and plausible-looking as any
+    // other nearby candidate once the labeled-metadata lines around it are
+    // excluded — the real company is often one tier further down (or one of
+    // the last-resort boilerplate-opener tiers below), not this heading.
+    const NEARBY_SECTION_HEADING = /^(posting details|job details|description|overview|position overview|summary|job summary|about (?:the )?(?:role|team|company|us|position)|responsibilities|requirements|qualifications)$/i;
     // A bare requisition/job ID ("371611") sitting right next to the title
     // is just as plausible-looking to every other check here (short, no
     // title words, not location-shaped, no trailing punctuation) as a real
@@ -1083,7 +1098,7 @@ function parseFreeText(text){
     // shape (Title / "Full Time" / "Finance" / "United States", each its own
     // unlabeled line) and without these guards picked up first one and then
     // the other as the "company" in turn.
-    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l)) || "";
+    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !NEARBY_NON_COMPANY_LABELED_LINE.test(l) && !NEARBY_SECTION_HEADING.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l)) || "";
   }
 
   // Last resort: many postings open their "About <Company>" boilerplate
@@ -1113,6 +1128,19 @@ function parseFreeText(text){
   // require every word be capitalized and silently fail on names like it.
   if (!company){
     const m = text.match(/^At\s+([A-Z][\w&.'-]*(?:\s(?:[A-Z][\w&.'-]*|of|and|for|the)){0,3}),/m);
+    if (m) company = m[1].trim();
+  }
+
+  // Same last-resort tier, a third boilerplate opener: postings often close
+  // with an EEO/disability-accommodation paragraph that names the company
+  // directly ("Spotless Brands and its subsidiaries comply with federal and
+  // state disability laws...") — no "is a/an/the" or "At <Company>," phrasing
+  // for the two tiers above to catch, but "<Company> and its
+  // subsidiary/subsidiaries" is itself a common enough boilerplate opener to
+  // be worth its own tier, the same way "About <Company>" and "Working
+  // With/At <Company>" already are.
+  if (!company){
+    const m = text.match(/^([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3})\s+and\s+its\s+subsidiar(?:y|ies)\b/m);
     if (m) company = m[1].trim();
   }
 
@@ -1168,13 +1196,14 @@ function parseFreeText(text){
   // Leave it blank rather than mislabel it.
   const isHourlyRate = /\$\s?[\d,]+(?:\.\d{1,2})?\s*(?:\/\s*(?:hr|hour)\b|per\s+hour\b|hourly\b)/i.test(text);
   if (!isHourlyRate){
-    // The second bound sometimes repeats a currency code right before its own
-    // "$" ("USD $79,000.00 - USD $103,000.00") — allow an optional 3-letter
-    // code (case-insensitive via the outer /i) ahead of the optional "$" so
-    // that repeated prefix doesn't sit between the connector and the second
-    // number and break the match, falling through to the single-value
-    // fallback and wrongly setting min and max to the same figure.
-    const rangeMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:-|to|–|—)\s*(?:[A-Z]{3}\s*)?\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+    // A currency code sometimes sits right after a bound's own number
+    // ("$101,000 USD to $120,000 USD", "USD $79,000.00 - USD $103,000.00") —
+    // allow an optional 3-letter code (case-insensitive via the outer /i) on
+    // either side of the connector so it doesn't sit between the first
+    // number and the connector, or the connector and the second number, and
+    // break the match — which otherwise falls through to the single-value
+    // fallback and wrongly sets min and max to the same figure.
+    const rangeMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:[A-Z]{3}\s*)?(?:-|to|–|—)\s*(?:[A-Z]{3}\s*)?\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
     if (rangeMatch){
       salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
       salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
