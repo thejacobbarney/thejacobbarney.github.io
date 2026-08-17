@@ -1144,6 +1144,22 @@ function parseFreeText(text){
     if (m) company = m[1].trim();
   }
 
+  // Fourth boilerplate-opener tier: a mission-statement sentence naming the
+  // company directly ("Tempur Sealy is committed to improving the sleep of
+  // more people..."). "is committed to" is a specific enough phrase (unlike
+  // the generic "is a/an/the" tier above, which is deliberately restricted
+  // to a single-token capture for that reason) that a multi-word capture is
+  // safe here — a real posting's actual opening branding line ("Tempur
+  // Sealy. Iconic brands. Storied history...") has no verb at all for any
+  // "X is ..." tier to anchor on, so this sentence right after it is the
+  // only clean signal.
+  if (!company){
+    const m = text.match(/^([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3})\s+is\s+committed\s+to\b/m);
+    if (m && !/^(this|it|they|we|he|she|our|the|i)$/i.test(m[1])){
+      company = m[1].trim();
+    }
+  }
+
   if (!location){
     for (let i = 0; i < header.length; i++){
       const line = header[i];
