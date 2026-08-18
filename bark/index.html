@@ -1128,6 +1128,12 @@ function parseFreeText(text){
     // excluded — the real company is often one tier further down (or one of
     // the last-resort boilerplate-opener tiers below), not this heading.
     const NEARBY_SECTION_HEADING = /^(posting details|job details|description|overview|position overview|summary|job summary|about (?:the )?(?:role|team|company|us|position)|responsibilities|requirements|qualifications)$/i;
+    // Same idea as the bare all-digit requisition ID below, but for the
+    // "Req #23998" shape some ATS pages use instead — the "Req #" prefix
+    // means the pure-digit check further down never catches it, so without
+    // this it's just as plausible-looking as any other short nearby
+    // candidate and wins the guess outright.
+    const NEARBY_BARE_REQ_ID = /^req(?:uisition)?\.?\s*#\s*\d+$/i;
     // A bare requisition/job ID ("371611") sitting right next to the title
     // is just as plausible-looking to every other check here (short, no
     // title words, not location-shaped, no trailing punctuation) as a real
@@ -1142,7 +1148,7 @@ function parseFreeText(text){
     // shape (Title / "Full Time" / "Finance" / "United States", each its own
     // unlabeled line) and without these guards picked up first one and then
     // the other as the "company" in turn.
-    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !NEARBY_NON_COMPANY_LABELED_LINE.test(l) && !NEARBY_SECTION_HEADING.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l)) || "";
+    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !NEARBY_NON_COMPANY_LABELED_LINE.test(l) && !NEARBY_SECTION_HEADING.test(l) && !NEARBY_BARE_REQ_ID.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l)) || "";
   }
 
   // Last resort: many postings open their "About <Company>" boilerplate
@@ -1202,6 +1208,17 @@ function parseFreeText(text){
     if (m && !/^(this|it|they|we|he|she|our|the|i)$/i.test(m[1])){
       company = m[1].trim();
     }
+  }
+
+  // Fifth boilerplate-opener tier: a rhetorical "Who is <Company>?" heading
+  // that opens the company's own pitch paragraph ("Who is Swire Coca-Cola?
+  // We are a family-owned bottling company with a story spanning over two
+  // centuries..."). Same multi-word capture rationale as the "is committed
+  // to" tier above — the phrase itself is specific enough that swallowing
+  // a whole generic sentence by mistake isn't a real risk.
+  if (!company){
+    const m = text.match(/^Who is ([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3})\?/m);
+    if (m) company = m[1].trim();
   }
 
   if (!location){
