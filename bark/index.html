@@ -924,13 +924,31 @@ function parseFreeText(text){
     }
   }
 
+  // Some ATS pages (American Airlines' among them) label the location field
+  // "Cities:" instead of "Location:" — a real "Location:" line can also be
+  // present elsewhere on the same posting but naming an office/building, not
+  // a place ("Location: Rio West E Bldg (PHX-RWE1)"), so this is often the
+  // only clean signal at all. Handled as its own tier rather than widening
+  // labeledLocationLine's own regex, since the value shape here ("Phoenix -
+  // AZ", a dash rather than a comma) is different enough to need its own
+  // extraction; left unhandled, the combined-line loop below would instead
+  // split "Cities: Phoenix - AZ" into two segments ("Cities: Phoenix", "AZ"),
+  // and — since "Cities: Phoenix" isn't location-shaped enough for
+  // looksLikeLocation to catch (the label prefix breaks the anchor) — it
+  // reads as a plausible company candidate instead of the real one.
+  const labeledCitiesLine = header.find(l => /^cit(?:y|ies)\s*:\s*[A-Za-z]/i.test(l));
+  if (labeledCitiesLine && !location){
+    const m = labeledCitiesLine.match(/^cit(?:y|ies)\s*:\s*([A-Za-z][A-Za-z .'-]*?)\s*-\s*([A-Z]{2})\b/i);
+    if (m) location = m[1].trim() + ", " + m[2].trim();
+  }
+
   // Combined "Company · Location · Full-time" style lines (skip salary lines —
   // "$110,000 - $140,000" also matches the "·/-"-separated shape but isn't one,
   // and skip the labeled Location line just handled above — it's already
   // resolved and isn't a real Company/Location/Employment-type combo line)
   for (const line of header){
     if (/\$/.test(line)) continue;
-    if (line === labeledLocationLine || line === labeledCompany) continue;
+    if (line === labeledLocationLine || line === labeledCompany || line === labeledCitiesLine) continue;
     // A "Country - State - City" hierarchical breadcrumb (Workday's
     // "Additional Locations" convention: "United States of America - North
     // Carolina - Whitsett") looks exactly like a Company - Location combo
@@ -1121,7 +1139,7 @@ function parseFreeText(text){
     // verbatim. Name the specific labels seen so far rather than excluding
     // every "Word: value" line, which would also throw out a real
     // "Company: Acme Inc" line some other posting might have right here.
-    const NEARBY_NON_COMPANY_LABELED_LINE = /^(job category|requisition (?:number|id|#)|req(?:uisition)?\.?\s*(?:number|id|#)|job (?:number|id|#)|department|business unit|cost center|posting date)\s*:/i;
+    const NEARBY_NON_COMPANY_LABELED_LINE = /^(job category|requisition (?:number|id|#)|req(?:uisition)?\.?\s*(?:number|id|#)|job (?:number|id|#)|department|business unit|cost center|posting (?:start |end )?date)\s*:/i;
     // A bare ATS section heading with no label/value shape at all ("Posting
     // Details", "Job Details") is just as short and plausible-looking as any
     // other nearby candidate once the labeled-metadata lines around it are
@@ -1148,7 +1166,13 @@ function parseFreeText(text){
     // shape (Title / "Full Time" / "Finance" / "United States", each its own
     // unlabeled line) and without these guards picked up first one and then
     // the other as the "company" in turn.
-    company = nearby.find(l => l !== title && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !NEARBY_NON_COMPANY_LABELED_LINE.test(l) && !NEARBY_SECTION_HEADING.test(l) && !NEARBY_BARE_REQ_ID.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l)) || "";
+    // Also exclude the labeled Location/Cities lines by reference — a
+    // "Location: Rio West E Bldg (PHX-RWE1)" office-building value isn't
+    // comma-shaped enough for looksLikeLocation to catch (so it isn't
+    // filtered out that way), but it's already been examined for a real
+    // place above and is exactly as non-answer as the "Cities:" line right
+    // next to it, not a company either.
+    company = nearby.find(l => l !== title && l !== labeledLocationLine && l !== labeledCitiesLine && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !NEARBY_NON_COMPANY_LABELED_LINE.test(l) && !NEARBY_SECTION_HEADING.test(l) && !NEARBY_BARE_REQ_ID.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l)) || "";
   }
 
   // Last resort: many postings open their "About <Company>" boilerplate
@@ -1218,6 +1242,14 @@ function parseFreeText(text){
   // a whole generic sentence by mistake isn't a real risk.
   if (!company){
     const m = text.match(/^Who is ([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3})\?/m);
+    if (m) company = m[1].trim();
+  }
+
+  // Sixth boilerplate-opener tier: "Join our <Company> family" — a common
+  // welcome-paragraph opener (American Airlines among others) that names the
+  // company without any of the sentence shapes the tiers above look for.
+  if (!company){
+    const m = text.match(/\bour ([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3}) family\b/);
     if (m) company = m[1].trim();
   }
 
