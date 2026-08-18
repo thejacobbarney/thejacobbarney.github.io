@@ -65,8 +65,11 @@
     min-height:64px; gap:1rem; flex-wrap:wrap;
   }
   .nb-logo{
-    display:flex;align-items:center;gap:0.55rem;
+    display:flex;flex-direction:column;align-items:flex-start;gap:0.1rem;
     text-decoration:none;
+  }
+  .nb-logo-top{
+    display:flex;align-items:center;gap:0.55rem;
   }
   .nb-logo-mark{
     width:83px;height:83px;flex-shrink:0;
@@ -84,7 +87,6 @@
   .nb-logo-sub{
     font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:500;
     letter-spacing:0.04em;text-transform:uppercase;color:var(--gray);
-    margin-left:0.5rem;
   }
   .nb-back{
     font-size:0.62rem;font-weight:700;letter-spacing:0.04em;
@@ -315,7 +317,7 @@
     }
     .nb-logo-mark{width:62px;height:62px;}
     .nb-logo-word{font-size:2.81rem;}
-    .nb-logo-sub{font-size:0.72rem;margin-left:0.4rem;}
+    .nb-logo-sub{font-size:0.72rem;}
     .nb-back{font-size:0.56rem;}
     .hero-strip{margin-top:0;padding:1.5rem 1.25rem;}
   }
@@ -3126,8 +3128,10 @@ function App(){
       <div className="nb-topbar">
         <div className="nb-topbar-inner">
           <div className="nb-logo">
-            <img className="nb-logo-mark" src="assets/bark-wolf.svg" alt="Bark" />
-            <span className="nb-logo-word">BARK</span>
+            <div className="nb-logo-top">
+              <img className="nb-logo-mark" src="assets/bark-wolf.svg" alt="Bark" />
+              <span className="nb-logo-word">BARK</span>
+            </div>
             <span className="nb-logo-sub">Paste. Score. Track.</span>
           </div>
           <a className="nb-back" href="https://thejacobbarney.com/#personal">← thejacobbarney.com</a>
