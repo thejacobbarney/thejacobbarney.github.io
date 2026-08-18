@@ -901,6 +901,20 @@ function parseFreeText(text){
   for (const line of header){
     if (/\$/.test(line)) continue;
     if (line === labeledLocationLine || line === labeledCompany) continue;
+    // A "Country - State - City" hierarchical breadcrumb (Workday's
+    // "Additional Locations" convention: "United States of America - North
+    // Carolina - Whitsett") looks exactly like a Company - Location combo
+    // line to the generic segment splitter below — country is location-shaped
+    // enough for looksLikeLocation to claim it first (losing the far more
+    // useful city/state), and the bare state name left over isn't
+    // comma-shaped enough for looksLikeLocation to catch on its own, so it
+    // reads as a plausible company instead. The whole line is location-only;
+    // extract "<City>, <State>" directly and skip company-guessing for it.
+    const geoBreadcrumb = line.match(/^(?:united states(?: of america)?|usa)\s*-\s*([A-Za-z][A-Za-z .'-]*?)\s*-\s*([A-Za-z][A-Za-z .'-]*)$/i);
+    if (geoBreadcrumb){
+      if (!location) location = geoBreadcrumb[2].trim() + ", " + geoBreadcrumb[1].trim();
+      continue;
+    }
     const hasBullet = /[·•]/.test(line);
     if (!hasBullet && !/\s-\s/.test(line)) continue;
     // A bare " - " (no real bullet) is a much weaker signal than "·"/"•" —
@@ -1211,6 +1225,14 @@ function parseFreeText(text){
   // heuristic would otherwise silently turn $70/hr into a $70,000 salary).
   // Leave it blank rather than mislabel it.
   const isHourlyRate = /\$\s?[\d,]+(?:\.\d{1,2})?\s*(?:\/\s*(?:hr|hour)\b|per\s+hour\b|hourly\b)/i.test(text);
+  // Company-boilerplate revenue figures ("Lenovo is a US$83 billion revenue
+  // global technology powerhouse...") are shaped exactly like a real salary
+  // figure to every tier below — none of them know a bare "$83" is actually
+  // "$83 billion" until the very next word, which none of them look at. Strip
+  // any "$<number> billion/million/trillion" out of a salary-only working
+  // copy first so a company's revenue can never be mistaken for a person's
+  // pay.
+  const salaryText = text.replace(/\$\s?[\d,.]+\s*(?:billion|million|trillion)\b/gi, "");
   if (!isHourlyRate){
     // A currency code sometimes sits right after a bound's own number
     // ("$101,000 USD to $120,000 USD", "USD $79,000.00 - USD $103,000.00") —
@@ -1219,7 +1241,7 @@ function parseFreeText(text){
     // number and the connector, or the connector and the second number, and
     // break the match — which otherwise falls through to the single-value
     // fallback and wrongly sets min and max to the same figure.
-    const rangeMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:[A-Z]{3}\s*)?(?:-|to|–|—)\s*(?:[A-Z]{3}\s*)?\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+    const rangeMatch = salaryText.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:[A-Z]{3}\s*)?(?:-|to|–|—)\s*(?:[A-Z]{3}\s*)?\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
     if (rangeMatch){
       salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
       salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
@@ -1233,8 +1255,8 @@ function parseFreeText(text){
       // the real maximum entirely. Require a literal "$" close to the label
       // so a generic "minimum of 5 years of experience" sentence elsewhere
       // in the posting doesn't get mistaken for a salary figure.
-      const minLabelMatch = text.match(/\bminimum\b[\s\S]{0,15}?\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
-      const maxLabelMatch = text.match(/\bmaximum\b[\s\S]{0,15}?\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+      const minLabelMatch = salaryText.match(/\bminimum\b[\s\S]{0,15}?\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+      const maxLabelMatch = salaryText.match(/\bmaximum\b[\s\S]{0,15}?\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
       if (minLabelMatch && maxLabelMatch){
         salaryMin = parseSalaryToken(minLabelMatch[1], !!minLabelMatch[2]);
         salaryMax = parseSalaryToken(maxLabelMatch[1], !!maxLabelMatch[2]);
@@ -1242,7 +1264,7 @@ function parseFreeText(text){
         // A trailing "+" ("$120,000+") states an open-ended floor, not a real
         // two-sided range — leave salaryMax unset so downstream logic (target
         // clamping, the salary badge) doesn't treat the floor as a hard ceiling.
-        const singleMatch = text.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?(\+)?/i);
+        const singleMatch = salaryText.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?(\+)?/i);
         if (singleMatch){
           const v = parseSalaryToken(singleMatch[1], !!singleMatch[2]);
           salaryMin = v;
@@ -1256,7 +1278,7 @@ function parseFreeText(text){
           // boilerplate ("eligible for USD-denominated...") with no salary
           // figure attached, so only trust it as a genuine signal in the
           // two-sided range shape.
-          const usdRangeMatch = text.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\s*(?:-|to|–|—)\s*([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\b/i);
+          const usdRangeMatch = salaryText.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\s*(?:-|to|–|—)\s*([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\b/i);
           if (usdRangeMatch){
             salaryMin = parseSalaryToken(usdRangeMatch[1], !!usdRangeMatch[2]);
             salaryMax = parseSalaryToken(usdRangeMatch[3], !!usdRangeMatch[4]);
@@ -1267,7 +1289,7 @@ function parseFreeText(text){
             // "annually" that always follows here too, for the same reason
             // usdRangeMatch's double "USD" requirement exists above: a bare
             // "X - Y USD" is too easy to coincide with unrelated numbers.
-            const annualUsdRangeMatch = text.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)\s*-\s*([\d,]{2,7}(?:\.\d{1,2})?)\s*USD\s+annually\b/i);
+            const annualUsdRangeMatch = salaryText.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)\s*-\s*([\d,]{2,7}(?:\.\d{1,2})?)\s*USD\s+annually\b/i);
             if (annualUsdRangeMatch){
               salaryMin = parseSalaryToken(annualUsdRangeMatch[1], false);
               salaryMax = parseSalaryToken(annualUsdRangeMatch[2], false);
