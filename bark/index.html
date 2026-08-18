@@ -88,6 +88,12 @@
     font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:500;
     letter-spacing:0.04em;text-transform:uppercase;color:var(--gray);
   }
+  .nb-logo-sub-word{
+    margin-right:0.35em;
+  }
+  .nb-logo-sub-word:last-child{
+    margin-right:0;
+  }
   .nb-back{
     font-size:0.62rem;font-weight:700;letter-spacing:0.04em;
     color:var(--gray); text-decoration:none;
@@ -315,7 +321,8 @@
       min-height:0;
       padding:0.6rem 1.25rem;
     }
-    .nb-logo{flex-direction:column;align-items:flex-start;gap:0.1rem;}
+    .nb-logo-sub{display:flex;flex-direction:column;justify-content:center;}
+    .nb-logo-sub-word{margin-right:0;}
     .nb-logo-mark{width:62px;height:62px;}
     .nb-logo-word{font-size:2.81rem;}
     .nb-logo-sub{font-size:0.72rem;}
@@ -3133,7 +3140,11 @@ function App(){
               <img className="nb-logo-mark" src="assets/bark-wolf.svg" alt="Bark" />
               <span className="nb-logo-word">BARK</span>
             </div>
-            <span className="nb-logo-sub">Paste. Score. Track.</span>
+            <span className="nb-logo-sub">
+              <span className="nb-logo-sub-word">Paste.</span>
+              <span className="nb-logo-sub-word">Score.</span>
+              <span className="nb-logo-sub-word">Track.</span>
+            </span>
           </div>
           <a className="nb-back" href="https://thejacobbarney.com/#personal">← thejacobbarney.com</a>
         </div>
