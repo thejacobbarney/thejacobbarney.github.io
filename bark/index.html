@@ -621,7 +621,16 @@ const CITY_STATE_RE = new RegExp("^[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0
 // Exported as a plain string (not anchored) so both looksLikeLocation
 // (anchored ^...$) and free-text extraction (searched as a substring) can
 // build the regex they each need from the same core pattern.
-const CITY_REGION_CORE = "[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*(?:,\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*)?";
+// The trailing "(?:\s+of\s+America\b)?" on the country segment is a narrow,
+// literal exception, not a general "allow lowercase connector words" rule —
+// "United States of America" is a real, common full country name, but a
+// glued-together ATS metadata line with no real separators ("...United
+// States of America Category Finance and Operations Job Id...") looks
+// identical past "United States" to anything that generically tolerates a
+// lowercase word there, and would keep matching straight through the rest
+// of the line. Naming the specific phrase lets the real country name
+// resolve fully without reopening that door.
+const CITY_REGION_CORE = "[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*(?:,\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*(?:\\s+of\\s+America\\b)?)?";
 const CITY_REGION_RE = new RegExp("^" + CITY_REGION_CORE + "$");
 
 // Matches a single "City, ST[, zip]" or "City, Region[, Country]" occurrence
@@ -629,7 +638,7 @@ const CITY_REGION_RE = new RegExp("^" + CITY_REGION_CORE + "$");
 // place out of a labeled value or descriptive sentence, as opposed to
 // CITY_STATE_RE/CITY_REGION_RE which test whether an entire string is
 // exactly one place with nothing else around it.
-const PLACE_MATCH_CORE = "[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?(?:" + US_STATE_CODE + "(?:\\s?\\d{5})?|[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*(?:,\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*)?)";
+const PLACE_MATCH_CORE = "[A-Z][a-zA-Z.\\-]+(?:\\s[A-Z][a-zA-Z.\\-]+){0,2},\\s?(?:" + US_STATE_CODE + "(?:\\s?\\d{5})?|[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*(?:,\\s?[A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)*(?:\\s+of\\s+America\\b)?)?)";
 
 // "COMPANY is seeking/looking for/hiring a ROLE to join..." — one of the
 // most common headerless-posting openers, so shared by both the early
@@ -860,7 +869,15 @@ function parseFreeText(text){
     // The capture itself is re-capitalized below since everything else in
     // the app (and the location field's display) expects "Phoenix", not
     // "phoenix".
-    const placeMatchLenient = PLACE_MATCH_CORE.replace(/\[A-Z\]/g, "[A-Za-z]");
+    // Only the very first [A-Z] (the city's leading letter) gets loosened —
+    // no "g" flag. Loosening every [A-Z] in the pattern also loosens every
+    // downstream capitalized-word check meant to stop the match at the end
+    // of a real place name, letting a lowercase connector deeper in the
+    // string ("United States of America Category Finance and Operations Job
+    // Id...", glued-together ATS metadata with no real separators) no longer
+    // halt anything — the match just runs straight through it instead of
+    // stopping at the real location.
+    const placeMatchLenient = PLACE_MATCH_CORE.replace(/\[A-Z\]/, "[A-Za-z]");
     const firstPlace = raw.match(new RegExp(placeMatchLenient));
     // Trust the match only when it's right at the front of the value — a
     // real "Location: City, ST; City, ST; ..." list starts with a place
@@ -894,7 +911,10 @@ function parseFreeText(text){
     const idx = header.findIndex(l => /^locations?\s*[:\-]?\s*$/i.test(l));
     if (idx !== -1 && idx + 1 < header.length){
       const raw = header[idx + 1].trim();
-      const placeMatchLenient = PLACE_MATCH_CORE.replace(/\[A-Z\]/g, "[A-Za-z]");
+      // Only the leading [A-Z] gets loosened here too — see the identical
+      // note on the labeledLocationLine tier above for why a global replace
+      // is a real bug, not just a stylistic choice.
+      const placeMatchLenient = PLACE_MATCH_CORE.replace(/\[A-Z\]/, "[A-Za-z]");
       const firstPlace = raw.match(new RegExp(placeMatchLenient));
       if (firstPlace && firstPlace.index <= 2){
         location = firstPlace[0].replace(/^[a-z]/, c => c.toUpperCase());
@@ -1250,8 +1270,11 @@ function parseFreeText(text){
     // either side of the connector so it doesn't sit between the first
     // number and the connector, or the connector and the second number, and
     // break the match — which otherwise falls through to the single-value
-    // fallback and wrongly sets min and max to the same figure.
-    const rangeMatch = salaryText.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:[A-Z]{3}\s*)?(?:-|to|–|—)\s*(?:[A-Z]{3}\s*)?\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
+    // fallback and wrongly sets min and max to the same figure. The dash
+    // itself sometimes repeats too ("$75,500 -- $174,400") — a real double
+    // hyphen used as a range dash, not a typo to normalize away — so match
+    // one or more rather than exactly one.
+    const rangeMatch = salaryText.match(/\$\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*(?:[A-Z]{3}\s*)?(?:-+|to|–+|—+)\s*(?:[A-Z]{3}\s*)?\$?\s?([\d,]{2,7}(?:\.\d{1,2})?)(k)?/i);
     if (rangeMatch){
       salaryMin = parseSalaryToken(rangeMatch[1], !!rangeMatch[2]);
       salaryMax = parseSalaryToken(rangeMatch[3], !!rangeMatch[4]);
@@ -1288,7 +1311,7 @@ function parseFreeText(text){
           // boilerplate ("eligible for USD-denominated...") with no salary
           // figure attached, so only trust it as a genuine signal in the
           // two-sided range shape.
-          const usdRangeMatch = salaryText.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\s*(?:-|to|–|—)\s*([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\b/i);
+          const usdRangeMatch = salaryText.match(/\b([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\s*(?:-+|to|–+|—+)\s*([\d,]{2,7}(?:\.\d{1,2})?)(k)?\s*USD\b/i);
           if (usdRangeMatch){
             salaryMin = parseSalaryToken(usdRangeMatch[1], !!usdRangeMatch[2]);
             salaryMax = parseSalaryToken(usdRangeMatch[3], !!usdRangeMatch[4]);
