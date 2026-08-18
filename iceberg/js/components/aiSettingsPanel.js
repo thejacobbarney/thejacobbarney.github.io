@@ -36,7 +36,7 @@ export function renderAiSettingsPanel(container, { onChange } = {}) {
   container.innerHTML = `
     <fieldset class="ai-settings-panel">
       <legend>AI assistance (optional)</legend>
-      <p class="muted">Off-ramp works fully offline by default. Turning this on sends text straight from this browser to Anthropic's API using your own key, for more capable results than the offline fallback. Your key is stored only in this browser's local storage — never on any server of ours — and Anthropic bills your account for usage at standard rates. Local storage isn't encrypted, so don't enable this on a shared computer.</p>
+      <p class="muted">Iceberg works fully offline by default. Turning this on sends text straight from this browser to Anthropic's API using your own key, for more capable results than the offline fallback. Your key is stored only in this browser's local storage — never on any server of ours — and Anthropic bills your account for usage at standard rates. Local storage isn't encrypted, so don't enable this on a shared computer.</p>
       <label class="checkbox-label">
         <input type="checkbox" class="ai-enabled" ${config.enabled ? 'checked' : ''} /> Use AI assistance
       </label>

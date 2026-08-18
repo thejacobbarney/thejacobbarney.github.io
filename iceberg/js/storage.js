@@ -10,7 +10,7 @@
 
 import { createEmptyDataset } from './data-model.js';
 
-const STORAGE_KEY = 'offramp:data:v1';
+const STORAGE_KEY = 'iceberg:data:v1';
 
 export function loadData() {
   try {
@@ -22,7 +22,7 @@ export function loadData() {
     }
     return parsed;
   } catch (err) {
-    console.error('Off-ramp: failed to load saved data, starting fresh.', err);
+    console.error('Iceberg: failed to load saved data, starting fresh.', err);
     return createEmptyDataset();
   }
 }
@@ -44,7 +44,7 @@ export function exportToJsonString(data) {
 export function importFromJsonString(jsonString) {
   const parsed = JSON.parse(jsonString);
   if (!parsed || !Array.isArray(parsed.experiences) || !Array.isArray(parsed.skills)) {
-    throw new Error('File does not look like an Off-ramp export (missing experiences/skills arrays).');
+    throw new Error('File does not look like an Iceberg export (missing experiences/skills arrays).');
   }
   return parsed;
 }
