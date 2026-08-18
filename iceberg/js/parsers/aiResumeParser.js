@@ -7,7 +7,7 @@
  * the heuristic parser produces, so views/importResume.js can use either
  * one interchangeably.
  *
- * Off-ramp has no backend (see ARCHITECTURE.md), so this calls the
+ * Iceberg has no backend (see ARCHITECTURE.md), so this calls the
  * Anthropic API directly from the browser with a user-supplied key — the
  * `anthropic-dangerous-direct-browser-access` header is Anthropic's
  * documented opt-in for exactly this shape of client-only, single-user

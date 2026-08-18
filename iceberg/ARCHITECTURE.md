@@ -1,6 +1,6 @@
-# Off-ramp — Career Journal — Architecture
+# Iceberg — Career Journal — Architecture
 
-Off-ramp is a client-only, zero-build-step web app (vanilla HTML/CSS/JS, ES modules) that acts as
+Iceberg is a client-only, zero-build-step web app (vanilla HTML/CSS/JS, ES modules) that acts as
 a living, three-dimensional record of a professional's work history. It goes beyond a static resume
 by letting you capture raw experiences as they happen, refine them into impact-focused STAR-style
 descriptions later, and match your full history against a specific job description when it's time
@@ -12,7 +12,7 @@ this is deliberate: the brief asked for content and structure first, styled and 
 ## 1. File layout
 
 ```
-off-ramp/
+iceberg/
   index.html              Page shell: header/nav + an empty #view-root the router fills in
   css/style.css            Minimal, readability-only styling
   vendor/                  Self-hosted third-party libraries (see vendor/VERSIONS.md)
@@ -91,7 +91,7 @@ the brief). The Skills view also allows adding one manually up front.
 
 ## 3. Persistence
 
-`storage.js` is the only module that touches `localStorage`, under the key `offramp:data:v1`. The
+`storage.js` is the only module that touches `localStorage`, under the key `iceberg:data:v1`. The
 whole dataset (`{ version, experiences, skills }`) is read once into memory at startup by
 `state.js`, and every mutation immediately re-serializes the whole thing back to storage. For a
 personal single-user tool this is simpler and less bug-prone than diffing/patching, and the data
@@ -174,7 +174,7 @@ ones later.
 
 ## 6. AI assistance (opt-in, bring-your-own-key)
 
-Off-ramp works fully offline by default — everything in §§1–5 above requires no network access. Two
+Iceberg works fully offline by default — everything in §§1–5 above requires no network access. Two
 features additionally offer an AI-assisted path that's off unless the user turns it on:
 
 | Feature | Offline default | AI-assisted alternative |

@@ -2,7 +2,7 @@
  * Text extraction from uploaded documents (PDF / DOCX / plain text).
  *
  * The heavy libraries (pdf.js, mammoth.js) are self-hosted under
- * off-ramp/vendor/ — see vendor/VERSIONS.md — and loaded lazily on first
+ * iceberg/vendor/ — see vendor/VERSIONS.md — and loaded lazily on first
  * use so they never add weight to the initial page load. Both are only
  * ever asked to extract raw text; nothing here understands resume
  * structure — that's resumeParser.js's job.

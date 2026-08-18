@@ -1,7 +1,7 @@
 /**
  * AI parsing configuration — bring-your-own-key.
  *
- * Off-ramp is a static, backend-free site (see ARCHITECTURE.md), so there is
+ * Iceberg is a static, backend-free site (see ARCHITECTURE.md), so there is
  * nowhere for an API key to live except the user's own browser. This module
  * is the one place that reads/writes the AI config to localStorage — the UI
  * (views/importResume.js) never touches localStorage directly.
@@ -12,7 +12,7 @@
  * BYOK integration, not something this module can fix.
  */
 
-const STORAGE_KEY = 'offramp:ai-config:v1';
+const STORAGE_KEY = 'iceberg:ai-config:v1';
 
 const DEFAULTS = {
   enabled: false,
@@ -26,7 +26,7 @@ export function loadAiConfig() {
     if (!raw) return { ...DEFAULTS };
     return { ...DEFAULTS, ...JSON.parse(raw) };
   } catch (err) {
-    console.error('Off-ramp: failed to load AI config.', err);
+    console.error('Iceberg: failed to load AI config.', err);
     return { ...DEFAULTS };
   }
 }

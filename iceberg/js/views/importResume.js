@@ -2,7 +2,7 @@
  * Import from Resume / LinkedIn View
  * ------------------------------------
  * Upload one or more documents (resume PDF/DOCX, a LinkedIn "Save to PDF"
- * export, an older resume version, plain text) and Off-ramp extracts
+ * export, an older resume version, plain text) and Iceberg extracts
  * candidate Experience entries and candidate skills/tools for review.
  * Nothing touches the database until the user reviews, edits, and clicks
  * "Add Selected to Career Database" — review-before-commit is the safety
@@ -109,7 +109,7 @@ export function render(root) {
     <div class="view-header">
       <h1>Import from Resume / LinkedIn</h1>
     </div>
-    <p class="muted">Upload a resume (PDF or DOCX), a LinkedIn "Save to PDF" export, or an old resume version — upload as many as you have. Off-ramp pulls out candidate roles and skills for you to review, edit, and add. Nothing is saved to your database until you approve it below.</p>
+    <p class="muted">Upload a resume (PDF or DOCX), a LinkedIn "Save to PDF" export, or an old resume version — upload as many as you have. Iceberg pulls out candidate roles and skills for you to review, edit, and add. Nothing is saved to your database until you approve it below.</p>
 
     <div id="ai-settings-container"></div>
 

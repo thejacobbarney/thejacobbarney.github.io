@@ -30,7 +30,7 @@ export function render(root) {
     <div class="view-header">
       <h1>Match Against a Job</h1>
     </div>
-    <p class="muted">Paste a job description, recruiter packet, or interview questions below. Off-ramp surfaces your most relevant experiences and drafts a tailored bullet for each.</p>
+    <p class="muted">Paste a job description, recruiter packet, or interview questions below. Iceberg surfaces your most relevant experiences and drafts a tailored bullet for each.</p>
     <textarea id="job-text" rows="8" placeholder="Paste the job description here…"></textarea>
     <button type="button" id="match-btn" class="btn">Find matching experiences</button>
     <div id="match-results"></div>
