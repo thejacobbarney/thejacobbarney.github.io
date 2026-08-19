@@ -1162,7 +1162,7 @@ function parseFreeText(text){
     // other nearby candidate once the labeled-metadata lines around it are
     // excluded — the real company is often one tier further down (or one of
     // the last-resort boilerplate-opener tiers below), not this heading.
-    const NEARBY_SECTION_HEADING = /^(posting details|job details|description|overview|position overview|summary|job summary|about (?:the )?(?:role|team|company|us|position)|responsibilities|requirements|qualifications)$/i;
+    const NEARBY_SECTION_HEADING = /^(posting details|job details|description|overview|position overview|summary|job summary|application|about (?:the )?(?:role|team|company|us|position)|responsibilities|requirements|qualifications)$/i;
     // Same idea as the bare all-digit requisition ID below, but for the
     // "Req #23998" shape some ATS pages use instead — the "Req #" prefix
     // means the pure-digit check further down never catches it, so without
@@ -1189,7 +1189,21 @@ function parseFreeText(text){
     // filtered out that way), but it's already been examined for a real
     // place above and is exactly as non-answer as the "Cities:" line right
     // next to it, not a company either.
-    company = nearby.find(l => l !== title && l !== labeledLocationLine && l !== labeledCitiesLine && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !NEARBY_NON_COMPANY_LABELED_LINE.test(l) && !NEARBY_SECTION_HEADING.test(l) && !NEARBY_BARE_REQ_ID.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l)) || "";
+    // Some ATS pages render several short badge values glued together with
+    // no separator at all ("On-siteFinanceFull time" = "On-site" + "Finance"
+    // + "Full time", each a separate UI badge on the real page) — the \b
+    // word-boundary WORK_FORM_WORD/EMPLOYMENT_META/JOB_FAMILY_WORD all rely
+    // on fails right where one glued word runs straight into the next (no
+    // boundary between two word characters), so the whole glued string
+    // sails past every check above meant to catch exactly this kind of
+    // non-answer. Insert a space at each lowercase-to-uppercase transition
+    // and strip every known badge word from that spaced copy — if nothing
+    // but whitespace is left, the line was never anything but glued badges.
+    // Used only for this check, never as the stored value, so it can't
+    // corrupt a real multi-word company name that happens to share a word.
+    const BADGE_WORD_RE = /remote|hybrid|on-?site|full[\s-]?time|part[\s-]?time|contract|internship|temporary|seasonal|volunteer|entry level|associate|mid-senior level|director level|executive level|finance|financial|accounting|engineering|marketing|sales|operations|product|design|legal|human resources|hr|information technology|it|customer (?:support|service)|research|data|administration|administrative/gi;
+    const isGluedBadgeLine = l => l.replace(/([a-z])([A-Z])/g, "$1 $2").replace(BADGE_WORD_RE, "").trim() === "";
+    company = nearby.find(l => l !== title && l !== labeledLocationLine && l !== labeledCitiesLine && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !NEARBY_NON_COMPANY_LABELED_LINE.test(l) && !NEARBY_SECTION_HEADING.test(l) && !NEARBY_BARE_REQ_ID.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l) && !isGluedBadgeLine(l)) || "";
   }
 
   // Last resort: many postings open their "About <Company>" boilerplate
@@ -1267,6 +1281,19 @@ function parseFreeText(text){
   // company without any of the sentence shapes the tiers above look for.
   if (!company){
     const m = text.match(/\bour ([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,3}) family\b/);
+    if (m) company = m[1].trim();
+  }
+
+  // Seventh boilerplate-opener tier: "Together, we're <Company>— a global
+  // ..." — a first-person opener naming the company directly. The capture
+  // allows a trailing comma/period inside each word so a legal suffix like
+  // "Holdings," or "Inc." rides along as part of the name, and stops at the
+  // next ".", ",", or em dash — which also naturally cuts it off right where
+  // the sentence continues into ordinary prose, so a generic "we're excited
+  // to..." doesn't get read as a company name (its next word isn't
+  // capitalized, so the capture group never even starts).
+  if (!company){
+    const m = text.match(/\bwe(?:'|’)re\s+([A-Z][\w&.,'-]*(?:\s[A-Z][\w&.,'-]*){0,4})[.,—]/);
     if (m) company = m[1].trim();
   }
 
