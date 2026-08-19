@@ -1079,6 +1079,23 @@ function parseFreeText(text){
     }
   }
 
+  // Same tier, an ALL-CAPS variant of the section heading ("ABOUT CARDONE
+  // VENTURES" rather than "About Cardone Ventures") — common enough on its
+  // own that the case-sensitive literal "About" above just doesn't match it
+  // at all. A dedicated tier rather than an "i" flag on the one above: /i
+  // would also case-fold every [A-Z] in the capture, letting an ordinary
+  // lowercase run-on sentence get swept in as if it were part of the company
+  // name (the same real bug already found and fixed on the RTX/Raytheon
+  // "is seeking" pattern). Title-cased on the way out since the captured
+  // text is itself all-caps and every other tier here writes a normal-cased
+  // name.
+  if (!company){
+    const m = text.match(/^ABOUT[ \t]+([A-Z][A-Z&.'-]*(?:[ \t]+[A-Z][A-Z&.'-]*){0,3})[ \t]*$/m);
+    if (m && !/^US$/.test(m[1])){
+      company = m[1].trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    }
+  }
+
   // Same tier, different boilerplate: a "Benefits of Working With/At
   // <Company>" section header (common in the benefits section that closes
   // out many ATS postings). Not anchored to the start of the line — unlike
@@ -1382,12 +1399,19 @@ function parseFreeText(text){
     }
   }
 
-  // Prefer an explicit "Remote Status:"/"Work Type:"/"Work Location:" labeled
-  // field over the naive whole-text keyword scan below — a posting can name
-  // that label using a WORK_FORM_WORD itself ("Remote Status: On-Site"),
-  // which a bare /remote/ scan over the whole text can't tell apart from the
-  // label's actual value and would misread as a remote posting.
-  const workFormLabelMatch = text.match(/\b(?:remote status|work(?:place)? type|work location(?:\s*type)?|location type)\s*[:\-]\s*([a-z][a-z\s\/-]{0,20})/i);
+  // Prefer an explicit "Remote Status:"/"Work Type:"/"Work Location:"/
+  // "Workplace Setting:" labeled field over the naive whole-text keyword scan
+  // below — a posting can name that label using a WORK_FORM_WORD itself
+  // ("Remote Status: On-Site"), which a bare /remote/ scan over the whole
+  // text can't tell apart from the label's actual value and would misread as
+  // a remote posting. This matters even more once an unrelated "remote"
+  // mention shows up elsewhere in the posting with nothing to do with this
+  // role's own arrangement (a benefits perk like "1 month remote" parental
+  // leave, or a "this is not a remote role" negation the naive scan can't
+  // parse) — the naive scan has no way to prefer the real label over that
+  // noise, so resolving from the label first, before the scan ever runs,
+  // is what keeps it from winning.
+  const workFormLabelMatch = text.match(/\b(?:remote status|work(?:place)? (?:type|setting)|work location(?:\s*type)?|location type)\s*[:\-]\s*([a-z][a-z\s\/-]{0,20})/i);
   let workForm = "Onsite";
   if (workFormLabelMatch && WORK_FORM_WORD.test(workFormLabelMatch[1])){
     const val = workFormLabelMatch[1];
