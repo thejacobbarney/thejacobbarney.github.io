@@ -907,10 +907,20 @@ function parseFreeText(text){
   // can never catch this: it's anchored to singular "location", and even
   // loosened to "locations" it would still require the value on the same
   // line, which isn't the shape here.
+  // Tracks the raw value line for the bare "locations" label above (when
+  // that shape is present) so it can be excluded by reference from the
+  // combined-line loop and the nearby-line company guess further down — a
+  // "ST - City" value ("AZ - Chandler") isn't comma-shaped enough for
+  // looksLikeLocation to catch on its own, so without this it reads as a
+  // plausible Company/Location combo line (or a plausible bare company
+  // candidate) to those checks, the same way labeledLocationLine and
+  // labeledCitiesLine already need to be excluded there.
+  let bareLocationsValueLine = null;
   if (!location){
     const idx = header.findIndex(l => /^locations?\s*[:\-]?\s*$/i.test(l));
     if (idx !== -1 && idx + 1 < header.length){
-      const raw = header[idx + 1].trim();
+      bareLocationsValueLine = header[idx + 1];
+      const raw = bareLocationsValueLine.trim();
       // Only the leading [A-Z] gets loosened here too — see the identical
       // note on the labeledLocationLine tier above for why a global replace
       // is a real bug, not just a stylistic choice.
@@ -920,6 +930,13 @@ function parseFreeText(text){
         location = firstPlace[0].replace(/^[a-z]/, c => c.toUpperCase());
       } else if (WORK_FORM_WORD.test(raw) && raw.length <= 20){
         location = raw;
+      } else {
+        // Some ATS pages reverse the usual order and use a dash instead of
+        // a comma ("AZ - Chandler" rather than "Chandler, AZ") — anchored
+        // to the whole value so a longer, unrelated "ST - ..." sentence
+        // elsewhere can't coincidentally match.
+        const stateCity = raw.match(new RegExp("^(" + US_STATE_CODE + ")\\s*-\\s*([A-Za-z][A-Za-z .'-]*)$"));
+        if (stateCity) location = stateCity[2].trim() + ", " + stateCity[1];
       }
     }
   }
@@ -948,7 +965,7 @@ function parseFreeText(text){
   // resolved and isn't a real Company/Location/Employment-type combo line)
   for (const line of header){
     if (/\$/.test(line)) continue;
-    if (line === labeledLocationLine || line === labeledCompany || line === labeledCitiesLine) continue;
+    if (line === labeledLocationLine || line === labeledCompany || line === labeledCitiesLine || line === bareLocationsValueLine) continue;
     // A "Country - State - City" hierarchical breadcrumb (Workday's
     // "Additional Locations" convention: "United States of America - North
     // Carolina - Whitsett") looks exactly like a Company - Location combo
@@ -1203,7 +1220,7 @@ function parseFreeText(text){
     // corrupt a real multi-word company name that happens to share a word.
     const BADGE_WORD_RE = /remote|hybrid|on-?site|full[\s-]?time|part[\s-]?time|contract|internship|temporary|seasonal|volunteer|entry level|associate|mid-senior level|director level|executive level|finance|financial|accounting|engineering|marketing|sales|operations|product|design|legal|human resources|hr|information technology|it|customer (?:support|service)|research|data|administration|administrative/gi;
     const isGluedBadgeLine = l => l.replace(/([a-z])([A-Z])/g, "$1 $2").replace(BADGE_WORD_RE, "").trim() === "";
-    company = nearby.find(l => l !== title && l !== labeledLocationLine && l !== labeledCitiesLine && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !NEARBY_NON_COMPANY_LABELED_LINE.test(l) && !NEARBY_SECTION_HEADING.test(l) && !NEARBY_BARE_REQ_ID.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l) && !isGluedBadgeLine(l)) || "";
+    company = nearby.find(l => l !== title && l !== labeledLocationLine && l !== labeledCitiesLine && l !== bareLocationsValueLine && l.length < 70 && !JOB_TITLE_WORDS.test(l) && !looksLikeLocation(l) && !/[.:]$/.test(l) && !NEARBY_FIELD_LABEL.test(l) && !NEARBY_NON_COMPANY_LABELED_LINE.test(l) && !NEARBY_SECTION_HEADING.test(l) && !NEARBY_BARE_REQ_ID.test(l) && !/^\d+$/.test(l) && !WORK_FORM_WORD.test(l) && !EMPLOYMENT_META.test(l) && !JOB_FAMILY_WORD.test(l) && !isGluedBadgeLine(l)) || "";
   }
 
   // Last resort: many postings open their "About <Company>" boilerplate
@@ -1294,6 +1311,15 @@ function parseFreeText(text){
   // capitalized, so the capture group never even starts).
   if (!company){
     const m = text.match(/\bwe(?:'|’)re\s+([A-Z][\w&.,'-]*(?:\s[A-Z][\w&.,'-]*){0,4})[.,—]/);
+    if (m) company = m[1].trim();
+  }
+
+  // Eighth boilerplate-opener tier: the EEO-policy sentence closing out
+  // almost every posting ("Microchip Technology Inc is an equal opportunity/
+  // affirmative action employer..."). Common and specific enough to be its
+  // own tier, the same way "is committed to" and "and its subsidiaries" are.
+  if (!company){
+    const m = text.match(/^([A-Z][\w&.'-]*(?:\s[A-Z][\w&.'-]*){0,4})\s+is\s+an?\s+equal\s+opportunity\b/m);
     if (m) company = m[1].trim();
   }
 
