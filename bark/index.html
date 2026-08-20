@@ -682,12 +682,15 @@ function looksLikeLocation(segment){
   // "<word> Area" ending is too permissive (e.g. a "Job Area:" ATS field
   // label, not a location, also ends that way).
   if (/\b(?:bay|metro(?:politan)?)\s+area$/i.test(s)) return true;
-  // A multi-office posting often lists several "City, ST" locations joined by
-  // semicolons on one line ("New York, NY; San Francisco, CA; ...") — treat
-  // the whole line as location-shaped if every semicolon-separated part is.
+  // A multi-office posting often lists several "City, ST"/"City, Region"
+  // locations joined by semicolons on one line ("New York, NY; San
+  // Francisco, CA; ..." or "Phoenix, Arizona; San Francisco, California;
+  // ..." with the region spelled out instead of abbreviated) — treat the
+  // whole line as location-shaped if every semicolon-separated part is
+  // either shape.
   if (/;/.test(s)){
     const parts = s.split(/\s*;\s*/).filter(Boolean);
-    if (parts.length > 1 && parts.every(p => CITY_STATE_RE.test(p))) return true;
+    if (parts.length > 1 && parts.every(p => CITY_STATE_RE.test(p) || CITY_REGION_RE.test(p))) return true;
   }
   if (BARE_COUNTRY_RE.test(s)) return true;
   // A full street address ("14636 N Scottsdale Rd, Scottsdale, Arizona,
@@ -959,6 +962,25 @@ function parseFreeText(text){
     if (m) location = m[1].trim() + ", " + m[2].trim();
   }
 
+  // A multi-office posting often lists several full "City, Region" places
+  // joined by semicolons right under the title ("Phoenix, Arizona; San
+  // Francisco, California; Modesto, California;") — looksLikeLocation now
+  // recognizes this shape (just extended above to accept spelled-out
+  // regions, not just 2-letter state codes), so the line no longer wins the
+  // nearby-line company guess, but nothing yet extracts a location from it:
+  // the header-scan loop further down that would otherwise catch a single
+  // "City, Region" via CITY_REGION_CORE is gated to lines <=60 chars, and a
+  // multi-office line like this routinely runs longer. Take the first
+  // office listed as the primary location.
+  if (!location){
+    const semicolonLocationLine = header.find(l => {
+      if (!/;/.test(l)) return false;
+      const parts = l.split(/\s*;\s*/).filter(Boolean);
+      return parts.length > 1 && parts.every(p => CITY_STATE_RE.test(p) || CITY_REGION_RE.test(p));
+    });
+    if (semicolonLocationLine) location = semicolonLocationLine.split(/\s*;\s*/)[0].trim();
+  }
+
   // Combined "Company · Location · Full-time" style lines (skip salary lines —
   // "$110,000 - $140,000" also matches the "·/-"-separated shape but isn't one,
   // and skip the labeled Location line just handled above — it's already
@@ -1164,7 +1186,7 @@ function parseFreeText(text){
     // this whole class of field (seen so far on both the employment-type and
     // remote-type fields), so match that shape generally rather than
     // hardcoding each one as a new posting happens to surface it.
-    const NEARBY_FIELD_LABEL = /^(locations?|\w+\s+type)$/i;
+    const NEARBY_FIELD_LABEL = /^((?:additional\s+)?locations?|\w+\s+type)$/i;
     // Unlike NEARBY_FIELD_LABEL above, some ATS metadata fields put both the
     // label AND its value on the same line ("Job Category: Professional",
     // "Requisition Number: SRFIN004703") — nothing else here excludes that
