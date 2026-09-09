@@ -13,8 +13,9 @@ even then only a computed JSON summary is sent, never the raw per-day rows.
 
 ```
 pulse/
-  index.html                    Page shell: upload UI + AI settings + #report-root
-  css/style.css                  Minimal, readability-only styling
+  index.html                    Page shell: dark hero + upload UI, AI settings, #vitals-strip + #report-root
+  css/style.css                  Design system: dark ink / white paper tokens, Sora + Plus Jakarta Sans +
+                                   JetBrains Mono, card+shadow components — see §7
   js/
     stats.js                      Dependency-free math: mean/stddev/percentile/linreg/correlation,
                                     plus circular-safe bedtime-hour handling
@@ -35,6 +36,7 @@ pulse/
       patterns.js                       Step 3: trends, variances, elevation events, cross-metric correlations
     report/
       renderReport.js                   Renders Data Summary / Baseline Profile / Pattern Analysis as HTML
+      renderVitals.js                    The dark "vitals strip": a Whoop-style recovery ring + secondary tiles
       aiReport.js                       Optional BYOK call: computed summary -> Top 5 Leverage Points + Weekly Protocol
 ```
 
@@ -180,3 +182,35 @@ To recognize a new metric:
 
 Everything downstream (inventory completeness, baseline averages, and — if you also add pattern
 logic — pattern analysis) picks it up automatically once it's flowing through as a canonical field.
+
+## 6. Design system
+
+The visual language is a deliberate cross of three references: Spotify's dark, immersive "now
+playing"-style data bands; Airbnb's warm, elevated white content cards; and Whoop's circular
+recovery-ring readout. Concretely:
+
+- **Two surfaces, not one theme.** `--ink`/`--ink-raised`/`--ink-border` (near-black) drive the
+  header, hero, footer, and the vitals strip — anywhere the page is showing a glanceable summary
+  rather than dense content. `--paper`/`--paper-raised` (true white) plus `.card`'s subtle
+  border+shadow combo drive everything else (the report tables, leverage-point cards, the AI
+  settings panel). Both are declared once in `css/style.css:root` — there's no dark-mode toggle,
+  just two fixed zones by design intent.
+- **One accent color, used consistently.** `--accent` (steel blue) marks anything interactive or
+  emphasized — the ring, buttons, section eyebrows, the leverage-card accent stripe — never
+  decoratively. `--accent2` exists only for a second data series inside a chart (there isn't one
+  yet in the shipped report, but `renderVitals.js`'s CSS leaves room for it).
+- **Three type roles**: Sora (bold, display — headings, the wordmark) / Plus Jakarta Sans (body
+  text) / JetBrains Mono (anything numeric — see the `.num` utility class, which also sets
+  `font-variant-numeric: tabular-nums` so columns of figures actually line up). Loaded from Google
+  Fonts in `index.html`'s `<head>`; there's no CSP restriction to work around here the way there
+  was in the Claude Artifact mockup preview — this is a normal GitHub Pages site.
+- **`renderVitals.js`** is the one place the Whoop reference shows up structurally rather than just
+  stylistically: it looks for `recoveryScore` first, falling back to `sleepEfficiencyPct`, as the
+  ring's headline number (both are naturally 0-100, unlike RHR or HRV), and renders nothing at all
+  — not an empty ring — when neither is present in the uploaded data. The ring's SVG
+  `stroke-dasharray`/`stroke-dashoffset` are computed from the real baseline average, not
+  hardcoded, so it reflects whatever the person actually uploaded.
+
+This design work started as a Claude Design canvas mockup (two static `.dc.html` artboards
+exploring the direction) before being ported into the real app; the mockup is not kept in this
+repo, since it was a disposable exploration step, not a second implementation to maintain.

@@ -1,17 +1,25 @@
 /*
- * Pulse — minimal, content-first styling, matching Iceberg's approach:
- * readability and layout only, no design system, no animation.
+ * Pulse — dark, immersive vitals modules (Spotify) crossed with warm,
+ * elevated content cards (Airbnb) and a Whoop-style recovery ring.
+ * See ARCHITECTURE.md §6 for the design system this implements.
  */
 
 :root {
-  --border: #d0d0d0;
-  --text: #1a1a1a;
-  --muted: #666;
-  --bg: #fff;
-  --bg-alt: #f7f7f7;
-  --accent: #1a1a1a;
-  --danger: #a3231b;
-  --success: #1a7a1a;
+  --ink: #0b0b0d;
+  --ink-raised: #17171a;
+  --ink-border: #2c2c30;
+  --paper: #ffffff;
+  --paper-raised: #ffffff;
+  --paper-border: #e3e4e6;
+  --text-on-ink: #edeeee;
+  --text-on-ink-muted: #8e9196;
+  --text-on-paper: #0b0b0d;
+  --text-on-paper-muted: #5b5d61;
+  --accent: #4682b4;
+  --accent2: #8fb4ce;
+  --danger: #a6402f;
+  --danger-soft: #f9e9e5;
+  --success: #2f7d5a;
 }
 
 * {
@@ -20,61 +28,201 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  color: var(--text);
-  background: var(--bg);
-  line-height: 1.5;
+  font-family: "Plus Jakarta Sans", -apple-system, "Segoe UI", sans-serif;
+  color: var(--text-on-paper);
+  background: var(--paper);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
 
+h1, h2, h3 {
+  font-family: "Sora", system-ui, sans-serif;
+  font-weight: 700;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.num {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-border);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(11, 11, 13, 0.04), 0 6px 20px rgba(11, 11, 13, 0.06);
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+
 .site-header {
-  border-bottom: 1px solid var(--border);
-  padding: 1rem 1.5rem;
+  background: var(--ink);
+  padding: 1.1rem 1.5rem;
 }
 .site-header-inner {
   max-width: 880px;
   margin: 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.site-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--accent);
 }
 .site-title {
-  font-size: 1.25rem;
+  font-family: "Sora", sans-serif;
   font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text-on-ink);
+  letter-spacing: -0.01em;
 }
 .site-subtitle {
   font-weight: 400;
-  color: var(--muted);
-  font-size: 1rem;
+  color: var(--text-on-ink-muted);
+  font-size: 0.85rem;
 }
+
+/* ── Hero / upload ─────────────────────────────────────────── */
+
+.hero {
+  background: radial-gradient(120% 140% at 12% 0%, #1c1d1f 0%, var(--ink) 55%);
+  padding: 3rem 1.5rem 3.5rem;
+}
+.hero-inner {
+  max-width: 880px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+.hero-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.1rem;
+}
+.eyebrow {
+  display: inline-block;
+  width: fit-content;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+}
+.hero h1 {
+  font-size: 2.1rem;
+  line-height: 1.12;
+  color: var(--text-on-ink);
+  letter-spacing: -0.01em;
+}
+.hero h1 em {
+  color: var(--accent);
+  font-style: italic;
+  font-weight: 600;
+}
+.hero-copy {
+  color: var(--text-on-ink-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+  max-width: 42ch;
+  margin: 0;
+}
+
+.upload-card {
+  padding: 1.6rem;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.55);
+}
+.upload-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+.upload-card-title {
+  font-family: "Sora", sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.muted-on-card {
+  color: var(--text-on-paper-muted);
+  font-size: 0.75rem;
+}
+
+.dropzone {
+  border: 2px dashed var(--paper-border);
+  border-radius: 12px;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fafafb;
+  position: relative;
+}
+.dropzone-hint {
+  font-size: 0.8rem;
+  color: var(--text-on-paper-muted);
+}
+#file-input {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text-on-paper-muted);
+  width: 100%;
+}
+#file-input::file-selector-button {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 0.5rem 0.85rem;
+  margin-right: 0.65rem;
+  border: 1px solid var(--paper-border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text-on-paper);
+  cursor: pointer;
+}
+#file-input::file-selector-button:hover {
+  border-color: var(--accent);
+}
+
+.privacy-note {
+  color: var(--text-on-paper-muted);
+  font-size: 0.78rem;
+  margin: 0.75rem 0 0;
+}
+
+/* ── Layout ────────────────────────────────────────────────── */
 
 .app-main {
   max-width: 880px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 2rem 1.5rem;
 }
 
 .site-footer {
+  background: var(--ink);
+  padding: 1.25rem 1.5rem;
+}
+.site-footer p {
   max-width: 880px;
-  margin: 2rem auto 1.5rem;
-  padding: 0 1.5rem;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-h1 {
-  font-size: 1.5rem;
-  margin: 0 0 0.5rem;
-}
-h2 {
-  font-size: 1.15rem;
-  margin: 2rem 0 0.75rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.4rem;
-}
-h3 {
-  font-size: 1rem;
-  margin: 1.25rem 0 0.4rem;
+  margin: 0 auto;
+  color: var(--text-on-ink-muted);
+  font-size: 0.82rem;
 }
 
 .muted {
-  color: var(--muted);
+  color: var(--text-on-paper-muted);
   font-size: 0.9rem;
 }
 
@@ -90,7 +238,11 @@ h3 {
 }
 .plain-list li {
   padding: 0.15rem 0;
+  font-size: 0.85rem;
+  color: var(--text-on-paper-muted);
 }
+
+/* ── Buttons & form controls ──────────────────────────────── */
 
 .btn,
 button {
@@ -99,25 +251,31 @@ button {
 }
 .btn {
   display: inline-block;
-  padding: 0.55rem 1rem;
+  padding: 0.65rem 1.15rem;
   border: 1px solid var(--accent);
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: #f5f6f7;
   text-decoration: none;
+  font-weight: 700;
   font-size: 0.9rem;
-  margin-top: 0.75rem;
+  margin-top: 0.85rem;
 }
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
+}
+.btn:not(:disabled):hover {
+  background: #3a6d95;
+  border-color: #3a6d95;
 }
 
 button {
   padding: 0.4rem 0.75rem;
-  border: 1px solid var(--border);
-  background: var(--bg-alt);
-  border-radius: 4px;
+  border: 1px solid var(--paper-border);
+  background: #fafafb;
+  border-radius: 6px;
+  color: var(--text-on-paper);
 }
 
 input,
@@ -125,10 +283,10 @@ select,
 textarea {
   font: inherit;
   padding: 0.4rem 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: var(--text);
+  border: 1px solid var(--paper-border);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text-on-paper);
 }
 
 label {
@@ -158,19 +316,18 @@ label > input {
 }
 
 fieldset {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 1rem;
+  border: 1px solid var(--paper-border);
+  border-radius: 12px;
+  padding: 1.1rem 1.3rem;
   margin: 1.5rem 0;
+  background: var(--paper-raised);
+  box-shadow: 0 1px 2px rgba(11, 11, 13, 0.04), 0 6px 20px rgba(11, 11, 13, 0.06);
 }
 legend {
+  font-family: "Sora", sans-serif;
   padding: 0 0.4rem;
-  font-weight: 600;
-}
-
-#file-input {
-  display: block;
-  margin: 0.75rem 0;
+  font-weight: 700;
+  font-size: 0.92rem;
 }
 
 .ai-fields {
@@ -185,46 +342,175 @@ legend {
   font-weight: 600;
 }
 
+/* ── Vitals strip (Whoop-style recovery ring + tiles) ────────── */
+
+.vitals-strip {
+  background: radial-gradient(110% 160% at 85% 0%, #1c1d1f 0%, var(--ink) 55%);
+  border-radius: 20px;
+  padding: 1.75rem 2rem;
+  margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) 1fr;
+  gap: 1.75rem;
+  align-items: center;
+}
+.vitals-ring-block {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+.vitals-ring {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  flex-shrink: 0;
+}
+.vitals-ring svg {
+  transform: rotate(-90deg);
+}
+.vitals-ring-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--text-on-ink);
+}
+.vitals-ring-value span {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-on-ink-muted);
+}
+.vitals-ring-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.vitals-ring-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.vitals-ring-caption {
+  font-size: 0.82rem;
+  color: var(--text-on-ink-muted);
+  max-width: 18ch;
+  line-height: 1.4;
+}
+
+.vital-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.75rem;
+}
+.vital-tile {
+  background: var(--ink-raised);
+  border: 1px solid var(--ink-border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+}
+.vital-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-on-ink-muted);
+  margin-bottom: 0.4rem;
+}
+.vital-value {
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.vital-unit {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-on-ink-muted);
+}
+
+.vitals-strip--no-ring {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 640px) {
+  .vitals-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Report ────────────────────────────────────────────────── */
 
 .report-section {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
+}
+
+.report-section h2 {
+  font-size: 1.25rem;
+  margin: 2rem 0 0.9rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--paper-border);
+}
+.report-section h3 {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 1.25rem 0 0.5rem;
 }
 
 .report-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 0.5rem 0 1rem;
-  font-size: 0.92rem;
+  margin: 0.5rem 0 1.1rem;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
 }
 .report-table th,
 .report-table td {
-  border: 1px solid var(--border);
-  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--paper-border);
+  padding: 0.45rem 0.65rem;
   text-align: left;
 }
 .report-table th {
-  background: var(--bg-alt);
+  background: #fafafb;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-on-paper-muted);
+}
+.report-table td:nth-child(2) {
+  font-family: "JetBrains Mono", monospace;
 }
 
 .quality-notes {
-  background: var(--bg-alt);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
-  margin-top: 0.75rem;
+  background: #fdf6f1;
+  border: 1px solid var(--paper-border);
+  border-left: 3px solid #c9822f;
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  margin-top: 0.85rem;
   font-size: 0.9rem;
 }
 
 .leverage-card {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 1rem;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-border);
+  border-left: 3px solid var(--accent);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(11, 11, 13, 0.04), 0 6px 20px rgba(11, 11, 13, 0.06);
+  padding: 1.15rem 1.35rem;
   margin-bottom: 1rem;
-  background: var(--bg);
 }
 .leverage-card h3 {
   margin-top: 0;
+  font-family: "Sora", sans-serif;
+  font-size: 1.05rem;
 }
 
 .flag-heading {
@@ -235,11 +521,24 @@ legend {
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin-top: 1rem;
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 700px) {
+  .hero-inner {
+    grid-template-columns: 1fr;
+  }
+  .hero h1 {
+    font-size: 1.7rem;
+  }
 }
 
 @media (max-width: 600px) {
   .report-table {
     font-size: 0.85rem;
+  }
+  .vitals-ring-block {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

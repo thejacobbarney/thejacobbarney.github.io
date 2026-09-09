@@ -3,6 +3,7 @@ import { buildInventory } from './analysis/inventory.js';
 import { buildBaselines } from './analysis/baselines.js';
 import { buildPatterns } from './analysis/patterns.js';
 import { renderReport } from './report/renderReport.js';
+import { renderVitalsBar } from './report/renderVitals.js';
 import { renderAiSettingsPanel } from './components/aiSettingsPanel.js';
 import { loadAiConfig } from './aiConfig.js';
 import { generateAiReport } from './report/aiReport.js';
@@ -13,6 +14,7 @@ const fileListEl = document.getElementById('file-list');
 const analyzeBtn = document.getElementById('analyze-btn');
 const errorEl = document.getElementById('upload-error');
 const aiPanelEl = document.getElementById('ai-settings-panel-container');
+const vitalsStripEl = document.getElementById('vitals-strip');
 const reportEl = document.getElementById('report-root');
 const generateAiBtn = document.getElementById('generate-ai-btn');
 const aiStatusEl = document.getElementById('generate-ai-status');
@@ -45,6 +47,8 @@ function renderFileList() {
 analyzeBtn.addEventListener('click', async () => {
   errorEl.textContent = '';
   reportEl.innerHTML = '';
+  vitalsStripEl.hidden = true;
+  vitalsStripEl.innerHTML = '';
   generateAiBtn.hidden = true;
   aiStatusEl.textContent = '';
   analyzeBtn.disabled = true;
@@ -73,6 +77,11 @@ analyzeBtn.addEventListener('click', async () => {
     const patterns = buildPatterns(records, baselines);
 
     lastSummary = { inventory, baselines, patterns };
+    const vitalsHtml = renderVitalsBar(baselines);
+    if (vitalsHtml) {
+      vitalsStripEl.innerHTML = vitalsHtml;
+      vitalsStripEl.hidden = false;
+    }
     reportEl.innerHTML = renderReport(lastSummary);
     if (parseErrors.length) {
       errorEl.textContent = `Some files were skipped: ${parseErrors.join(' ')}`;
