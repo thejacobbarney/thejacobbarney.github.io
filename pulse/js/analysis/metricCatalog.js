@@ -25,6 +25,7 @@ export const METRICS = {
 
   recoveryScore: { label: 'Recovery / readiness score', unit: '', category: 'Recovery' },
   tempDeviation: { label: 'Body temperature deviation', unit: '°', category: 'Recovery' },
+  skinTempC: { label: 'Skin temperature', unit: '°C', category: 'Recovery' },
   bodyBattery: { label: 'Body Battery', unit: '', category: 'Recovery' },
   stressScore: { label: 'Stress score', unit: '', category: 'Recovery' },
 

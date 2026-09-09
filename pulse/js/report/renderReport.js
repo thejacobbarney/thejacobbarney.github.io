@@ -123,7 +123,11 @@ function renderPatternAnalysis(patterns) {
 
   if (patterns.temp) {
     const t = patterns.temp;
-    const items = [`Stability (stddev): ±${t.stddev}°.`];
+    const items = [];
+    if (t.source === 'computedFromOwnAverage') {
+      items.push(`This device reports absolute skin temperature, not a deviation from baseline — "elevation" below is this person's own reading minus their own dataset average, not a device-provided normal.`);
+    }
+    items.push(`Stability (stddev): ±${t.stddev}°.`);
     items.push(`Nights above +0.5°: ${t.elevationEvents.length}${t.elevationEvents.length ? ' — ' + t.elevationEvents.map((e) => `${formatDate(e.date)} (+${e.value}°)`).join(', ') : ''}.`);
     if (t.consecutiveElevationRuns.length) {
       items.push(`Sustained elevation runs: ${t.consecutiveElevationRuns.map((r) => `${formatDate(r.start)}–${formatDate(r.end)} (${r.nights} nights)`).join(', ')}.`);

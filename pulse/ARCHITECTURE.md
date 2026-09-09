@@ -69,6 +69,62 @@ message asking for a CSV/JSON export instead — XML health exports are typicall
 (hundreds of thousands of fine-grained samples) and need a fundamentally different, streaming
 parser to handle in-browser without freezing the tab. Out of scope for v1.
 
+### 2a. Event-level exports (validated against a real Whoop data export)
+
+Not every export is one row per day. Whoop's bundle is a good stress test because it's four
+files with three different shapes:
+
+- `physiological_cycles.csv` — one row per day (mostly): recovery, RHR, HRV, skin temp, strain,
+  sleep stages. The normal case `fieldMapper.js` was designed around.
+- `sleeps.csv` — one row per *sleep*, including naps, flagged by a `Nap` column. `fileParser.js`
+  drops nap rows before mapping (a 20-minute nap has no business being averaged into, or
+  overwriting, that night's real sleep numbers) via a generic "does any header normalize to
+  `nap`" check, not a Whoop-specific one.
+- `workouts.csv` — one row per *workout*, several per day on a hard training day.
+- `journal_entries.csv` — "long" format: one row per (day, yes/no habit question) pair, e.g.
+  `"Have any alcoholic drinks?", "true"`. This doesn't fit the one-column-per-metric model at
+  all — the behavior name is in a cell value, not a header — so `fieldMapper.js:
+  parseJournalRows()` detects the `Question text` / `Answered yes` shape and pivots it: each
+  matched row becomes its own `{ date, alcoholTag: true }`-style micro-record, keyed off the same
+  `TAG_KEYWORDS` used to build the eventual behavioral-correlation section.
+
+Two general-purpose mechanisms make this work without hardcoding Whoop's file names:
+
+1. **`fileParser.js: aggregateByDate()`** folds multiple same-date rows from one file into a
+   single per-day record before that file's data reaches `mergeParsedFiles()`. Fields where two
+   rows really do represent two separate events (`workoutMinutes`, `activeCalories`,
+   `totalCalories`, `steps`, `disturbances` — see `ADDITIVE_FIELDS`) are summed; everything else
+   (a score, a rate, a percentage) is averaged, since two same-day values for those are two
+   readings of the same thing, not two things to add. Boolean tags OR together. A same-date group
+   that included any row with `workoutMinutes` also gets a computed `workoutCount`.
+2. **`mergeParsedFiles()` takes the max, not the last write, for `ADDITIVE_FIELDS`** when two
+   *different* files both report a value for the same date. A day-summary file's whole-day
+   calories and a workout-log file's per-workout calories are both real numbers at very different
+   scales; blindly letting whichever file the browser lists last win could silently replace the
+   larger, complete figure with a small partial one. Taking the max is a cheap, generally-correct
+   way to prefer the more complete source without knowing which file that is.
+
+**Known limitation:** cross-file precedence for *non*-additive fields (a score, a rate) is still
+simple last-file-wins — there's no generic way to know which of two sources is more authoritative
+for those without device-specific knowledge, and getting it wrong is lower-stakes (the two numbers
+are usually close, not off by 5x like calories can be).
+
+### 2b. Absolute readings vs. device-reported deviations
+
+Oura reports body temperature as a deviation from *your own* rolling baseline (0.0 = normal for
+you). Whoop and some Garmin devices report an absolute skin temperature instead (e.g. 34.5°C),
+which has no built-in "normal" to compare against. Mapping both onto one canonical field would
+either misinterpret an absolute 34.5°C reading as +34.5° above baseline (setting off every
+elevation flag, every night) or need the renderer to guess which kind of number it's looking at.
+
+Instead `fieldMapper.js` keeps them as two separate canonical fields — `tempDeviation` (device-
+reported) and `skinTempC` (absolute) — and `analysis/patterns.js` §3D computes a "deviation" for
+the absolute case itself: each night's `skinTempC` minus that person's own dataset average. The
+same downstream logic (stddev, the +0.5° elevation threshold, consecutive-night run detection)
+then runs identically either way; `renderReport.js` just adds one sentence noting when a
+"baseline" is self-computed rather than device-provided, so nobody reads a Whoop user's
+temperature section as more clinically calibrated than it is.
+
 ## 3. Analysis engine (fully offline)
 
 `analysis/inventory.js`, `baselines.js`, and `patterns.js` implement Steps 1-3 of the analysis

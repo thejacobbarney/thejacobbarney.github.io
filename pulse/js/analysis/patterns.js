@@ -145,17 +145,32 @@ export function buildPatterns(records, baselines) {
   }
 
   // ── 3D Body temperature ───────────────────────────────────
-  const tempRecords = records.filter((r) => r.tempDeviation !== undefined);
-  if (tempRecords.length >= 4) {
-    const tempValues = tempRecords.map((r) => r.tempDeviation);
-    const temp = { stddev: round(stddev(tempValues), 2) };
-    const elevated = tempRecords.filter((r) => r.tempDeviation > 0.5);
-    temp.elevationEvents = elevated.slice(-10).map((r) => ({ date: r.date, value: r.tempDeviation }));
+  // Device-reported deviation (Oura-style) needs no adjustment — 0.0 already means "your
+  // normal." An absolute skin-temperature reading (Whoop/Garmin-style) has no built-in
+  // "normal" to compare against, so we compute one: each night's deviation from this
+  // person's own dataset average. Same +0.5° elevation threshold and run-detection either way.
+  let tempSource = null;
+  let deviationByDate = null;
+  if (records.some((r) => r.tempDeviation !== undefined)) {
+    tempSource = 'deviceReported';
+    deviationByDate = new Map(records.filter((r) => r.tempDeviation !== undefined).map((r) => [r.date, r.tempDeviation]));
+  } else if (records.some((r) => r.skinTempC !== undefined)) {
+    tempSource = 'computedFromOwnAverage';
+    const skinTemps = records.filter((r) => r.skinTempC !== undefined);
+    const ownAvg = mean(skinTemps.map((r) => r.skinTempC));
+    deviationByDate = new Map(skinTemps.map((r) => [r.date, round(r.skinTempC - ownAvg, 2)]));
+  }
+  if (deviationByDate && deviationByDate.size >= 4) {
+    const orderedDates = records.map((r) => r.date).filter((d) => deviationByDate.has(d));
+    const tempValues = orderedDates.map((d) => deviationByDate.get(d));
+    const temp = { stddev: round(stddev(tempValues), 2), source: tempSource };
+    const elevatedDates = orderedDates.filter((d) => deviationByDate.get(d) > 0.5);
+    temp.elevationEvents = elevatedDates.slice(-10).map((d) => ({ date: d, value: deviationByDate.get(d) }));
     let runs = [];
     let current = [];
-    for (const r of records) {
-      if (r.tempDeviation !== undefined && r.tempDeviation > 0.5) {
-        current.push(r.date);
+    for (const d of orderedDates) {
+      if (deviationByDate.get(d) > 0.5) {
+        current.push(d);
       } else if (current.length) {
         if (current.length >= 2) runs.push({ start: current[0], end: current[current.length - 1], nights: current.length });
         current = [];
