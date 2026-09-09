@@ -7,6 +7,7 @@ import { renderVitalsBar } from './report/renderVitals.js';
 import { renderAiSettingsPanel } from './components/aiSettingsPanel.js';
 import { loadAiConfig } from './aiConfig.js';
 import { generateAiReport } from './report/aiReport.js';
+import { loadCachedSummary, saveCachedSummary, clearCachedSummary } from './reportCache.js';
 import { escapeHtml } from './utils.js';
 
 const fileInput = document.getElementById('file-input');
@@ -14,6 +15,8 @@ const fileListEl = document.getElementById('file-list');
 const analyzeBtn = document.getElementById('analyze-btn');
 const errorEl = document.getElementById('upload-error');
 const aiPanelEl = document.getElementById('ai-settings-panel-container');
+const restoredBannerEl = document.getElementById('restored-banner');
+const clearCacheBtn = document.getElementById('clear-cache-btn');
 const vitalsStripEl = document.getElementById('vitals-strip');
 const reportEl = document.getElementById('report-root');
 const generateAiBtn = document.getElementById('generate-ai-btn');
@@ -26,6 +29,16 @@ let aiConfig = renderAiSettingsPanel(aiPanelEl, { onChange: (cfg) => syncAiButto
 function syncAiButton(cfg) {
   aiConfig = cfg;
   generateAiBtn.hidden = !(lastSummary && cfg.enabled && cfg.apiKey);
+}
+
+/** Renders the vitals strip + report body from a summary, and updates the AI button. Does not touch the cache. */
+function renderSummary(summary) {
+  lastSummary = summary;
+  const vitalsHtml = renderVitalsBar(summary.baselines);
+  vitalsStripEl.innerHTML = vitalsHtml;
+  vitalsStripEl.hidden = !vitalsHtml;
+  reportEl.innerHTML = renderReport(summary);
+  syncAiButton(aiConfig);
 }
 
 fileInput.addEventListener('change', () => {
@@ -49,6 +62,7 @@ analyzeBtn.addEventListener('click', async () => {
   reportEl.innerHTML = '';
   vitalsStripEl.hidden = true;
   vitalsStripEl.innerHTML = '';
+  restoredBannerEl.hidden = true;
   generateAiBtn.hidden = true;
   aiStatusEl.textContent = '';
   analyzeBtn.disabled = true;
@@ -76,17 +90,11 @@ analyzeBtn.addEventListener('click', async () => {
     }
     const patterns = buildPatterns(records, baselines);
 
-    lastSummary = { inventory, baselines, patterns };
-    const vitalsHtml = renderVitalsBar(baselines);
-    if (vitalsHtml) {
-      vitalsStripEl.innerHTML = vitalsHtml;
-      vitalsStripEl.hidden = false;
-    }
-    reportEl.innerHTML = renderReport(lastSummary);
+    renderSummary({ inventory, baselines, patterns });
+    saveCachedSummary(lastSummary);
     if (parseErrors.length) {
       errorEl.textContent = `Some files were skipped: ${parseErrors.join(' ')}`;
     }
-    syncAiButton(aiConfig);
     reportEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) {
     errorEl.textContent = err.message;
@@ -104,9 +112,10 @@ generateAiBtn.addEventListener('click', async () => {
   aiStatusEl.className = 'muted';
   try {
     const aiReport = await generateAiReport(lastSummary, cfg);
-    reportEl.innerHTML = renderReport({ ...lastSummary, aiReport });
+    renderSummary({ ...lastSummary, aiReport });
+    saveCachedSummary(lastSummary);
     aiStatusEl.textContent = '';
-    document.getElementById('report-root').querySelector('.leverage-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    reportEl.querySelector('.leverage-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) {
     aiStatusEl.textContent = `✗ ${err.message}`;
     aiStatusEl.className = 'muted status-error';
@@ -114,3 +123,20 @@ generateAiBtn.addEventListener('click', async () => {
     generateAiBtn.disabled = false;
   }
 });
+
+clearCacheBtn.addEventListener('click', () => {
+  clearCachedSummary();
+  lastSummary = null;
+  restoredBannerEl.hidden = true;
+  vitalsStripEl.hidden = true;
+  vitalsStripEl.innerHTML = '';
+  reportEl.innerHTML = '';
+  generateAiBtn.hidden = true;
+});
+
+// Restore the last computed report, if any, so a reload doesn't lose it.
+const cached = loadCachedSummary();
+if (cached) {
+  renderSummary(cached);
+  restoredBannerEl.hidden = false;
+}

@@ -22,6 +22,7 @@ pulse/
     utils.js                       escapeHtml, date formatting, FileReader wrapper
     aiConfig.js                    localStorage read/write for the optional bring-your-own-key AI settings
     aiVerify.js                    "Test connection" — smallest possible live API call
+    reportCache.js                  localStorage read/write for the last computed report (local-only persistence)
     app.js                         Wires upload -> parse -> analyze -> render, and the AI report button
     components/
       aiSettingsPanel.js            Shared enable/key/model UI (same contract as Iceberg's)
@@ -214,3 +215,23 @@ recovery-ring readout. Concretely:
 This design work started as a Claude Design canvas mockup (two static `.dc.html` artboards
 exploring the direction) before being ported into the real app; the mockup is not kept in this
 repo, since it was a disposable exploration step, not a second implementation to maintain.
+
+## 7. Local persistence (not cloud sync)
+
+Pulse never stored the uploaded file itself — it's read in memory, analyzed, and discarded — but
+until this point the *computed report* was fully ephemeral too: reloading the tab meant re-
+uploading. `reportCache.js` fixes that by saving the computed `{ inventory, baselines, patterns,
+aiReport? }` object (never the raw per-day records, and never the file) to
+`localStorage['pulse:last-summary:v1']`, and `app.js` restores it on load, showing a small
+"Showing your last analysis, saved in this browser" banner with a `Clear` button
+(`clearCachedSummary()`).
+
+This is **local-only** — there is deliberately no cross-device sync. That was a real option on the
+table (either a bring-your-own-key GitHub Gist sync, matching the app's existing BYOK pattern for
+AI, or a real backend like Supabase/Firebase), but both would have meant either a new account
+requirement or a new third-party service holding synced health data, which is a materially
+different privacy posture than "nothing leaves your browser" — worth deciding deliberately with
+the site owner rather than defaulting into. localStorage keeps that promise intact (the data still
+never leaves the device) while fixing the actual annoyance (losing your report on a reload).
+Reintroducing real sync later is a separate, self-contained decision — `reportCache.js`'s
+`loadCachedSummary`/`saveCachedSummary` contract wouldn't need to change, only what calls them.
