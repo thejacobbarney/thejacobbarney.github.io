@@ -26,6 +26,13 @@
   box-sizing: border-box;
 }
 
+/* The `hidden` attribute must always win over a class's own `display` rule
+   (e.g. `.btn { display: inline-block }` on a hidden button) — otherwise an
+   element with both loses the fight on selector order, not intent. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: "Plus Jakarta Sans", -apple-system, "Segoe UI", sans-serif;
@@ -271,7 +278,8 @@ button {
 }
 
 button {
-  padding: 0.4rem 0.75rem;
+  padding: 0.6rem 0.85rem;
+  min-height: 44px;
   border: 1px solid var(--paper-border);
   background: #fafafb;
   border-radius: 6px;
@@ -485,6 +493,14 @@ legend {
   margin: 1.25rem 0 0.5rem;
 }
 
+.table-scroll {
+  overflow-x: auto;
+  margin: 0.5rem 0 1.1rem;
+}
+.table-scroll .report-table {
+  margin: 0;
+}
+
 .report-table {
   width: 100%;
   border-collapse: collapse;
@@ -497,6 +513,13 @@ legend {
   border: 1px solid var(--paper-border);
   padding: 0.45rem 0.65rem;
   text-align: left;
+}
+/* Short-label tables (RHR by weekday, sleep architecture): never wrap a
+   value awkwardly mid-number — let the table scroll horizontally instead
+   (see .table-scroll). The long-label metric table stays wrap-friendly. */
+.report-table--compact th,
+.report-table--compact td {
+  white-space: nowrap;
 }
 .report-table th {
   background: #fafafb;

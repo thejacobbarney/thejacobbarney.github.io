@@ -9,6 +9,11 @@ function section(title, innerHtml) {
   return `<section class="report-section"><h2>${escapeHtml(title)}</h2>${innerHtml}</section>`;
 }
 
+/** Wraps a <table> in a horizontally-scrollable container so a wide table (e.g. 7 weekday columns) scrolls on its own on a narrow screen instead of the whole page. */
+function scrollableTable(tableHtml) {
+  return `<div class="table-scroll">${tableHtml}</div>`;
+}
+
 function renderDataSummary(inventory) {
   const filesHtml = inventory.files
     .map((f) => `<li><strong>${escapeHtml(f.name)}</strong> — ${escapeHtml(f.format)}, ${f.rowCount} row(s)</li>`)
@@ -59,20 +64,26 @@ function renderBaselineTable(baselines) {
 
   let weekdayTable = '';
   if (baselines.rhrByWeekday?.length) {
-    weekdayTable = `<h3>RHR by day of week</h3><table class="report-table"><thead><tr>${baselines.rhrByWeekday
-      .map((d) => `<th>${d.day}</th>`)
-      .join('')}</tr></thead><tbody><tr>${baselines.rhrByWeekday.map((d) => `<td>${fmt(d.avg, 'bpm')}</td>`).join('')}</tr></tbody></table>`;
+    weekdayTable = `<h3>RHR by day of week</h3>${scrollableTable(
+      `<table class="report-table report-table--compact"><thead><tr>${baselines.rhrByWeekday
+        .map((d) => `<th>${d.day}</th>`)
+        .join('')}</tr></thead><tbody><tr>${baselines.rhrByWeekday.map((d) => `<td>${fmt(d.avg, 'bpm')}</td>`).join('')}</tr></tbody></table>`
+    )}`;
   }
 
   let archTable = '';
   if (baselines.sleepArchitecturePct) {
     const a = baselines.sleepArchitecturePct;
-    archTable = `<h3>Sleep architecture</h3><table class="report-table"><thead><tr><th>Deep</th><th>REM</th><th>Light</th></tr></thead><tbody><tr><td>${fmt(a.deepPct, '%')}</td><td>${fmt(a.remPct, '%')}</td><td>${fmt(a.lightPct, '%')}</td></tr></tbody></table>`;
+    archTable = `<h3>Sleep architecture</h3>${scrollableTable(
+      `<table class="report-table report-table--compact"><thead><tr><th>Deep</th><th>REM</th><th>Light</th></tr></thead><tbody><tr><td>${fmt(a.deepPct, '%')}</td><td>${fmt(a.remPct, '%')}</td><td>${fmt(a.lightPct, '%')}</td></tr></tbody></table>`
+    )}`;
   }
 
   return section(
     'Baseline Profile',
-    `<table class="report-table"><thead><tr><th>Metric</th><th>Average</th><th></th></tr></thead><tbody>${rows}${extras.join('')}</tbody></table>${weekdayTable}${archTable}`
+    `${scrollableTable(
+      `<table class="report-table"><thead><tr><th>Metric</th><th>Average</th><th></th></tr></thead><tbody>${rows}${extras.join('')}</tbody></table>`
+    )}${weekdayTable}${archTable}`
   );
 }
 
