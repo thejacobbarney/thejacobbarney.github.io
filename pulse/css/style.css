@@ -476,21 +476,46 @@ legend {
 
 /* ── Report ────────────────────────────────────────────────── */
 
+/* Every top-level section reads as one continuous white card, matching the
+   hero's upload card and the vitals strip — the same "content floats on an
+   elevated surface" language throughout, not just at the top of the page.
+   Exception: the leverage-points section already renders its own cards per
+   point, so it goes chromeless here rather than nesting a card in a card. */
 .report-section {
-  margin-top: 1.25rem;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-border);
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(11, 11, 13, 0.04), 0 6px 20px rgba(11, 11, 13, 0.06);
+  padding: 1.75rem;
+  margin-top: 1.5rem;
+}
+.report-section:first-of-type {
+  margin-top: 0;
+}
+.report-section:has(.leverage-card) {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
 }
 
 .report-section h2 {
-  font-size: 1.25rem;
-  margin: 2rem 0 0.9rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--paper-border);
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 1.15rem;
 }
 .report-section h3 {
-  font-family: "Plus Jakarta Sans", sans-serif;
-  font-weight: 600;
-  font-size: 0.95rem;
-  margin: 1.25rem 0 0.5rem;
+  font-family: "Sora", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.005em;
+  margin: 0 0 0.65rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--paper-border);
+}
+.report-section h3:first-of-type {
+  padding-top: 0;
+  border-top: none;
 }
 
 .table-scroll {
