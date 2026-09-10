@@ -235,3 +235,14 @@ the site owner rather than defaulting into. localStorage keeps that promise inta
 never leaves the device) while fixing the actual annoyance (losing your report on a reload).
 Reintroducing real sync later is a separate, self-contained decision — `reportCache.js`'s
 `loadCachedSummary`/`saveCachedSummary` contract wouldn't need to change, only what calls them.
+
+## 8. Cache-busting
+
+There's no build step generating hashed filenames, so `index.html` links `css/style.css` with a
+manual `?v=N` query string. A visual redesign shipped once with an unversioned link and some
+visitors kept seeing the old stylesheet indefinitely (their browser had a cached copy of the exact
+same URL from before the deploy, and nothing about that URL changed to tell it otherwise) — the
+HTML itself updated fine, since GitHub Pages doesn't cache as aggressively as browsers do, but
+`css/style.css` didn't. **Bump `?v=N` in `index.html` any time `css/style.css` changes** — it costs
+one line and guarantees every visitor gets the new one instead of hoping their cache expires on its
+own.
