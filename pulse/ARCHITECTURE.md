@@ -192,10 +192,17 @@ recovery-ring readout. Concretely:
 
 - **Two surfaces, not one theme.** `--ink`/`--ink-raised`/`--ink-border` (near-black) drive the
   header, hero, footer, and the vitals strip — anywhere the page is showing a glanceable summary
-  rather than dense content. `--paper`/`--paper-raised` (true white) plus `.card`'s subtle
-  border+shadow combo drive everything else (the report tables, leverage-point cards, the AI
-  settings panel). Both are declared once in `css/style.css:root` — there's no dark-mode toggle,
-  just two fixed zones by design intent.
+  rather than dense content. `--paper`/`--paper-raised` (true white) plus the same subtle
+  border+shadow combo drive everything else. Both are declared once in `css/style.css:root` —
+  there's no dark-mode toggle, just two fixed zones by design intent.
+- **Every top-level report section is a card — not just the special ones.** `.report-section`
+  itself carries the white-card treatment (border, radius, shadow, padding), so Data Summary,
+  Baseline Profile, and Pattern Analysis read as the same elevated surface as the upload card and
+  the AI settings panel, instead of the generic sections looking like plain document text next to
+  a few hand-styled components. The one deliberate exception is CSS-only:
+  `.report-section:has(.leverage-card)` strips that outer card back off for the leverage-points
+  section, because it already renders one accent-striped card per point — an outer card there
+  would just be a card wrapped around cards.
 - **One accent color, used consistently.** `--accent` (steel blue) marks anything interactive or
   emphasized — the ring, buttons, section eyebrows, the leverage-card accent stripe — never
   decoratively. `--accent2` exists only for a second data series inside a chart (there isn't one
