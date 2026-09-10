@@ -5,29 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Pulse — Wearable Health Analyst</title>
 <meta name="description" content="Upload a wearable export (Oura, Whoop, Garmin, Fitbit, or generic CSV/JSON) and get a data-grounded baseline profile, pattern analysis, and prioritized leverage points — computed entirely in your browser." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="site-header-inner">
-      <span class="site-title">Pulse <span class="site-subtitle">— wearable health analyst</span></span>
+      <div class="site-brand">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12h4l2.5-7L13 19l2.5-9L18 12h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="site-title">pulse</span>
+      </div>
+      <span class="site-subtitle">wearable health analyst</span>
     </div>
   </header>
 
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-text">
+        <p class="eyebrow">Wearable health analyst</p>
+        <h1>Your data, read by<br>someone who <em>actually</em><br>studied it.</h1>
+        <p class="hero-copy">Upload an export from Oura, Whoop, Garmin, or Fitbit. Get a baseline profile, trend analysis, and ranked leverage points — grounded entirely in your own numbers, computed right here in this browser.</p>
+      </div>
+
+      <section id="upload-section" class="card upload-card">
+        <div class="upload-card-header">
+          <span class="upload-card-title">Drop your export</span>
+          <span class="num muted-on-card">.csv / .json</span>
+        </div>
+        <div class="dropzone">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/></svg>
+          <input type="file" id="file-input" accept=".csv,.json,.txt" multiple />
+          <span class="dropzone-hint">CSV or JSON, one or more files</span>
+        </div>
+        <ul id="file-list" class="plain-list"></ul>
+        <button type="button" id="analyze-btn" class="btn" disabled>Analyze My Data</button>
+        <p id="upload-error" class="error-text"></p>
+        <p class="privacy-note">No account. Nothing is uploaded anywhere unless you turn on optional AI assistance below.</p>
+      </section>
+    </div>
+  </section>
+
   <main class="app-main">
-    <section id="upload-section">
-      <h1>Upload your wearable data</h1>
-      <p class="muted">Export a CSV or JSON file from Oura, Whoop, Garmin, Fitbit, or any tracker's data export, and drop it in. Everything is parsed and analyzed in this browser — nothing is uploaded anywhere unless you turn on optional AI assistance below.</p>
-
-      <input type="file" id="file-input" accept=".csv,.json,.txt" multiple />
-      <ul id="file-list" class="plain-list"></ul>
-      <button type="button" id="analyze-btn" class="btn" disabled>Analyze My Data</button>
-      <p id="upload-error" class="error-text"></p>
-    </section>
-
     <div id="ai-settings-panel-container"></div>
 
     <section id="report-section">
+      <div id="restored-banner" class="restored-banner" hidden>
+        <span>Showing your last analysis, saved in this browser.</span>
+        <button type="button" id="clear-cache-btn">Clear</button>
+      </div>
+      <div id="vitals-strip" hidden></div>
       <div id="report-root"></div>
       <div class="ai-generate-row">
         <button type="button" id="generate-ai-btn" class="btn" hidden>Generate Leverage Points &amp; Protocol</button>
@@ -37,7 +65,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>File parsing and every baseline/pattern calculation happen locally in this browser. Nothing is sent anywhere unless you enable optional AI assistance, which sends only the computed summary (not your raw file) to Anthropic using your own API key.</p>
+    <p>File parsing and every baseline/pattern calculation happen locally in this browser. Your last computed report is saved to this browser's local storage so it survives a reload — it never leaves your device, isn't synced anywhere, and "Clear" above removes it. Nothing is sent anywhere unless you enable optional AI assistance, which sends only the computed summary (not your raw file) to Anthropic using your own API key.</p>
   </footer>
 
   <script type="module" src="js/app.js"></script>
