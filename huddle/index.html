@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Huddle — Fantasy Lineup Co-Pilot</title>
+<meta name="description" content="Your ESPN Fantasy Football roster, start/sit calls, matchup, and standings, built for checking on your phone." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="css/style.css?v=1" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div class="site-brand">
+        <span class="brand-emoji" aria-hidden="true">🏈</span>
+        <span class="site-title">huddle</span>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="refresh-btn" class="icon-btn" title="Refresh" hidden>⟳</button>
+        <button type="button" id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+      </div>
+    </div>
+  </header>
+
+  <p id="status-line" class="status-line"></p>
+
+  <main class="app-main" id="app-root"></main>
+
+  <nav class="tab-bar" id="tab-bar" hidden></nav>
+
+  <footer class="site-footer">
+    <p>Your league ID, team ID, and (if private) ESPN cookies are saved only in this browser's local storage, and sent only to the Worker URL you configure — never to any other server. See <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> for the one-time proxy setup this needs.</p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
