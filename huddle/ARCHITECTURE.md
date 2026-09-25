@@ -51,10 +51,20 @@ huddle/
                                   the same position) — both projected-points comparisons only
     utils.js                     escapeHtml, point formatting
     app.js                       Tab routing, load/refresh/cache orchestration
+    aiConfig.js                  localStorage read/write for the optional bring-your-own-key AI
+                                   settings — same contract as Pulse's/Iceberg's aiConfig.js
+    aiVerify.js                   "Test connection" — smallest possible live Anthropic API call
+    components/
+      aiSettingsPanel.js            Shared enable/key/model UI, rendered into My Team
+    report/
+      aiRecommendation.js            generateAiRecommendation() — sends the computed roster/
+                                       matchup/waiver summary to Anthropic, gets back a structured
+                                       game plan (see §6)
     render/
       setup.js                    League config form
       myTeam.js                   Roster (starters/bench/IR) + inline start/sit callout +
-                                    per-player recent-form trend and bye badge
+                                    per-player recent-form trend and bye badge + the AI game plan
+                                    panel/button/result
       matchup.js                  This week's matchup, my score vs opponent's
       waiver.js                    Add/drop suggestions + browsable free-agent pool by position
       outlook.js                   Bye weeks coming up on your roster + next few opponents
@@ -140,7 +150,30 @@ ahead: it lists your next few scheduled opponents (sliced straight out of the sa
 array the current matchup uses) and flags any rostered player (IR excluded) whose bye week has
 arrived or is coming up, so a bye doesn't surprise you the morning lineups lock.
 
-## 4. Local persistence, no account
+## 4. AI game plan (optional, bring-your-own-key)
+
+The offline signals (§3) are deliberately narrow — a raw projected-points delta is honest but
+thin, and mostly just re-displays a number ESPN's own app already shows. `report/aiRecommendation.js`
+is the "so what" layer on top: `render/myTeam.js: buildAiSummary()` packages the current roster
+(starters/bench, each with projection, recent-form trend, injury status, bye week), the matchup,
+the already-computed start/sit and waiver suggestions, and the upcoming schedule into one JSON
+object, and sends it to the Anthropic Messages API directly from the browser — same BYOK pattern as
+Pulse's `report/aiReport.js` (`anthropic-dangerous-direct-browser-access`, `output_config.format:
+{ type: 'json_schema' }` for a guaranteed-parseable response). Only that computed summary is sent —
+never ESPN cookies, never the raw ESPN API response.
+
+The system prompt explicitly tells the model not to just restate the pre-computed suggestions:
+it's meant to weigh them against context the raw numbers don't carry (a `QUESTIONABLE` tag, a wide
+gap between recent actuals and this week's projection, a bye week two weeks out that changes
+whether a waiver move is worth a bench spot now) and say where it agrees, disagrees, or adds
+nuance — that's the actual value-add over the free offline comparisons.
+
+`myTeam.js` keeps the last generated recommendation in a module-level `WeakMap` keyed by the
+`league` object itself, so switching tabs away and back doesn't lose it (the object reference is
+stable until the next fetch), but a fresh fetch — a new `league` object from `app.js` — naturally
+starts clean rather than showing a stale recommendation next to this week's new numbers.
+
+## 5. Local persistence, no account
 
 League config (Worker URL, league ID, year, team ID, and — for private leagues — SWID/espn_s2)
 lives in `localStorage['huddle:config:v1']`, never anywhere else. The last successfully fetched
@@ -156,7 +189,7 @@ periodically (weeks to months), at which point requests to a private league star
 they need refreshing from a logged-in `fantasy.espn.com` browser session (Settings → the two
 private-league fields).
 
-## 5. Cache-busting
+## 6. Cache-busting
 
 Same manual-versioning approach as the rest of the site (see Pulse's ARCHITECTURE.md §8) — bump
 `?v=N` on `css/style.css`'s `<link>` in `index.html` any time the stylesheet changes.
