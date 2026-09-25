@@ -32,3 +32,37 @@ export function findStartSitSuggestions(roster) {
   }
   return suggestions.sort((a, b) => b.delta - a.delta);
 }
+
+/**
+ * For each position on your roster, compares your weakest rostered player
+ * (by projected points, IR excluded) against the best available free agent
+ * at that same default position. Only surfaces a case where the free agent
+ * projects higher — an add/drop suggestion, not a full waiver-wire browse.
+ */
+export function findWaiverUpgrades(roster, freeAgents) {
+  const rosteredByPos = new Map();
+  for (const p of roster) {
+    if (p.slotId === IR_SLOT_ID || typeof p.projected !== 'number') continue;
+    const list = rosteredByPos.get(p.defaultPosition) || [];
+    list.push(p);
+    rosteredByPos.set(p.defaultPosition, list);
+  }
+
+  const faByPos = new Map();
+  for (const p of freeAgents) {
+    if (typeof p.projected !== 'number') continue;
+    const list = faByPos.get(p.defaultPosition) || [];
+    list.push(p);
+    faByPos.set(p.defaultPosition, list);
+  }
+
+  const suggestions = [];
+  for (const [pos, rosteredList] of rosteredByPos) {
+    const weakest = rosteredList.reduce((a, b) => (b.projected < a.projected ? b : a));
+    const candidates = (faByPos.get(pos) || []).filter((fa) => fa.projected > weakest.projected);
+    if (candidates.length === 0) continue;
+    const best = candidates.reduce((a, b) => (b.projected > a.projected ? b : a));
+    suggestions.push({ drop: weakest, add: best, delta: best.projected - weakest.projected });
+  }
+  return suggestions.sort((a, b) => b.delta - a.delta);
+}

@@ -1,9 +1,11 @@
 import { loadConfig, hasConfig } from './storage.js';
-import { fetchLeague, normalizeLeague } from './espnClient.js';
+import { fetchLeague, fetchFreeAgents, normalizeLeague, normalizeFreeAgents } from './espnClient.js';
 import { renderSetup } from './render/setup.js';
 import { renderMyTeam } from './render/myTeam.js';
 import { renderMatchup } from './render/matchup.js';
 import { renderStandings } from './render/standings.js';
+import { renderWaiver } from './render/waiver.js';
+import { renderOutlook } from './render/outlook.js';
 
 const appRoot = document.getElementById('app-root');
 const tabBar = document.getElementById('tab-bar');
@@ -11,10 +13,12 @@ const settingsBtn = document.getElementById('settings-btn');
 const refreshBtn = document.getElementById('refresh-btn');
 const statusEl = document.getElementById('status-line');
 
-const CACHE_KEY = 'huddle:cache:v1';
+const CACHE_KEY = 'huddle:cache:v2';
 const TABS = {
   team: { label: 'My Team', render: renderMyTeam },
   matchup: { label: 'Matchup', render: renderMatchup },
+  waiver: { label: 'Waivers', render: renderWaiver },
+  outlook: { label: 'Outlook', render: renderOutlook },
   standings: { label: 'Standings', render: renderStandings },
 };
 
@@ -69,9 +73,21 @@ async function loadLeague({ silent } = {}) {
   try {
     const raw = await fetchLeague(config);
     currentLeague = normalizeLeague(raw, config);
+    showTabBar(true);
+    renderActiveTab();
+
+    // Free agents are a separate ESPN request — let the rest of the app work
+    // even if this one fails (e.g. the deployed Worker predates waiver support).
+    try {
+      const rawFreeAgents = await fetchFreeAgents(config, { week: currentLeague.week });
+      currentLeague.freeAgents = normalizeFreeAgents(rawFreeAgents, currentLeague.week);
+    } catch (faErr) {
+      currentLeague.freeAgents = null;
+      currentLeague.freeAgentsError = faErr.message;
+    }
+
     saveCache(currentLeague);
     statusEl.textContent = '';
-    showTabBar(true);
     renderActiveTab();
   } catch (err) {
     if (!currentLeague) {

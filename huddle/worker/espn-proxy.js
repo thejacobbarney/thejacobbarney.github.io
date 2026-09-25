@@ -53,9 +53,6 @@ export default {
     const espnUrl = new URL(
       `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${year}/segments/0/leagues/${leagueId}`
     );
-    for (const view of url.searchParams.getAll('view')) {
-      espnUrl.searchParams.append('view', view);
-    }
     const scoringPeriodId = url.searchParams.get('scoringPeriodId');
     if (scoringPeriodId) espnUrl.searchParams.set('scoringPeriodId', scoringPeriodId);
 
@@ -64,6 +61,25 @@ export default {
     const espnHeaders = { Accept: 'application/json' };
     if (swid && espnS2) {
       espnHeaders.Cookie = `SWID=${swid}; espn_s2=${espnS2}`;
+    }
+
+    // Free-agent/waiver-wire lookups use a different ESPN view that requires
+    // a special header instead of the usual view=... query params — the
+    // "player pool" endpoint, not the roster endpoint.
+    if (url.searchParams.get('players') === 'freeagents') {
+      espnUrl.searchParams.append('view', 'kona_player_info');
+      espnHeaders['X-Fantasy-Filter'] = JSON.stringify({
+        players: {
+          filterStatus: { value: ['FREEAGENT', 'WAIVERS'] },
+          filterSlotIds: { value: [0, 2, 4, 6, 16, 17, 23] },
+          limit: 200,
+          sortPercOwned: { sortPriority: 1, sortAsc: false },
+        },
+      });
+    } else {
+      for (const view of url.searchParams.getAll('view')) {
+        espnUrl.searchParams.append('view', view);
+      }
     }
 
     let espnRes;
