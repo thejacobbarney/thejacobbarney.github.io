@@ -16,28 +16,45 @@ function injuryBadge(status) {
   return `<span class="badge ${cls}">${escapeHtml(status.replace('_', ' '))}</span>`;
 }
 
-function playerRow(p) {
+function byeBadge(byeWeek, week) {
+  if (typeof byeWeek !== 'number' || byeWeek !== week) return '';
+  return `<span class="badge badge-out">BYE</span>`;
+}
+
+function trendText(recentActual) {
+  if (!recentActual || recentActual.length === 0) return '';
+  const pts = recentActual.map((r) => fmtPts(r.points)).join(', ');
+  return `<span class="muted player-meta">last ${recentActual.length}: ${pts}</span>`;
+}
+
+function playerRow(p, week) {
   return `
     <tr>
       <td class="col-slot">${escapeHtml(p.slotLabel)}</td>
       <td class="col-player">
         <span class="player-name">${escapeHtml(p.name)}</span>
         <span class="muted player-meta">${escapeHtml(p.proTeam)} · ${escapeHtml(p.defaultPosition)}</span>
+        ${trendText(p.recentActual)}
         ${injuryBadge(p.injuryStatus)}
+        ${byeBadge(p.byeWeek, week)}
       </td>
       <td class="num col-num">${fmtPts(p.projected)}</td>
       <td class="num col-num">${fmtPts(p.actual)}</td>
     </tr>`;
 }
 
-function table(title, players) {
+function table(title, players, week) {
   if (players.length === 0) return '';
   return `
     <div class="roster-group">
       <h3>${escapeHtml(title)}</h3>
       <table class="roster-table">
         <thead><tr><th>Slot</th><th>Player</th><th class="num">Proj</th><th class="num">Actual</th></tr></thead>
-        <tbody>${players.slice().sort(slotSort).map(playerRow).join('')}</tbody>
+        <tbody>${players
+          .slice()
+          .sort(slotSort)
+          .map((p) => playerRow(p, week))
+          .join('')}</tbody>
       </table>
     </div>`;
 }
@@ -77,8 +94,8 @@ export function renderMyTeam(root, league) {
       ${league.week ? `<span class="muted">Week ${league.week}</span>` : ''}
     </div>
     ${suggestionsHtml}
-    ${table('Starters', starters)}
-    ${table('Bench', bench)}
-    ${table('IR', ir)}
+    ${table('Starters', starters, league.week)}
+    ${table('Bench', bench, league.week)}
+    ${table('IR', ir, league.week)}
   `;
 }
