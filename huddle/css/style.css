@@ -105,6 +105,30 @@ h1, h2, h3 { font-family: "Sora", system-ui, sans-serif; font-weight: 700; margi
 
 .row-mine { background: var(--accent-soft); }
 
+/* ── AI game plan ───────────────────────────────────── */
+.ai-settings-panel {
+  border: 1px solid var(--paper-border); border-radius: 12px; padding: 1rem 1.1rem;
+  background: var(--paper-raised); margin: 0;
+}
+.ai-settings-panel legend { font-family: "Sora", sans-serif; font-weight: 700; font-size: 0.9rem; padding: 0 0.3rem; }
+.ai-settings-panel label { display: block; margin-top: 0.75rem; font-size: 0.85rem; font-weight: 600; }
+.ai-settings-panel label input {
+  font: inherit; font-weight: 400; margin-top: 0.3rem; width: 100%; padding: 0.6rem 0.7rem;
+  border-radius: 8px; border: 1px solid var(--paper-border); background: var(--paper);
+}
+.checkbox-label { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 0.9rem; }
+.checkbox-label input { width: auto; }
+.ai-fields { margin-top: 0.5rem; }
+.row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-top: 0.9rem; }
+.status-success { color: var(--success); font-weight: 600; }
+.status-error { color: var(--danger); font-weight: 600; }
+
+.ai-generate-row { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+.ai-result { border-left: 4px solid var(--accent); }
+.ai-headline { font-weight: 600; margin: 0 0 0.6rem; }
+.ai-move-group { margin-top: 0.8rem; }
+.ai-move-group h4 { font-size: 0.78rem; margin: 0 0 0.35rem; color: var(--text-on-paper-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
 /* ── Matchup ────────────────────────────────────────── */
 .matchup-card { text-align: center; }
 .matchup-row { display: flex; align-items: center; justify-content: center; gap: 1.2rem; margin-top: 0.5rem; }
