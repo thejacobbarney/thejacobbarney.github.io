@@ -34,15 +34,34 @@ export function findStartSitSuggestions(roster) {
 }
 
 /**
+ * A player's "roster value" for drop purposes: their recent scoring average
+ * when we have it, falling back to this week's projection only if there's no
+ * game history yet. This deliberately does NOT use this week's projection as
+ * the primary signal — a single-week OUT/injury projects 0 and would
+ * otherwise make a rostered star look like the weakest player on the team
+ * every week he's hurt, which is a false signal, not a real drop case.
+ */
+function rosterValue(player) {
+  if (player.recentActual && player.recentActual.length > 0) {
+    const sum = player.recentActual.reduce((total, r) => total + r.points, 0);
+    return sum / player.recentActual.length;
+  }
+  return typeof player.projected === 'number' ? player.projected : null;
+}
+
+/**
  * For each position on your roster, compares your weakest rostered player
- * (by projected points, IR excluded) against the best available free agent
- * at that same default position. Only surfaces a case where the free agent
- * projects higher — an add/drop suggestion, not a full waiver-wire browse.
+ * (by roster value — see rosterValue() — IR excluded) against the best
+ * available free agent's projection for the week at that same default
+ * position. Only surfaces a case where the free agent projects higher — an
+ * add/drop suggestion, not a full waiver-wire browse, and specifically not a
+ * "your OUT stud is droppable" trap: a good recent-form average protects a
+ * temporarily-injured player from looking like the weakest link.
  */
 export function findWaiverUpgrades(roster, freeAgents) {
   const rosteredByPos = new Map();
   for (const p of roster) {
-    if (p.slotId === IR_SLOT_ID || typeof p.projected !== 'number') continue;
+    if (p.slotId === IR_SLOT_ID || rosterValue(p) === null) continue;
     const list = rosteredByPos.get(p.defaultPosition) || [];
     list.push(p);
     rosteredByPos.set(p.defaultPosition, list);
@@ -58,11 +77,12 @@ export function findWaiverUpgrades(roster, freeAgents) {
 
   const suggestions = [];
   for (const [pos, rosteredList] of rosteredByPos) {
-    const weakest = rosteredList.reduce((a, b) => (b.projected < a.projected ? b : a));
-    const candidates = (faByPos.get(pos) || []).filter((fa) => fa.projected > weakest.projected);
+    const weakest = rosteredList.reduce((a, b) => (rosterValue(b) < rosterValue(a) ? b : a));
+    const weakestValue = rosterValue(weakest);
+    const candidates = (faByPos.get(pos) || []).filter((fa) => fa.projected > weakestValue);
     if (candidates.length === 0) continue;
     const best = candidates.reduce((a, b) => (b.projected > a.projected ? b : a));
-    suggestions.push({ drop: weakest, add: best, delta: best.projected - weakest.projected });
+    suggestions.push({ drop: weakest, add: best, delta: best.projected - weakestValue });
   }
   return suggestions.sort((a, b) => b.delta - a.delta);
 }

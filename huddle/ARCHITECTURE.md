@@ -140,10 +140,25 @@ line) rather than guessing. It's explicitly a projection-only signal — no awar
 past what ESPN's `injuryStatus` field already says, no weather, no gut feel.
 
 `lineup.js: findWaiverUpgrades()` is the same idea one level out: for each position you roster, it
-finds your single weakest player there (by projected points, IR excluded) and checks whether any
-available free agent at that position projects higher — one add/drop suggestion per position, not
+finds your single weakest player there (by **roster value** — see `rosterValue()`, IR excluded) and
+checks whether any available free agent at that position projects higher — one add/drop suggestion
+per position, not
 a ranked list of everyone worth considering. The Waivers tab's "Top available" section below that
 is the full browsable pool if the one-line suggestion isn't the move you want.
+
+**Why "roster value" and not just this week's projection:** the first version of this used raw
+projected points to find the "weakest" rostered player, which meant a rostered star who's simply
+OUT for a single week (projection: 0) looked like the worst player on the team *every week he was
+hurt* — indistinguishable from an actually bad player, and confidently suggested as a drop candidate
+against literally any healthy waiver-wire body. `rosterValue()` fixes this by preferring a player's
+recent scoring average (`recentActual`, already computed for the My Team trend display) over a
+single week's projection, falling back to the projection only when there's no game history yet (a
+new pickup with nothing to average). A temporarily-injured performer with a strong recent average
+no longer gets flagged just because this week reads zero; a rostered player whose recent form is
+itself weak still correctly does. The AI game plan's system prompt (§4) carries the same rule as a
+second line of defense, in case a future change to the offline heuristic reintroduces this failure
+mode — it's explicitly told never to endorse a drop suggestion caused by a single-week absence
+rather than genuine recent-form weakness.
 
 `render/outlook.js` covers the other direction — not swapping players now, but planning a week
 ahead: it lists your next few scheduled opponents (sliced straight out of the same `schedule[]`
