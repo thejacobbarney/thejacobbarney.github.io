@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DateBloom</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#fdf2f7">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%97%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --pink: #d6287a;
+    --pink-dark: #b81f66;
+    --pink-soft: #f4a6c8;
+    --ink: #4a0f2b;
+    --muted: #6b6470;
+    --card: #fbf9fa;
+    --chip: #f1ecee;
+    --bg1: #f6f3f5;
+    --bg2: #ecd3e2;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(135deg, var(--bg1) 0%, #f3e9ef 55%, var(--bg2) 100%);
+    background-attachment: fixed;
+    display: flex; flex-direction: column; align-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
+  }
+  .shell { width: 100%; max-width: 560px; flex: 1; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 10px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 22px; letter-spacing: -0.03em; }
+  .brand svg { width: 28px; height: 28px; fill: var(--pink); }
+  .count { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .08em; }
+  .bar { height: 3px; background: rgba(0,0,0,.08); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--pink); transition: width .45s ease; }
+
+  main { flex: 1; display: flex; align-items: center; }
+  .card {
+    width: 100%; min-height: 440px; background: var(--card); border-radius: 32px;
+    box-shadow: 0 30px 60px -25px rgba(120,20,70,.25), 0 2px 0 rgba(255,255,255,.8) inset;
+    padding: 36px 28px 32px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; position: relative; animation: pop .4s ease both;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+
+  .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--pink); margin-bottom: 14px; }
+  h1 { font-size: clamp(30px, 8vw, 44px); line-height: 1.02; letter-spacing: -0.045em; margin: 0 0 14px; font-weight: 800; }
+  .sub { color: var(--muted); font-size: 15px; margin: 0 0 26px; }
+  .tiny { color: var(--muted); font-size: 12px; margin-top: 22px; }
+
+  .btn {
+    appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 800; letter-spacing: .02em;
+    background: var(--pink); color: #fff; padding: 16px 30px; border-radius: 999px; font-size: 15px;
+    box-shadow: 0 12px 24px -10px rgba(214,40,122,.7); transition: transform .15s, background .2s, opacity .2s;
+  }
+  .btn:hover { transform: translateY(-1px); background: var(--pink-dark); }
+  .btn:active { transform: scale(.97); }
+  .btn[disabled] { background: var(--pink-soft); box-shadow: none; cursor: not-allowed; transform: none; }
+  .btn.ghost { background: var(--chip); color: var(--ink); box-shadow: none; }
+
+  /* step 1 */
+  .ask-zone { position: relative; width: 100%; height: 150px; margin-top: 4px; }
+  .ask-zone .yes { position: absolute; left: 12%; top: 24px; }
+  .ask-zone .no { position: absolute; right: 12%; top: 70px; padding: 14px 26px; transition: left .25s ease, top .25s ease, right .25s ease, transform .15s; }
+
+  /* step 2 */
+  .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 26px; }
+  .chip {
+    appearance: none; border: 2px solid transparent; font: inherit; font-weight: 700; font-size: 15px; color: var(--ink);
+    background: var(--chip); padding: 14px 18px; border-radius: 18px; cursor: pointer; text-align: left;
+    display: flex; align-items: center; gap: 10px; transition: transform .15s, border-color .15s, background .15s;
+  }
+  .chip:hover { transform: translateY(-1px); }
+  .chip.on { border-color: var(--pink); background: #fff; box-shadow: 0 8px 18px -10px rgba(214,40,122,.6); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 420px; margin-bottom: 26px; }
+
+  /* step 3 */
+  .field { width: 100%; max-width: 420px; text-align: left; margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 800; margin: 0 0 6px 2px; }
+  .field input, .field select {
+    width: 100%; font: inherit; font-size: 16px; font-weight: 600; color: var(--ink);
+    background: var(--chip); border: 2px solid transparent; border-radius: 16px; padding: 14px 16px; outline: none;
+  }
+  .field input:focus, .field select:focus { border-color: var(--pink-soft); background: #fff; }
+
+  /* step 6 */
+  .paper { width: 100%; background: #fff; border-radius: 22px; padding: 22px 20px; text-align: left; box-shadow: 0 10px 30px -18px rgba(0,0,0,.3); margin-bottom: 22px; position: relative; }
+  .paper .heart { position: absolute; top: 18px; right: 18px; width: 18px; fill: var(--pink); }
+  .paper .tag { font-size: 10px; font-weight: 800; letter-spacing: .18em; color: var(--pink); }
+  .paper h2 { font-size: 34px; letter-spacing: -0.045em; line-height: 1; margin: 6px 0 4px; }
+  .paper h2 sup { font-size: .4em; vertical-align: super; }
+  .paper .joke { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #eee; }
+  .line { display: flex; justify-content: space-between; align-items: baseline; font-weight: 600; }
+  .line b { font-size: 17px; }
+  .fine { font-size: 12px; color: var(--muted); margin: 4px 0 14px; }
+  .slot { background: #faf6f8; border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; gap: 10px; }
+  .footnote { font-size: 11px; color: var(--muted); margin-top: 14px; }
+
+  /* done */
+  .receipt { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #fff; border-radius: 16px; padding: 16px 18px; text-align: left; width: 100%; max-width: 360px; margin: 0 0 20px; box-shadow: 0 10px 30px -18px rgba(0,0,0,.3); }
+  .receipt div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+  .receipt hr { border: 0; border-top: 1px dashed #ccc; margin: 8px 0; }
+  .status { font-size: 13px; color: var(--muted); min-height: 18px; margin-top: 10px; }
+  .link { color: var(--pink); font-weight: 800; text-decoration: none; }
+
+  footer { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .18em; color: #6b5b66; padding: 18px 0 6px; text-transform: uppercase; }
+  footer span { color: var(--pink); }
+
+  canvas#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+
+  @media (max-width: 420px) { .card { padding: 30px 18px 26px; border-radius: 26px; } .paper h2 { font-size: 28px; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.2 2.8 4.5 6.4 4.5c2 0 3.6 1 4.6 2.6l1 1.4 1-1.4c1-1.6 2.6-2.6 4.6-2.6 3.6 0 5.5 3.7 4 7.2C19.5 16.4 12 21 12 21z"/></svg>
+      DateBloom
+    </div>
+    <div class="count" id="count">1 / 6</div>
+  </header>
+  <div class="bar"><i id="progress"></i></div>
+  <main><section class="card" id="card" aria-live="polite"></section></main>
+  <footer>Dates bloom better here <span>&#9829;</span></footer>
+</div>
+<canvas id="confetti"></canvas>
+
+<script>
+/* ---------------------------------------------------------------
+   EDIT ME. Everything you might want to change lives here.
+---------------------------------------------------------------- */
+const CONFIG = {
+  herName: "",                       // optional, e.g. "Sam"; shows in a few spots when set
+  yourName: "Jake",                  // used in the notification you receive
+  // How you get her answers. Use ONE or both:
+  //  1) Formspree (free): create a form at formspree.io, paste the endpoint here.
+  //     It emails you when she finishes. Example: "https://formspree.io/f/abcdwxyz"
+  formEndpoint: "",
+  //  2) SMS fallback: your phone number, digits only. Opens a prefilled text she can send you.
+  yourPhone: "",
+  defaultDate: "",                   // "YYYY-MM-DD". Leave blank to default to the next Friday.
+  times: ["5:00 PM", "6:00 PM", "7:00 PM", "8:00 PM", "whenever, I'm easy"],
+  foods: [
+    ["\u{1F355}", "Pizza"], ["\u{1F363}", "Sushi"],
+    ["\u{1F354}", "Burgers"], ["\u{1F35D}", "Pasta"],
+    ["\u{1F32E}", "Tacos"], ["\u{1F35C}", "Ramen"]
+  ],
+  vibes: [
+    ["\u{1F60C}", "Comfy and casual"], ["✨", "A little cute"],
+    ["\u{1F483}", "Dressed up"], ["\u{1F917}", "Surprise me"]
+  ],
+  pickup: "6",                       // "be ready by ___"
+  psText: "P.S. normal people text. I made a website during lunch, for you. no big deal.",
+  price: "$499",
+  priceNote: "price may be paid in laughs, good company, and letting me pick the playlist."
+};
+
+/* ---------------- state ---------------- */
+const state = { step: 1, vibe: null, date: "", time: "", food: null, noDodges: 0 };
+const TOTAL = 6;
+const $ = (s, el = document) => el.querySelector(s);
+const card = $("#card");
+
+function nextFriday() {
+  const d = new Date(); d.setHours(12);
+  do { d.setDate(d.getDate() + 1); } while (d.getDay() !== 5);
+  return d.toISOString().slice(0, 10);
+}
+state.date = CONFIG.defaultDate || nextFriday();
+
+function parseDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
+function prettyDate(iso) { return parseDate(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
+function timeLabel(t) { return /whenever/i.test(t) ? "Whenever" : t; }
+function herBit() { return CONFIG.herName ? ", " + CONFIG.herName : ""; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function setStep(n) {
+  state.step = n;
+  $("#count").textContent = n + " / " + TOTAL;
+  $("#progress").style.width = (n / TOTAL * 100) + "%";
+  card.style.animation = "none"; void card.offsetWidth; card.style.animation = "";
+  render();
+}
+
+/* ---------------- screens ---------------- */
+function render() {
+  const s = state.step;
+  if (s === 1) {
+    card.innerHTML = `
+      <div class="eyebrow">&#9829; A very important question</div>
+      <h1>Will you go on a date with me${esc(herBit())}?</h1>
+      <p class="sub">Be honest. There is a right answer, obviously.</p>
+      <div class="ask-zone" id="zone">
+        <button class="btn yes" id="yes">YES &#10024;</button>
+        <button class="btn ghost no" id="no">NO</button>
+      </div>
+      <div class="tiny" id="shy">psst... the NO button is a little shy</div>`;
+    $("#yes").onclick = () => { burst(); setStep(2); };
+    setupNo();
+  } else if (s === 2) {
+    card.innerHTML = `
+      <div class="eyebrow">&#10024; Excellent choice</div>
+      <h1>First, the dress code.</h1>
+      <p class="sub">So I know how hard to impress you.</p>
+      <div class="grid2" id="opts"></div>
+      <button class="btn" id="go" disabled>next &rarr;</button>`;
+    buildChips(CONFIG.vibes, "vibe");
+    $("#go").onclick = () => setStep(3);
+    syncGo();
+  } else if (s === 3) {
+    card.innerHTML = `
+      <div class="eyebrow">&#128197; Save the moment</div>
+      <h1>So... when are you free?</h1>
+      <p class="sub">Pick a day and a time that feels cute.</p>
+      <div class="field"><label for="d">Date</label><input id="d" type="date" value="${esc(state.date)}"></div>
+      <div class="field"><label for="t">Time</label>
+        <select id="t"><option value="">choose a time</option>
+          ${CONFIG.times.map(t => `<option ${t === state.time ? "selected" : ""}>${esc(t)}</option>`).join("")}
+        </select></div>
+      <button class="btn" id="go" disabled style="margin-top:10px">lock it in &rarr;</button>`;
+    const go = $("#go");
+    const check = () => { state.date = $("#d").value; state.time = $("#t").value; go.disabled = !(state.date && state.time); };
+    $("#d").onchange = check; $("#t").onchange = check; check();
+    go.onclick = () => setStep(4);
+  } else if (s === 4) {
+    card.innerHTML = `
+      <div class="eyebrow">&#10022; Date night research</div>
+      <h1>What are we feeling? &#127869;&#10024;</h1>
+      <p class="sub">pick your vibe</p>
+      <div class="grid2" id="opts"></div>
+      <button class="btn" id="go" disabled>this is the vibe &rarr;</button>`;
+    buildChips(CONFIG.foods, "food");
+    $("#go").onclick = () => { burst(); setStep(5); };
+    syncGo();
+  } else if (s === 5) {
+    card.innerHTML = `
+      <div style="font-size:64px;line-height:1;margin-bottom:18px">&#128150;</div>
+      <h1>glad you didn't say no. be ready by ${esc(CONFIG.pickup)}, I'm coming to get you &#128663;</h1>
+      <p class="sub" style="font-size:12px;max-width:380px">${esc(CONFIG.psText)}</p>
+      <button class="btn" id="go">one tiny detail &rarr;</button>`;
+    $("#go").onclick = () => setStep(6);
+  } else if (s === 6) {
+    const food = state.food ? state.food[1] : "Surprise";
+    const emoji = state.food ? state.food[0] : "\u{1F37D}️";
+    card.innerHTML = `
+      <div class="paper">
+        <svg class="heart" viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.2 2.8 4.5 6.4 4.5c2 0 3.6 1 4.6 2.6l1 1.4 1-1.4c1-1.6 2.6-2.6 4.6-2.6 3.6 0 5.5 3.7 4 7.2C19.5 16.4 12 21 12 21z"/></svg>
+        <div class="tag">DATEBLOOM</div>
+        <h2>Date Agreement<sup>TM</sup></h2>
+        <div class="joke">Officially very real paperwork</div>
+        <div class="line"><span>Date Agreement<sup style="font-size:.6em">TM</sup></span><b>${esc(CONFIG.price)}</b></div>
+        <div class="fine">one-time fee &middot; non-refundable &middot; absolutely worth it</div>
+        <div class="slot"><span>${esc(prettyDate(state.date))} &middot; ${esc(timeLabel(state.time))}</span><span>${emoji} ${esc(food)}</span></div>
+        <div class="footnote">${esc(CONFIG.priceNote)}</div>
+      </div>
+      <button class="btn" id="pay">Pay &amp; Confirm &#9829;</button>`;
+    $("#pay").onclick = pay;
+  } else {
+    done();
+  }
+}
+
+function buildChips(list, key) {
+  const box = $("#opts");
+  list.forEach(([emoji, label]) => {
+    const b = document.createElement("button");
+    b.className = "chip" + (state[key] && state[key][1] === label ? " on" : "");
+    b.innerHTML = `<span>${emoji}</span><span>${esc(label)}</span>`;
+    b.onclick = () => {
+      state[key] = [emoji, label];
+      box.querySelectorAll(".chip").forEach(c => c.classList.remove("on"));
+      b.classList.add("on"); syncGo();
+    };
+    box.appendChild(b);
+  });
+}
+function syncGo() {
+  const need = state.step === 2 ? state.vibe : state.food;
+  $("#go").disabled = !need;
+}
+
+/* ---------------- the shy NO button ---------------- */
+function setupNo() {
+  const no = $("#no"), zone = $("#zone"), shy = $("#shy");
+  const lines = ["psst... the NO button is a little shy", "it really doesn't want to be clicked", "still shy", "just say yes already \u{1F97A}", "it moved again, huh", "the NO button has left the building"];
+  const dodge = e => {
+    if (e) e.preventDefault();
+    state.noDodges++;
+    const zr = zone.getBoundingClientRect(), br = no.getBoundingClientRect();
+    const maxX = Math.max(0, zr.width - br.width), maxY = Math.max(0, zr.height - br.height);
+    no.style.right = "auto";
+    no.style.left = Math.random() * maxX + "px";
+    no.style.top = Math.random() * maxY + "px";
+    shy.textContent = lines[Math.min(state.noDodges, lines.length - 1)];
+  };
+  no.addEventListener("pointerenter", dodge);
+  no.addEventListener("touchstart", dodge, { passive: false });
+  no.addEventListener("click", dodge);
+}
+
+/* ---------------- pay and confirm ---------------- */
+function summary() {
+  return {
+    from: CONFIG.yourName,
+    answer: "YES",
+    vibe: state.vibe ? state.vibe[1] : "",
+    date: prettyDate(state.date),
+    time: timeLabel(state.time),
+    food: state.food ? state.food[1] : "",
+    noButtonDodges: state.noDodges,
+    submittedAt: new Date().toLocaleString()
+  };
+}
+function smsText(o) {
+  return `YES! Paid in laughs. ${o.date} at ${o.time}, ${o.food}. Dress code: ${o.vibe}. (${o.noButtonDodges} NO button attempts)`;
+}
+
+async function pay() {
+  const btn = $("#pay"); btn.disabled = true; btn.textContent = "Processing...";
+  const data = summary();
+  state.sent = null;
+  if (CONFIG.formEndpoint) {
+    try {
+      const r = await fetch(CONFIG.formEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ ...data, _subject: "DateBloom: she said YES" })
+      });
+      state.sent = r.ok;
+    } catch (e) { state.sent = false; }
+  }
+  await new Promise(r => setTimeout(r, 700));
+  burst(); burst(); setStep(7); $("#count").textContent = "✓";
+}
+
+function done() {
+  const o = summary();
+  const sms = CONFIG.yourPhone ? `sms:${CONFIG.yourPhone}?&body=${encodeURIComponent(smsText(o))}` : "";
+  let status = "";
+  if (state.sent === true) status = "Your date has been notified. Pretty smooth.";
+  else if (state.sent === false) status = "Couldn't reach the server, so tap the button below to text it instead.";
+  card.innerHTML = `
+    <div style="font-size:54px;line-height:1;margin-bottom:12px">&#127881;</div>
+    <h1>Payment accepted.</h1>
+    <p class="sub">Receipt, for your records:</p>
+    <div class="receipt">
+      <div><span>Date</span><span>${esc(o.date)}</span></div>
+      <div><span>Time</span><span>${esc(o.time)}</span></div>
+      <div><span>Food</span><span>${esc(o.food)}</span></div>
+      <div><span>Dress code</span><span>${esc(o.vibe)}</span></div>
+      <hr>
+      <div><span>Paid in</span><span>laughs</span></div>
+      <div><span>Playlist</span><span>mine</span></div>
+    </div>
+    ${sms ? `<a class="btn" style="text-decoration:none;display:inline-block" href="${sms}">text ${esc(CONFIG.yourName)} the receipt</a>` : ""}
+    <div class="status">${esc(status)}</div>
+    <div class="tiny">see you at ${esc(CONFIG.pickup)} &#128663;</div>`;
+}
+
+/* ---------------- confetti ---------------- */
+const cv = $("#confetti"), cx = cv.getContext("2d");
+let bits = [], raf = null;
+function fit() { cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; }
+addEventListener("resize", fit); fit();
+function burst() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const cols = ["#d6287a", "#f4a6c8", "#ffd1e3", "#ff6fa5", "#fff"];
+  for (let i = 0; i < 90; i++) {
+    bits.push({ x: cv.width / 2, y: cv.height * .55, vx: (Math.random() - .5) * 18 * devicePixelRatio, vy: (-Math.random() * 16 - 6) * devicePixelRatio,
+      s: (Math.random() * 7 + 4) * devicePixelRatio, r: Math.random() * 6, vr: (Math.random() - .5) * .4, c: cols[i % cols.length], life: 1 });
+  }
+  if (!raf) raf = requestAnimationFrame(tick);
+}
+function tick() {
+  cx.clearRect(0, 0, cv.width, cv.height);
+  bits.forEach(b => {
+    b.vy += .5 * devicePixelRatio; b.x += b.vx; b.y += b.vy; b.r += b.vr; b.life -= .008;
+    cx.save(); cx.globalAlpha = Math.max(b.life, 0); cx.translate(b.x, b.y); cx.rotate(b.r);
+    cx.fillStyle = b.c; cx.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2); cx.restore();
+  });
+  bits = bits.filter(b => b.life > 0 && b.y < cv.height + 50);
+  raf = bits.length ? requestAnimationFrame(tick) : null;
+  if (!raf) cx.clearRect(0, 0, cv.width, cv.height);
+}
+
+setStep(1);
+</script>
+</body>
+</html>
