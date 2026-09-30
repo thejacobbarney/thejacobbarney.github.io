@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>DateBloom</title>
+<title>Swoon</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#fdf2f7">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%97%3C/text%3E%3C/svg%3E">
@@ -121,13 +121,13 @@
   <header>
     <div class="brand">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.2 2.8 4.5 6.4 4.5c2 0 3.6 1 4.6 2.6l1 1.4 1-1.4c1-1.6 2.6-2.6 4.6-2.6 3.6 0 5.5 3.7 4 7.2C19.5 16.4 12 21 12 21z"/></svg>
-      DateBloom
+      Swoon
     </div>
     <div class="count" id="count">1 / 6</div>
   </header>
   <div class="bar"><i id="progress"></i></div>
   <main><section class="card" id="card" aria-live="polite"></section></main>
-  <footer>Dates bloom better here <span>&#9829;</span></footer>
+  <footer>Dates go better here <span>&#9829;</span></footer>
 </div>
 <canvas id="confetti"></canvas>
 
@@ -151,9 +151,10 @@ const CONFIG = {
     ["\u{1F354}", "Burgers"], ["\u{1F35D}", "Pasta"],
     ["\u{1F32E}", "Tacos"], ["\u{1F35C}", "Ramen"]
   ],
-  vibes: [
-    ["\u{1F60C}", "Comfy and casual"], ["✨", "A little cute"],
-    ["\u{1F483}", "Dressed up"], ["\u{1F917}", "Surprise me"]
+  // Step 2: the kind of date. A label containing "Uber Eats" counts as a stay in.
+  plans: [
+    ["\u{1F37D}\uFE0F", "Dinner out"], ["\u{1F6CB}\uFE0F", "Uber Eats and chill"],
+    ["\u{1F3AC}", "Movie night out"], ["\u{1F917}", "Surprise me"]
   ],
   pickup: "6",                       // "be ready by ___"
   psText: "P.S. normal people text. I made a website during lunch, for you. no big deal.",
@@ -162,7 +163,7 @@ const CONFIG = {
 };
 
 /* ---------------- state ---------------- */
-const state = { step: 1, vibe: null, date: "", time: "", food: null, noDodges: 0 };
+const state = { step: 1, plan: null, date: "", time: "", food: null, noDodges: 0 };
 const TOTAL = 6;
 const $ = (s, el = document) => el.querySelector(s);
 const card = $("#card");
@@ -177,6 +178,7 @@ state.date = CONFIG.defaultDate || nextFriday();
 function parseDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
 function prettyDate(iso) { return parseDate(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
 function timeLabel(t) { return /whenever/i.test(t) ? "Whenever" : t; }
+function isStayIn() { return !!(state.plan && /uber eats/i.test(state.plan[1])); }
 function herBit() { return CONFIG.herName ? ", " + CONFIG.herName : ""; }
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
@@ -206,11 +208,11 @@ function render() {
   } else if (s === 2) {
     card.innerHTML = `
       <div class="eyebrow">&#10024; Excellent choice</div>
-      <h1>First, the dress code.</h1>
-      <p class="sub">So I know how hard to impress you.</p>
+      <h1>Where are we doing this?</h1>
+      <p class="sub">Out on the town or couch mode.</p>
       <div class="grid2" id="opts"></div>
       <button class="btn" id="go" disabled>next &rarr;</button>`;
-    buildChips(CONFIG.vibes, "vibe");
+    buildChips(CONFIG.plans, "plan");
     $("#go").onclick = () => setStep(3);
     syncGo();
   } else if (s === 3) {
@@ -232,7 +234,7 @@ function render() {
     card.innerHTML = `
       <div class="eyebrow">&#10022; Date night research</div>
       <h1>What are we feeling? &#127869;&#10024;</h1>
-      <p class="sub">pick your vibe</p>
+      <p class="sub">${isStayIn() ? "pick your order" : "pick your vibe"}</p>
       <div class="grid2" id="opts"></div>
       <button class="btn" id="go" disabled>this is the vibe &rarr;</button>`;
     buildChips(CONFIG.foods, "food");
@@ -241,7 +243,9 @@ function render() {
   } else if (s === 5) {
     card.innerHTML = `
       <div style="font-size:64px;line-height:1;margin-bottom:18px">&#128150;</div>
-      <h1>glad you didn't say no. be ready by ${esc(CONFIG.pickup)}, I'm coming to get you &#128663;</h1>
+      <h1>${isStayIn()
+        ? `glad you didn't say no. Uber Eats is on me, I'm coming over at ${esc(CONFIG.pickup)} &#128715;&#65039;`
+        : `glad you didn't say no. be ready by ${esc(CONFIG.pickup)}, I'm coming to get you &#128663;`}</h1>
       <p class="sub" style="font-size:12px;max-width:380px">${esc(CONFIG.psText)}</p>
       <button class="btn" id="go">one tiny detail &rarr;</button>`;
     $("#go").onclick = () => setStep(6);
@@ -251,7 +255,7 @@ function render() {
     card.innerHTML = `
       <div class="paper">
         <svg class="heart" viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.2 2.8 4.5 6.4 4.5c2 0 3.6 1 4.6 2.6l1 1.4 1-1.4c1-1.6 2.6-2.6 4.6-2.6 3.6 0 5.5 3.7 4 7.2C19.5 16.4 12 21 12 21z"/></svg>
-        <div class="tag">DATEBLOOM</div>
+        <div class="tag">SWOON</div>
         <h2>Date Agreement<sup>TM</sup></h2>
         <div class="joke">Officially very real paperwork</div>
         <div class="line"><span>Date Agreement<sup style="font-size:.6em">TM</sup></span><b>${esc(CONFIG.price)}</b></div>
@@ -281,7 +285,7 @@ function buildChips(list, key) {
   });
 }
 function syncGo() {
-  const need = state.step === 2 ? state.vibe : state.food;
+  const need = state.step === 2 ? state.plan : state.food;
   $("#go").disabled = !need;
 }
 
@@ -309,7 +313,7 @@ function summary() {
   return {
     from: CONFIG.yourName,
     answer: "YES",
-    vibe: state.vibe ? state.vibe[1] : "",
+    plan: state.plan ? state.plan[1] : "",
     date: prettyDate(state.date),
     time: timeLabel(state.time),
     food: state.food ? state.food[1] : "",
@@ -318,7 +322,7 @@ function summary() {
   };
 }
 function smsText(o) {
-  return `YES! Paid in laughs. ${o.date} at ${o.time}, ${o.food}. Dress code: ${o.vibe}. (${o.noButtonDodges} NO button attempts)`;
+  return `YES! Paid in laughs. ${o.date} at ${o.time}, ${o.food}. Plan: ${o.plan}. (${o.noButtonDodges} NO button attempts)`;
 }
 
 async function pay() {
@@ -330,7 +334,7 @@ async function pay() {
       const r = await fetch(CONFIG.formEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify({ ...data, _subject: "DateBloom: she said YES" })
+        body: JSON.stringify({ ...data, _subject: "Swoon: she said YES" })
       });
       state.sent = r.ok;
     } catch (e) { state.sent = false; }
@@ -353,14 +357,14 @@ function done() {
       <div><span>Date</span><span>${esc(o.date)}</span></div>
       <div><span>Time</span><span>${esc(o.time)}</span></div>
       <div><span>Food</span><span>${esc(o.food)}</span></div>
-      <div><span>Dress code</span><span>${esc(o.vibe)}</span></div>
+      <div><span>Plan</span><span>${esc(o.plan)}</span></div>
       <hr>
       <div><span>Paid in</span><span>laughs</span></div>
       <div><span>Playlist</span><span>mine</span></div>
     </div>
     ${sms ? `<a class="btn" style="text-decoration:none;display:inline-block" href="${sms}">text ${esc(CONFIG.yourName)} the receipt</a>` : ""}
     <div class="status">${esc(status)}</div>
-    <div class="tiny">see you at ${esc(CONFIG.pickup)} &#128663;</div>`;
+    <div class="tiny">see you at ${esc(CONFIG.pickup)} ${isStayIn() ? "&#128715;&#65039;" : "&#128663;"}</div>`;
 }
 
 /* ---------------- confetti ---------------- */
