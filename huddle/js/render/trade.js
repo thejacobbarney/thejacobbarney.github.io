@@ -1,0 +1,212 @@
+import { escapeHtml, fmtPts } from '../utils.js';
+import { playerValue } from '../lineup.js';
+import { evaluateTrade } from '../trade.js';
+import { loadAiConfig } from '../aiConfig.js';
+import { generateTradeAnalysis } from '../report/aiTrade.js';
+
+// Module-level so selections survive switching tabs away and back within the
+// same league fetch; a fresh fetch doesn't reset this on purpose (still
+// building the same offer across a refresh is the common case), but
+// changing partner clears both sides since picks belong to specific rosters.
+const state = { partnerId: null, give: new Set(), receive: new Set() };
+let aiResult = null;
+let aiResultKey = null;
+
+const VERDICT_LABEL = {
+  favors_you: 'Favors you',
+  favors_them: 'Favors them',
+  even: 'Roughly even',
+};
+
+function compactPlayer(p) {
+  return {
+    name: p.name,
+    position: p.defaultPosition,
+    proTeam: p.proTeam,
+    recentValue: playerValue(p),
+    projected: p.projected,
+    injuryStatus: p.injuryStatus,
+    byeWeek: p.byeWeek,
+  };
+}
+
+function buildTradeAiSummary(league, partner, giving, receiving) {
+  return {
+    week: league.week,
+    you: { team: league.myTeam.name, roster: league.myTeam.roster.map(compactPlayer) },
+    them: { team: partner.name, roster: partner.roster.map(compactPlayer) },
+    trade: {
+      youGive: giving.map(compactPlayer),
+      youReceive: receiving.map(compactPlayer),
+    },
+  };
+}
+
+function playerRow(p, side) {
+  const value = playerValue(p);
+  const checked = state[side].has(p.playerId) ? 'checked' : '';
+  const injury =
+    p.injuryStatus && p.injuryStatus !== 'ACTIVE'
+      ? `<span class="badge ${p.injuryStatus === 'OUT' ? 'badge-out' : 'badge-warn'}">${escapeHtml(p.injuryStatus.replace('_', ' '))}</span>`
+      : '';
+  return `
+    <label class="trade-row">
+      <input type="checkbox" class="trade-check" data-side="${side}" data-id="${p.playerId}" ${checked} />
+      <span class="trade-row-body">
+        <span class="player-name">${escapeHtml(p.name)}</span>
+        <span class="muted player-meta">${escapeHtml(p.proTeam)} · ${escapeHtml(p.defaultPosition)} · <span class="num">${fmtPts(value)}</span> avg</span>
+        ${injury}
+      </span>
+    </label>`;
+}
+
+function verdictBadgeClass(verdict) {
+  if (verdict === 'favors_you') return 'badge-out callout-ok';
+  if (verdict === 'favors_them') return 'badge-warn';
+  return '';
+}
+
+function renderAiResult(result) {
+  const move = (items, render) =>
+    items && items.length ? `<ul class="plain-list">${items.map((i) => `<li>${render(i)}</li>`).join('')}</ul>` : '';
+  return `
+    <div class="card ai-result">
+      <p class="ai-headline">${escapeHtml(result.headline)}</p>
+      ${move(result.reasoning, (r) => escapeHtml(r))}
+      <div class="ai-move-group">
+        <h4>Roster impact</h4>
+        <p><b>You:</b> ${escapeHtml(result.rosterImpact.you)}</p>
+        <p><b>Them:</b> ${escapeHtml(result.rosterImpact.them)}</p>
+      </div>
+      ${result.risks && result.risks.length ? `<div class="ai-move-group"><h4>Risks</h4>${move(result.risks, (r) => escapeHtml(r))}</div>` : ''}
+    </div>`;
+}
+
+export function renderTrade(root, league) {
+  if (!league.myTeam) {
+    root.innerHTML = `<div class="card"><p>Couldn't find your team in this league's response.</p></div>`;
+    return;
+  }
+
+  const otherTeams = league.teams.filter((t) => t.id !== league.myTeam.id);
+  if (otherTeams.length === 0) {
+    root.innerHTML = `<div class="card"><p>No other teams found in this league's response.</p></div>`;
+    return;
+  }
+
+  if (state.partnerId == null || !otherTeams.some((t) => t.id === state.partnerId)) {
+    state.partnerId = otherTeams[0].id;
+  }
+  const partner = otherTeams.find((t) => t.id === state.partnerId);
+
+  const myRoster = league.myTeam.roster;
+  const theirRoster = partner.roster || [];
+
+  if (myRoster.length === 0 || theirRoster.length === 0) {
+    root.innerHTML = `
+      <div class="card">
+        <p>Couldn't load a full roster for one or both teams from this league's response, so there's nothing to build a trade from right now.</p>
+      </div>`;
+    return;
+  }
+
+  const giving = myRoster.filter((p) => state.give.has(p.playerId));
+  const receiving = theirRoster.filter((p) => state.receive.has(p.playerId));
+  const evaluation = evaluateTrade(giving, receiving);
+  const hasSelection = giving.length > 0 || receiving.length > 0;
+
+  const summaryHtml = hasSelection
+    ? `
+      <div class="card trade-summary">
+        <div class="trade-summary-row">
+          <div><span class="muted small">You give</span><div class="num trade-summary-value">${fmtPts(evaluation.giveValue)}</div></div>
+          <span class="trade-vs">⇄</span>
+          <div><span class="muted small">You get</span><div class="num trade-summary-value">${fmtPts(evaluation.receiveValue)}</div></div>
+        </div>
+        <span class="badge ${verdictBadgeClass(evaluation.verdict)}">${VERDICT_LABEL[evaluation.verdict]}</span>
+        ${evaluation.countMismatch ? `<p class="muted small">${giving.length}-for-${receiving.length} — uneven player counts affect roster-spot value beyond raw points.</p>` : ''}
+        <p class="muted small">Value is each player's recent scoring average, not a single week's projection.</p>
+      </div>`
+    : `<div class="card"><p class="muted">Select players on each side to compare.</p></div>`;
+
+  const aiConfig = loadAiConfig();
+  const currentKey = JSON.stringify({ partnerId: state.partnerId, give: [...state.give].sort(), receive: [...state.receive].sort() });
+  const cachedAi = aiResultKey === currentKey ? aiResult : null;
+
+  root.innerHTML = `
+    <div class="card">
+      <label class="field">
+        <span>Trade partner</span>
+        <select id="trade-partner">
+          ${otherTeams.map((t) => `<option value="${t.id}" ${t.id === state.partnerId ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}
+        </select>
+      </label>
+    </div>
+
+    ${summaryHtml}
+
+    <div class="trade-columns">
+      <div class="roster-group">
+        <h3>You give</h3>
+        ${myRoster.map((p) => playerRow(p, 'give')).join('')}
+      </div>
+      <div class="roster-group">
+        <h3>You get (${escapeHtml(partner.name)})</h3>
+        ${theirRoster.map((p) => playerRow(p, 'receive')).join('')}
+      </div>
+    </div>
+
+    ${
+      hasSelection
+        ? `<div class="ai-generate-row">
+            <button type="button" id="trade-ai-btn" class="btn" ${aiConfig.enabled && aiConfig.apiKey ? '' : 'hidden'}>Get AI Trade Analysis</button>
+            <span id="trade-ai-status" class="muted small"></span>
+          </div>
+          ${!(aiConfig.enabled && aiConfig.apiKey) ? '<p class="muted small">Enable AI assistance on the My Team tab to get a written analysis here.</p>' : ''}
+          <div id="trade-ai-result">${cachedAi ? renderAiResult(cachedAi) : ''}</div>`
+        : ''
+    }
+  `;
+
+  root.querySelector('#trade-partner').addEventListener('change', (e) => {
+    state.partnerId = Number(e.target.value);
+    state.give.clear();
+    state.receive.clear();
+    renderTrade(root, league);
+  });
+
+  root.querySelectorAll('.trade-check').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      const side = e.target.dataset.side;
+      const id = Number(e.target.dataset.id);
+      if (e.target.checked) state[side].add(id);
+      else state[side].delete(id);
+      renderTrade(root, league);
+    });
+  });
+
+  const aiBtn = root.querySelector('#trade-ai-btn');
+  if (aiBtn) {
+    aiBtn.addEventListener('click', async () => {
+      const statusEl = root.querySelector('#trade-ai-status');
+      const resultEl = root.querySelector('#trade-ai-result');
+      aiBtn.disabled = true;
+      statusEl.textContent = 'Thinking…';
+      statusEl.className = 'muted small';
+      try {
+        const summary = buildTradeAiSummary(league, partner, giving, receiving);
+        const result = await generateTradeAnalysis(summary, loadAiConfig());
+        aiResult = result;
+        aiResultKey = currentKey;
+        resultEl.innerHTML = renderAiResult(result);
+        statusEl.textContent = '';
+        resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) {
+        statusEl.textContent = `✗ ${err.message}`;
+        statusEl.className = 'muted small status-error';
+      } finally {
+        aiBtn.disabled = false;
+      }
+    });
+  }
+}

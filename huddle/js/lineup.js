@@ -41,7 +41,7 @@ export function findStartSitSuggestions(roster) {
  * otherwise make a rostered star look like the weakest player on the team
  * every week he's hurt, which is a false signal, not a real drop case.
  */
-function rosterValue(player) {
+export function playerValue(player) {
   if (player.recentActual && player.recentActual.length > 0) {
     const sum = player.recentActual.reduce((total, r) => total + r.points, 0);
     return sum / player.recentActual.length;
@@ -61,7 +61,7 @@ function rosterValue(player) {
 export function findWaiverUpgrades(roster, freeAgents) {
   const rosteredByPos = new Map();
   for (const p of roster) {
-    if (p.slotId === IR_SLOT_ID || rosterValue(p) === null) continue;
+    if (p.slotId === IR_SLOT_ID || playerValue(p) === null) continue;
     const list = rosteredByPos.get(p.defaultPosition) || [];
     list.push(p);
     rosteredByPos.set(p.defaultPosition, list);
@@ -77,8 +77,8 @@ export function findWaiverUpgrades(roster, freeAgents) {
 
   const suggestions = [];
   for (const [pos, rosteredList] of rosteredByPos) {
-    const weakest = rosteredList.reduce((a, b) => (rosterValue(b) < rosterValue(a) ? b : a));
-    const weakestValue = rosterValue(weakest);
+    const weakest = rosteredList.reduce((a, b) => (playerValue(b) < playerValue(a) ? b : a));
+    const weakestValue = playerValue(weakest);
     const candidates = (faByPos.get(pos) || []).filter((fa) => fa.projected > weakestValue);
     if (candidates.length === 0) continue;
     const best = candidates.reduce((a, b) => (b.projected > a.projected ? b : a));

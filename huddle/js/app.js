@@ -6,6 +6,7 @@ import { renderMatchup } from './render/matchup.js';
 import { renderStandings } from './render/standings.js';
 import { renderWaiver } from './render/waiver.js';
 import { renderOutlook } from './render/outlook.js';
+import { renderTrade } from './render/trade.js';
 
 const appRoot = document.getElementById('app-root');
 const tabBar = document.getElementById('tab-bar');
@@ -13,11 +14,12 @@ const settingsBtn = document.getElementById('settings-btn');
 const refreshBtn = document.getElementById('refresh-btn');
 const statusEl = document.getElementById('status-line');
 
-const CACHE_KEY = 'huddle:cache:v2';
+const CACHE_KEY = 'huddle:cache:v3';
 const TABS = {
   team: { label: 'My Team', render: renderMyTeam },
   matchup: { label: 'Matchup', render: renderMatchup },
   waiver: { label: 'Waivers', render: renderWaiver },
+  trade: { label: 'Trade', render: renderTrade },
   outlook: { label: 'Outlook', render: renderOutlook },
   standings: { label: 'Standings', render: renderStandings },
 };
