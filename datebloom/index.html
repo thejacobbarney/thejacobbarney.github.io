@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Swoon</title>
 <meta name="robots" content="noindex">
+<meta name="description" content="Priority guest. Flight SW 001. Your seat is waiting.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Swoon Private Aviation">
+<meta property="og:title" content="You're invited to board">
+<meta property="og:description" content="Priority guest. Flight SW 001. Your seat is waiting.">
+<meta property="og:url" content="https://thejacobbarney.com/datebloom/">
+<meta property="og:image" content="https://thejacobbarney.com/datebloom/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A boarding pass inviting Camryn to a date">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="You're invited to board">
+<meta name="twitter:description" content="Priority guest. Flight SW 001. Your seat is waiting.">
+<meta name="twitter:image" content="https://thejacobbarney.com/datebloom/og.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0a0f1c">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230a0f1c'/%3E%3Cpath transform='translate(14 14) scale(3)' fill='%23c2a265' d='M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z'/%3E%3C/svg%3E">
 <style>
@@ -154,22 +169,83 @@
   .status { font-size: 10px; letter-spacing: .14em; color: var(--soft); text-align: center; margin-top: 16px; min-height: 14px; text-transform: uppercase; line-height: 1.6; }
   .link { display: block; text-align: center; margin-top: 14px; font-size: 10px; letter-spacing: .22em; color: var(--brass); text-decoration: none; text-transform: uppercase; }
 
+
+  /* back button */
+  .backrow { height: 22px; margin: 2px 0 0; }
+  .back { appearance: none; background: transparent; border: 0; font: inherit; font-size: 9px; letter-spacing: .3em; text-transform: uppercase; color: var(--soft); cursor: pointer; padding: 4px 2px; transition: color .3s; }
+  .back:hover { color: var(--brass-hi); }
+
+  /* cinematic intro */
+  #intro { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;
+    background: radial-gradient(90% 60% at 50% 30%, #1c2745 0%, #070b15 70%); transition: opacity .9s ease, visibility .9s; }
+  #intro.out { opacity: 0; visibility: hidden; pointer-events: none; }
+  #intro .arc { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; animation: fade 1.2s .2s forwards; }
+  .intro-brand { position: relative; font-family: var(--cond); font-weight: 600; font-size: 38px; color: var(--brass); margin-right: -.5em; opacity: 0; animation: brandIn 1.8s .3s cubic-bezier(.16,.84,.3,1) forwards; }
+  @keyframes brandIn { from { opacity: 0; letter-spacing: 1em; filter: blur(8px); } to { opacity: 1; letter-spacing: .5em; filter: blur(0); } }
+  .intro-sub { position: relative; font-size: 9px; letter-spacing: .4em; color: var(--soft); margin-top: 12px; opacity: 0; animation: fade 1s 1.1s forwards; }
+  .intro-line { position: relative; width: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--brass), transparent); margin: 26px 0; animation: grow 1.2s 1.3s ease forwards; }
+  @keyframes grow { to { width: 180px; } }
+  .intro-welcome { position: relative; font-family: var(--cond); font-weight: 600; font-size: 26px; letter-spacing: .16em; text-transform: uppercase; color: #f1ecde; opacity: 0; animation: fade 1.1s 1.9s forwards; text-align: center; padding: 0 20px; }
+  .intro-skip { position: absolute; bottom: max(24px, env(safe-area-inset-bottom)); font-size: 8px; letter-spacing: .3em; color: #5d5b52; text-transform: uppercase; opacity: 0; animation: fade 1s 1.2s forwards; }
+  @keyframes fade { to { opacity: 1; } }
+
+  /* tear-off boarding pass */
+  .tearwrap { position: relative; filter: drop-shadow(0 22px 26px rgba(0,0,0,.5)); }
+  .shellp { transition: transform 1s cubic-bezier(.2,1.15,.3,1); }
+  .shellp.bot { margin-top: -1px; }
+  .part { box-shadow: none; }
+  .part.top { border-radius: 14px 14px 0 0; padding-bottom: 22px; }
+  .part.stub { border-radius: 0 0 14px 14px; padding-top: 0; }
+  .stub .perf { margin: 0 -22px 16px; }
+  .tearwrap.torn .shellp.top { transform: translate(-5px, -10px) rotate(-1.1deg); }
+  .tearwrap.torn .shellp.bot { transform: translate(10px, 20px) rotate(2.6deg); }
+  .tearwrap.torn .perf { visibility: hidden; }
+  .tearwrap.torn .part.top {
+    -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - 8px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 16px 8px repeat-x;
+    mask: linear-gradient(#000 0 0) top / 100% calc(100% - 8px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 16px 8px repeat-x; }
+  .tearwrap.torn .part.stub {
+    -webkit-mask: linear-gradient(#000 0 0) bottom / 100% calc(100% - 8px) no-repeat, conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / 16px 8px repeat-x;
+    mask: linear-gradient(#000 0 0) bottom / 100% calc(100% - 8px) no-repeat, conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / 16px 8px repeat-x; }
+  .tearwrap.torn.still .shellp { transition: none; }
+  .under { margin-top: 26px; }
+  .under.in { animation: rise .8s cubic-bezier(.16,.84,.3,1) both; }
+  .tear { position: relative; height: 58px; border: 1px solid #2a3452; border-radius: 4px; background: #0c1325; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; transition: opacity .4s, height .5s .1s; }
+  .tear.gone { opacity: 0; }
+  .tear .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(194,162,101,.18); }
+  .tear .label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-left: 54px; font-size: 9.5px; letter-spacing: .26em; text-transform: uppercase; color: var(--soft); pointer-events: none; }
+  .tear .handle { position: absolute; left: 4px; top: 4px; width: 48px; height: 48px; border-radius: 3px; background: linear-gradient(135deg, var(--brass-hi), var(--brass)); color: var(--ink); display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; animation: nudge 2.4s ease-in-out infinite; outline: none; }
+  .tear .handle svg { width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  @keyframes nudge { 0%, 70%, 100% { transform: translateX(0); } 80% { transform: translateX(8px); } 90% { transform: translateX(2px); } }
+
   footer { text-align: center; font-size: 8.5px; letter-spacing: .3em; color: #5d5b52; padding: 16px 0 4px; text-transform: uppercase; }
 
   .fly { position: fixed; left: 0; top: 0; width: 56px; height: 56px; z-index: 60; pointer-events: none; fill: var(--brass-hi); filter: drop-shadow(0 0 10px rgba(227,203,148,.7)); animation: fly 1.9s cubic-bezier(.5,0,.8,.5) forwards; }
   @keyframes fly { from { transform: translate(-12vw, 78vh) rotate(62deg); } to { transform: translate(112vw, -18vh) rotate(62deg); } }
 
   @media (max-width: 380px) { .city { font-size: 38px; } .guest { font-size: 28px; } .brow .code { font-size: 26px; width: 52px; } }
-  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } .fly { display: none; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } .fly, #intro { display: none; } .intro-brand, .intro-sub, .intro-welcome, .intro-skip { opacity: 1; } .under.in { animation: none; } }
 </style>
 </head>
 <body>
+<div id="intro" aria-hidden="true">
+  <svg class="arc" viewBox="0 0 400 700" preserveAspectRatio="xMidYMid slice">
+    <path id="introPath" d="M-30 600 C 60 380, 280 420, 430 120" fill="none" stroke="#c2a265" stroke-width="1" stroke-dasharray="3 8" opacity=".55"/>
+    <g fill="#e3cb94"><g transform="translate(-12 -12) rotate(90 12 12) scale(1.1)"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></g>
+      <animateMotion dur="2.8s" begin="0.5s" fill="freeze" rotate="auto"><mpath href="#introPath"/></animateMotion></g>
+  </svg>
+  <div class="intro-brand">SWOON</div>
+  <div class="intro-sub">PRIVATE AVIATION</div>
+  <div class="intro-line"></div>
+  <div class="intro-welcome" id="introWelcome">Welcome aboard</div>
+  <div class="intro-skip">tap to skip</div>
+</div>
 <div class="shell">
   <header>
     <div class="brand">SWOON<small>PRIVATE AVIATION</small></div>
     <div class="count" id="count">01 / 09</div>
   </header>
   <div class="bar"><i id="progress"></i><svg id="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></div>
+  <div class="backrow"><button class="back" id="back" style="visibility:hidden">&larr; Back</button></div>
   <main><section class="card" id="card" aria-live="polite"></section></main>
   <footer>dates go better here</footer>
 </div>
@@ -189,7 +265,7 @@ const CONFIG = {
   //     It emails you when she finishes. Example: "https://formspree.io/f/abcdwxyz"
   formEndpoint: "https://formspree.io/f/xzezwokz",
   //  2) SMS fallback: your phone number, digits only. Opens a prefilled text she can send you.
-  yourPhone: "",
+  yourPhone: "6026940472",
   defaultDate: "",                   // "YYYY-MM-DD". Leave blank to default to the next Friday.
   times: ["5:00 PM", "6:00 PM", "7:00 PM", "8:00 PM", "whenever, I'm easy"],
   defaultTime: "7:00 PM",            // used when she picks "whenever, I'm easy"
@@ -217,7 +293,25 @@ const CONFIG = {
 };
 
 /* ---------------- state ---------------- */
-const state = { i: 0, done: false, where: null, detail: null, date: "", time: "", food: null, after: [], note: "", noDodges: 0, nameTries: 0 };
+const state = { i: 0, done: false, torn: false, where: null, detail: null, date: "", time: "", food: null, after: [], note: "", noDodges: 0, nameTries: 0, sent: null };
+const QS = new URLSearchParams(location.search);
+const TEST = QS.has("test");            // add ?test to the link to skip sending anything
+const STORE = "swoon-progress-v1";
+const SAVED = ["i", "done", "torn", "where", "detail", "date", "time", "food", "after", "note", "noDodges", "nameTries", "sent"];
+function save() {
+  try { const o = {}; SAVED.forEach(k => { o[k] = state[k]; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {}
+}
+function loadProgress() {
+  try {
+    if (QS.has("reset")) { localStorage.removeItem(STORE); return false; }   // add ?reset to the link to start over
+    const raw = localStorage.getItem(STORE); if (!raw) return false;
+    const o = JSON.parse(raw);
+    SAVED.forEach(k => { if (o[k] !== undefined) state[k] = o[k]; });
+    if (!Array.isArray(state.after)) state.after = [];
+    if (typeof state.i !== "number" || state.i < 0 || state.i >= steps().length) state.i = 0;
+    return true;
+  } catch (e) { return false; }
+}
 const $ = (s, el = document) => el.querySelector(s);
 const card = $("#card");
 const pad = n => String(n).padStart(2, "0");
@@ -228,7 +322,8 @@ function nextFriday() {
   do { d.setDate(d.getDate() + 1); } while (d.getDay() !== 5);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-state.date = CONFIG.defaultDate || nextFriday();
+const DEFAULT_DATE = CONFIG.defaultDate || nextFriday();
+state.date = DEFAULT_DATE;
 
 function parseDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
 function prettyDate(iso) { return parseDate(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
@@ -266,9 +361,12 @@ function show() {
   $("#plane").style.left = pct + "%";
   card.style.animation = "none"; void card.offsetWidth; card.style.animation = "";
   render();
+  const back = $("#back"); if (back) back.style.visibility = (state.i > 0 && !state.done) ? "visible" : "hidden";
+  save();
   window.scrollTo(0, 0);
 }
 function next() { state.i++; show(); }
+function prev() { if (state.i > 0 && !state.done) { state.i--; show(); } }
 
 /* ---------------- screens ---------------- */
 function render() {
@@ -332,13 +430,13 @@ function render() {
       b.className = "pill" + (t === state.time ? " on" : "");
       b.textContent = t.replace(/ (AM|PM)$/i, "");
       b.onclick = () => {
-        state.time = t;
+        state.time = t; save();
         pills.querySelectorAll(".pill").forEach(x => x.classList.remove("on")); b.classList.add("on");
         drawFlaps(true); go.disabled = !state.date;
       };
       pills.appendChild(b);
     });
-    $("#d").onchange = () => { state.date = $("#d").value; go.disabled = !(state.date && state.time); };
+    $("#d").onchange = () => { state.date = $("#d").value; save(); go.disabled = !(state.date && state.time); };
     drawFlaps(false); go.disabled = !(state.date && state.time);
     go.onclick = next;
   } else if (id === "food") {
@@ -370,7 +468,7 @@ function render() {
         <textarea id="n" rows="4" maxlength="300" placeholder="ex: I want something spicy and we have to watch that new show">${esc(state.note)}</textarea></div>
       <button class="btn brass" id="go">${state.note.trim() ? "All set" : "Skip"}</button>`;
     const n = $("#n"), go = $("#go");
-    n.oninput = () => { state.note = n.value; go.textContent = n.value.trim() ? "All set" : "Skip"; };
+    n.oninput = () => { state.note = n.value; save(); go.textContent = n.value.trim() ? "All set" : "Skip"; };
     go.onclick = next;
   } else if (id === "glad") {
     const msg = isStayIn()
@@ -434,7 +532,7 @@ function buildChips(list, key, multi, onPick) {
         box.querySelectorAll(".brow").forEach(c => c.classList.remove("on"));
         b.classList.add("on");
       }
-      syncGo(key);
+      syncGo(key); save();
     };
     box.appendChild(b);
   });
@@ -566,7 +664,7 @@ async function pay() {
   const btn = $("#pay"); btn.disabled = true; btn.textContent = "Processing...";
   const data = summary();
   state.sent = null;
-  if (CONFIG.formEndpoint) {
+  if (CONFIG.formEndpoint && !TEST) {
     try {
       const r = await fetch(CONFIG.formEndpoint, {
         method: "POST",
@@ -593,39 +691,94 @@ function barcode() {
 
 function done() {
   const o = summary();
+  card.innerHTML = `
+    <div class="tearwrap${state.torn ? " torn still" : ""}" id="tw">
+      <div class="shellp top"><div class="ticket part top">
+        <div class="row"><div class="tl">Boarding pass</div><div class="tl">No. ${refNo()}</div></div>
+        <div class="row" style="margin-top:16px;align-items:center">
+          <div><div class="tl">From</div><div class="big city">${esc(o.from)}</div></div>
+          <div class="mid"><i></i>${PLANE}<i></i></div>
+          <div style="text-align:right"><div class="tl">To</div><div class="big city">${esc(o.to)}</div></div>
+        </div>
+        <div class="perf"></div>
+        <div class="grid3">
+          <div><div class="tl">Date</div><b>${esc(o.date)}</b></div>
+          <div><div class="tl">Departs</div><b>${esc(o.time)}</b></div>
+          <div><div class="tl">Seat</div><b>${esc(CONFIG.seat)}</b></div>
+          <div><div class="tl">Gate</div><b>${esc(o.food)}</b></div>
+          <div style="grid-column:2 / -1"><div class="tl">Plan</div><b>${esc(o.plan)}</b></div>
+          ${o.after ? `<div class="wide"><div class="tl">After</div><b>${esc(o.after)}</b></div>` : ""}
+          ${o.note ? `<div class="wide"><div class="tl">Special requests</div><b style="font-family:var(--mono);font-weight:400;font-size:12px;letter-spacing:.02em;text-transform:none">${esc(o.note)}</b></div>` : ""}
+        </div>
+      </div></div>
+      <div class="shellp bot"><div class="ticket part stub">
+        <div class="perf"></div>
+        <div class="fare"><span>Fare &middot; paid in laughs</span><b>${esc(CONFIG.price)}</b></div>
+        <div class="bars">${barcode()}<div class="stamp">CONFIRMED</div></div>
+      </div></div>
+    </div>
+    <div class="under" id="under"></div>`;
+  if (state.torn) showActions(o);
+  else setupTear(o);
+}
+
+function showActions(o) {
   const sms = CONFIG.yourPhone ? `sms:${CONFIG.yourPhone}?&body=${encodeURIComponent(smsText(o))}` : "";
   let status = "";
-  if (state.sent === true) status = "Your host has been notified";
+  if (TEST) status = "Test mode: nothing was sent";
+  else if (state.sent === true) status = "Your host has been notified";
   else if (state.sent === false) status = "Couldn't reach the tower, so text it instead";
-  card.innerHTML = `
-    <div class="ticket">
-      <div class="row"><div class="tl">Boarding pass</div><div class="tl">No. ${refNo()}</div></div>
-      <div class="row" style="margin-top:16px;align-items:center">
-        <div><div class="tl">From</div><div class="big city">${esc(o.from)}</div></div>
-        <div class="mid"><i></i>${PLANE}<i></i></div>
-        <div style="text-align:right"><div class="tl">To</div><div class="big city">${esc(o.to)}</div></div>
-      </div>
-      <div class="perf"></div>
-      <div class="grid3">
-        <div><div class="tl">Date</div><b>${esc(o.date)}</b></div>
-        <div><div class="tl">Departs</div><b>${esc(o.time)}</b></div>
-        <div><div class="tl">Seat</div><b>${esc(CONFIG.seat)}</b></div>
-        <div><div class="tl">Gate</div><b>${esc(o.food)}</b></div>
-        <div style="grid-column:2 / -1"><div class="tl">Plan</div><b>${esc(o.plan)}</b></div>
-        ${o.after ? `<div class="wide"><div class="tl">After</div><b>${esc(o.after)}</b></div>` : ""}
-        ${o.note ? `<div class="wide"><div class="tl">Special requests</div><b style="font-family:var(--mono);font-weight:400;font-size:12px;letter-spacing:.02em;text-transform:none">${esc(o.note)}</b></div>` : ""}
-      </div>
-      <div class="perf"></div>
-      <div class="fare"><span>Fare &middot; paid in laughs</span><b>${esc(CONFIG.price)}</b></div>
-      <div class="bars">${barcode()}<div class="stamp">CONFIRMED</div></div>
-    </div>
-    <div class="btns">
+  const under = $("#under");
+  under.className = "under in";
+  under.innerHTML = `
+    <div class="btns" style="margin-top:0">
       <button class="btn brass" id="ics">Add to calendar</button>
       <a class="btn line" id="gcal" target="_blank" rel="noopener" href="${esc(googleCalUrl())}">Google</a>
     </div>
     ${sms ? `<a class="link" href="${sms}">or text ${esc(CONFIG.yourName)} the boarding pass</a>` : ""}
     <div class="status">${esc(status)}${status ? "<br>" : ""}see you at ${esc(pickupLabel())}</div>`;
   $("#ics").onclick = downloadIcs;
+}
+
+/* slide (or tap) to tear the stub off the boarding pass */
+function setupTear(o) {
+  const under = $("#under");
+  under.innerHTML = `
+    <div class="tear" id="tear">
+      <div class="fill" id="fill"></div>
+      <div class="label">slide to tear off your stub</div>
+      <div class="handle" id="handle" role="button" tabindex="0" aria-label="Tear off your stub"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+    </div>`;
+  const tear = $("#tear"), h = $("#handle"), fill = $("#fill");
+  let drag = false, startX = 0, x = 0, max = 0, moved = false;
+  const doTear = () => {
+    if (state.torn) return;
+    state.torn = true; save();
+    if (navigator.vibrate) navigator.vibrate([20, 40, 30]);
+    $("#tw").classList.add("torn");
+    tear.classList.add("gone");
+    setTimeout(() => showActions(o), 650);
+  };
+  h.addEventListener("pointerdown", e => {
+    drag = true; moved = false; h.style.animation = "none";
+    max = tear.clientWidth - h.offsetWidth - 8; startX = e.clientX - x;
+    try { h.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  h.addEventListener("pointermove", e => {
+    if (!drag) return;
+    x = Math.max(0, Math.min(max, e.clientX - startX));
+    if (x > 4) moved = true;
+    h.style.transform = `translateX(${x}px)`; fill.style.width = (x + 52) + "px";
+  });
+  const end = () => {
+    if (!drag) return; drag = false;
+    if (!moved || x >= max * .85) return doTear();
+    x = 0; h.style.transition = "transform .3s"; h.style.transform = ""; fill.style.width = "0";
+    setTimeout(() => { h.style.transition = ""; h.style.animation = ""; }, 320);
+  };
+  h.addEventListener("pointerup", end);
+  h.addEventListener("pointercancel", end);
+  h.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); doTear(); } });
 }
 
 /* ---------------- takeoff ---------------- */
@@ -638,7 +791,22 @@ function takeoff() {
   document.body.appendChild(el);
 }
 
-show();
+/* ---------------- startup ---------------- */
+$("#back").onclick = prev;
+const restored = loadProgress();
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const intro = $("#intro");
+const playIntro = !reduced && (!restored || (state.i === 0 && !state.done));
+if (playIntro) {
+  $("#introWelcome").textContent = "Welcome aboard, " + CONFIG.herName;
+  let fin = false;
+  const end = () => { if (fin) return; fin = true; show(); intro.classList.add("out"); setTimeout(() => intro.remove(), 1000); };
+  intro.addEventListener("click", end);
+  setTimeout(end, 3600);
+} else {
+  intro.remove();
+  show();
+}
 </script>
 </body>
 </html>
