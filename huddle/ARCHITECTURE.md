@@ -255,6 +255,15 @@ nuance — that's the actual value-add over the free offline comparisons.
 stable until the next fetch), but a fresh fetch — a new `league` object from `app.js` — naturally
 starts clean rather than showing a stale recommendation next to this week's new numbers.
 
+`components/aiSettingsPanel.js` renders the whole settings block (the explanation paragraph,
+enable checkbox, key/model fields) inside a native `<details>`/`<summary>` rather than always-open
+markup, since on a phone screen the full explanation text competes with the roster for space every
+time you open My Team. It defaults open the first time (nothing saved yet, so the setup
+explanation shouldn't be hidden behind a tap) and defaults collapsed once a key is already saved
+(`config.enabled && config.apiKey`), showing "— configured" in the summary line so it's still
+obvious AI is on without expanding it. This is pure presentation — the enable/save/test logic
+underneath is unchanged.
+
 ## 6. Local persistence, no account
 
 League config (Worker URL, league ID, year, team ID, and — for private leagues — SWID/espn_s2)
