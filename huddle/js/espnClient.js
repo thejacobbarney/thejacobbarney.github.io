@@ -117,6 +117,15 @@ export function normalizeLeague(raw, config) {
   const week = raw?.scoringPeriodId ?? raw?.status?.currentMatchupPeriod ?? null;
   const rawTeams = Array.isArray(raw?.teams) ? raw.teams : [];
 
+  const byeWeekByProTeamId = buildByeWeekMap(raw);
+
+  // Every team's roster, not just mine — `view=mRoster` returns the whole
+  // league's rosters in one payload, not a per-team filtered one, which is
+  // what lets the Trade tab show a trade partner's roster with no extra
+  // request. (Least-tested assumption in this file: if a future ESPN
+  // response only includes the requesting team's own roster.entries, other
+  // teams' `roster` here comes back empty rather than breaking anything —
+  // see ARCHITECTURE.md §7.)
   const teams = rawTeams.map((t) => ({
     id: t.id,
     name: teamDisplayName(t),
@@ -126,16 +135,14 @@ export function normalizeLeague(raw, config) {
     ties: t.record?.overall?.ties ?? 0,
     pointsFor: t.record?.overall?.pointsFor ?? null,
     pointsAgainst: t.record?.overall?.pointsAgainst ?? null,
+    roster: (t.roster?.entries || [])
+      .map((e) => normalizePlayerEntry(e, week, byeWeekByProTeamId))
+      .filter(Boolean),
   }));
 
-  const byeWeekByProTeamId = buildByeWeekMap(raw);
   const myTeamId = Number(config.teamId);
   const myRawTeam = rawTeams.find((t) => t.id === myTeamId) || null;
-  const roster = myRawTeam
-    ? (myRawTeam.roster?.entries || [])
-        .map((e) => normalizePlayerEntry(e, week, byeWeekByProTeamId))
-        .filter(Boolean)
-    : [];
+  const roster = teams.find((t) => t.id === myTeamId)?.roster || [];
 
   const findName = (id) => teams.find((t) => t.id === id)?.name || `Team ${id}`;
 

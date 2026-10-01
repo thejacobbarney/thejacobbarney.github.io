@@ -2,8 +2,9 @@
 
 Huddle is a mobile-first, client-only web app (vanilla HTML/CSS/JS, ES modules) that shows your
 ESPN Fantasy Football roster, a start/sit comparison against your bench, waiver-wire add/drop
-suggestions, a multi-week outlook (bye weeks, upcoming opponents), your current matchup, and league
-standings — built to be checked from a phone, not a desktop dashboard.
+suggestions, a trade builder/evaluator against any other team in the league, a multi-week outlook
+(bye weeks, upcoming opponents), your current matchup, and league standings — built to be checked
+from a phone, not a desktop dashboard.
 
 ## 0. Why this isn't purely static like Pulse/Iceberg
 
@@ -46,9 +47,13 @@ huddle/
                                   if the league is private) — local-only, same posture as Pulse
     espnClient.js                fetchLeague() (calls the Worker) + normalizeLeague() (raw ESPN
                                   JSON -> the small shape every render/*.js module consumes)
-    lineup.js                    findStartSitSuggestions() (bench vs. starter) and
-                                  findWaiverUpgrades() (free agent vs. weakest rostered player at
-                                  the same position) — both projected-points comparisons only
+    lineup.js                    findStartSitSuggestions() (bench vs. starter), findWaiverUpgrades()
+                                  (free agent vs. weakest rostered player at the same position), and
+                                  playerValue() (see §3) — the shared "how good is this player right
+                                  now" signal all three of the above, plus trade.js, are built on
+    trade.js                      evaluateTrade() — compares two lists of players (what you'd give
+                                    vs. receive) by playerValue(), works for either building an
+                                    offer or checking one someone sent you (see §4)
     utils.js                     escapeHtml, point formatting
     app.js                       Tab routing, load/refresh/cache orchestration
     aiConfig.js                  localStorage read/write for the optional bring-your-own-key AI
@@ -59,7 +64,9 @@ huddle/
     report/
       aiRecommendation.js            generateAiRecommendation() — sends the computed roster/
                                        matchup/waiver summary to Anthropic, gets back a structured
-                                       game plan (see §6)
+                                       game plan (see §5)
+      aiTrade.js                     generateTradeAnalysis() — same BYOK contract, evaluates a
+                                       specific trade against both teams' full rosters (see §4)
     render/
       setup.js                    League config form
       myTeam.js                   Roster (starters/bench/IR) + inline start/sit callout +
@@ -67,6 +74,8 @@ huddle/
                                     panel/button/result
       matchup.js                  This week's matchup, my score vs opponent's
       waiver.js                    Add/drop suggestions + browsable free-agent pool by position
+      trade.js                     Trade partner picker, two-column player checklist (give/get),
+                                     live value comparison, optional AI trade analysis
       outlook.js                   Bye weeks coming up on your roster + next few opponents
       standings.js                League table sorted by record then points-for
 ```
@@ -114,6 +123,13 @@ assumptions, in case ESPN changes something and a section of the page comes up e
   `{ id, byeWeek }`). If it's wrong, bye-week badges and the Outlook tab's bye-week section just
   render nothing (no crash) — that's the one part of this most likely to need a field-name fix
   once tested against a real league.
+- `view=mRoster` is assumed to return **every team's** roster in one payload, not just the team
+  matching `config.teamId` — `normalizeLeague()` builds a `roster` array on every entry in `teams[]`
+  this way, which is what lets the Trade tab show a trade partner's roster with no extra request.
+  This is the single least-tested assumption behind a whole feature rather than one field: if a
+  future ESPN response only includes the requesting team's own `roster.entries` and leaves other
+  teams' empty, the Trade tab's "You get" column just renders nothing for that team rather than
+  breaking (see §4) — that would be the first thing to check if Trade comes up empty.
 - The free-agent/waiver pool uses a completely different ESPN view, `view=kona_player_info`, which
   additionally requires a request header (`X-Fantasy-Filter`, a JSON string) rather than just query
   params — that's built server-side in `worker/espn-proxy.js`, not passed through from the client.
@@ -140,17 +156,64 @@ line) rather than guessing. It's explicitly a projection-only signal — no awar
 past what ESPN's `injuryStatus` field already says, no weather, no gut feel.
 
 `lineup.js: findWaiverUpgrades()` is the same idea one level out: for each position you roster, it
-finds your single weakest player there (by projected points, IR excluded) and checks whether any
-available free agent at that position projects higher — one add/drop suggestion per position, not
+finds your single weakest player there (by **player value** — see `playerValue()`, IR excluded) and
+checks whether any available free agent at that position projects higher — one add/drop suggestion
+per position, not
 a ranked list of everyone worth considering. The Waivers tab's "Top available" section below that
 is the full browsable pool if the one-line suggestion isn't the move you want.
+
+**Why `playerValue()` and not just this week's projection:** the first version of this used raw
+projected points to find the "weakest" rostered player, which meant a rostered star who's simply
+OUT for a single week (projection: 0) looked like the worst player on the team *every week he was
+hurt* — indistinguishable from an actually bad player, and confidently suggested as a drop candidate
+against literally any healthy waiver-wire body. `playerValue()` fixes this by preferring a player's
+recent scoring average (`recentActual`, already computed for the My Team trend display) over a
+single week's projection, falling back to the projection only when there's no game history yet (a
+new pickup with nothing to average). A temporarily-injured performer with a strong recent average
+no longer gets flagged just because this week reads zero; a rostered player whose recent form is
+itself weak still correctly does. The AI game plan's system prompt (§5) carries the same rule as a
+second line of defense, in case a future change to the offline heuristic reintroduces this failure
+mode — it's explicitly told never to endorse a drop suggestion caused by a single-week absence
+rather than genuine recent-form weakness. `trade.js` (§4) uses the same function for the same
+reason — a trade target shouldn't look worthless just because he's on a bye the week you're
+evaluating the trade.
 
 `render/outlook.js` covers the other direction — not swapping players now, but planning a week
 ahead: it lists your next few scheduled opponents (sliced straight out of the same `schedule[]`
 array the current matchup uses) and flags any rostered player (IR excluded) whose bye week has
 arrived or is coming up, so a bye doesn't surprise you the morning lineups lock.
 
-## 4. AI game plan (optional, bring-your-own-key)
+## 4. Trade builder / evaluator
+
+`render/trade.js` covers both directions the name implies: building a package to offer another
+team, or plugging in a trade someone offered you to check whether it's fair — mechanically identical,
+just which side you tick boxes on first. Pick a trade partner from the other teams in the league
+(§2 — this needs every team's roster in the fetched payload, not just yours), check players on your
+side ("You give") and theirs ("You get"), and `trade.js: evaluateTrade()` compares both sides by
+`playerValue()` (§3) — recent scoring average, not a single week's projection, so a trade target on
+a bye this week doesn't look like a throw-in. A delta inside ±2 points/game is called "roughly
+even" rather than forcing a winner on a close deal; outside that band it says who it favors. An
+uneven player count (e.g. 2-for-1) gets a note, since roster-spot cost isn't captured by point value
+alone.
+
+Selection state (`trade.js`'s module-level `state` object — partner, give set, receive set) lives
+outside React-less render functions the same way `myTeam.js`'s AI cache does: it survives switching
+tabs away and back within a session, but isn't tied to the `league` object, so it persists across a
+refresh too (rebuilding the same offer shouldn't need re-picking every player after every data
+pull). Changing trade partner clears both selections, since a pick belongs to a specific roster.
+
+**AI trade analysis** (`report/aiTrade.js`, optional, same BYOK contract as §5) goes beyond the
+value comparison: it's given both teams' *full* current rosters (not just the traded players) so it
+can reason about roster construction after the trade — does either side end up thin at a position,
+bye-week stacking, injury-risk concentration — the kind of context a bare point-total comparison
+can't see. Same rule as the AI game plan: never call a player droppable/worthless for being
+OUT/QUESTIONABLE/bye this single week without checking his recent-form average first. The result is
+cached per exact selection (a JSON key of partner + give + receive, not a `WeakMap` on the league
+object like `myTeam.js`, since the same league fetch can back many different trade ideas in one
+sitting) so re-rendering after toggling a checkbox doesn't wipe out an unrelated prior analysis
+until the selection actually changes.
+
+## 5. AI game plan (optional, bring-your-own-key)
 
 The offline signals (§3) are deliberately narrow — a raw projected-points delta is honest but
 thin, and mostly just re-displays a number ESPN's own app already shows. `report/aiRecommendation.js`
@@ -173,23 +236,23 @@ nuance — that's the actual value-add over the free offline comparisons.
 stable until the next fetch), but a fresh fetch — a new `league` object from `app.js` — naturally
 starts clean rather than showing a stale recommendation next to this week's new numbers.
 
-## 5. Local persistence, no account
+## 6. Local persistence, no account
 
 League config (Worker URL, league ID, year, team ID, and — for private leagues — SWID/espn_s2)
 lives in `localStorage['huddle:config:v1']`, never anywhere else. The last successfully fetched
-league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v2']`
+league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v3']`
 purely so reopening the app on a spotty phone connection shows *something* instantly (with a
 "showing cached data" note) while a fresh fetch runs in the background — same pattern as Pulse's
-`reportCache.js`. (Bumped from `v1` to `v2` when the free-agent/bye-week/outlook fields were added,
-so an old cached snapshot from before this change doesn't get fed to render code expecting the new
-shape — it's just a cache key, so nothing needed migrating, the old entry is simply never read.)
+`reportCache.js`. (Bumped `v1` → `v2` when the free-agent/bye-week/outlook fields were added, then
+`v2` → `v3` when every team's roster was added for Trade — each bump is just a cache key, so
+nothing needed migrating, the old entry is simply never read.)
 
 SWID/espn_s2 cookies are ESPN's own session cookies, not a Huddle-issued credential — they expire
 periodically (weeks to months), at which point requests to a private league start failing and
 they need refreshing from a logged-in `fantasy.espn.com` browser session (Settings → the two
 private-league fields).
 
-## 6. Cache-busting
+## 7. Cache-busting
 
 Same manual-versioning approach as the rest of the site (see Pulse's ARCHITECTURE.md §8) — bump
 `?v=N` on `css/style.css`'s `<link>` in `index.html` any time the stylesheet changes.
