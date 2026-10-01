@@ -626,6 +626,32 @@ function syncGo(key) {
   $("#go").disabled = Array.isArray(v) ? v.length === 0 : !v;
 }
 
+/* ---------------- haptics ---------------- */
+/* Patterns alternate vibrate, pause, vibrate... in milliseconds. Android uses the Vibration API.
+   iPhone Safari has no such API, so on iOS 17.4+ a hidden switch is toggled instead, which
+   gives a short tick for each "vibrate" step. */
+const HAPTIC = {
+  rip: [14, 22, 20, 22, 26, 22, 34, 22, 48],      // a quick ripple that builds, like paper tearing
+  denied: [70, 60, 70, 60, 150]                   // two sharp knocks and a heavy one
+};
+let hapticSwitch = null;
+function haptic(pattern) {
+  try {
+    if (navigator.vibrate) { navigator.vibrate(pattern); return; }
+    if (!hapticSwitch) {
+      const label = document.createElement("label");
+      label.setAttribute("aria-hidden", "true");
+      label.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
+      const input = document.createElement("input");
+      input.type = "checkbox"; input.setAttribute("switch", ""); input.tabIndex = -1;
+      label.appendChild(input); document.body.appendChild(label);
+      hapticSwitch = label;
+    }
+    let t = 0;
+    pattern.forEach((ms, i) => { if (i % 2 === 0) setTimeout(() => hapticSwitch.click(), t); t += ms; });
+  } catch (e) {}
+}
+
 /* ---------------- the name gag (escalates) ---------------- */
 function accessDenied(n) {
   const el = document.createElement("div");
@@ -634,7 +660,7 @@ function accessDenied(n) {
   document.body.appendChild(el);
   el.addEventListener("animationend", () => el.remove());
   const t = $(".ticket"); if (t) { t.classList.remove("shake"); void t.offsetWidth; t.classList.add("shake"); }
-  if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+  haptic(HAPTIC.denied);
 }
 function setupName() {
   const sel = $("#nm"), shy = $("#shy"), her = CONFIG.herName;
@@ -910,7 +936,7 @@ function setupTear(o) {
   const doTear = () => {
     if (state.torn) return;
     state.torn = true; save();
-    if (navigator.vibrate) navigator.vibrate([20, 40, 30]);
+    haptic(HAPTIC.rip);
     $("#tw").classList.add("torn");
     tear.classList.add("gone");
     setTimeout(() => showActions(o), 650);
