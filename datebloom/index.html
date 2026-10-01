@@ -107,6 +107,14 @@
   .status { font-size: 13px; color: var(--muted); min-height: 18px; margin-top: 10px; }
   .link { color: var(--pink); font-weight: 800; text-decoration: none; }
 
+
+  .field textarea { width: 100%; font: inherit; font-size: 16px; font-weight: 600; color: var(--ink); background: var(--chip); border: 2px solid transparent; border-radius: 16px; padding: 14px 16px; outline: none; resize: vertical; }
+  .field textarea:focus { border-color: var(--pink-soft); background: #fff; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .namepick { font: inherit; letter-spacing: inherit; font-weight: 800; color: var(--pink); background: transparent; border: 0; border-bottom: 3px dashed var(--pink-soft); border-radius: 0; padding: 0 2px; cursor: pointer; outline: none; max-width: 100%; }
+  .btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .btns .btn { text-decoration: none; display: inline-block; }
+
   footer { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .18em; color: #6b5d3a; padding: 18px 0 6px; text-transform: uppercase; }
   footer span { color: var(--pink); }
 
@@ -136,8 +144,9 @@
    EDIT ME. Everything you might want to change lives here.
 ---------------------------------------------------------------- */
 const CONFIG = {
-  herName: "",                       // optional, e.g. "Sam"; shows in a few spots when set
-  yourName: "Jake",                  // used in the notification you receive
+  herName: "Camryn",                 // always pre-selected, and the only name that sticks (see names)
+  names: ["Aaliyah", "Ava", "Bella", "Charlotte", "Camryn", "Chloe", "Emily", "Emma", "Grace", "Harper", "Isabella", "Layla", "Lily", "Mia", "Olivia", "Sophia", "Zoe"],
+  yourName: "Jake",                  // used in the notification you receive and the calendar event
   // How you get her answers. Use ONE or both:
   //  1) Formspree (free): create a form at formspree.io, paste the endpoint here.
   //     It emails you when she finishes. Example: "https://formspree.io/f/abcdwxyz"
@@ -151,10 +160,25 @@ const CONFIG = {
     ["\u{1F354}", "Burgers"], ["\u{1F35D}", "Pasta"],
     ["\u{1F32E}", "Tacos"], ["\u{1F35C}", "Ramen"]
   ],
-  // Step 2: the kind of date. A label containing "Uber Eats" counts as a stay in.
-  plans: [
-    ["\u{1F37D}\uFE0F", "Dinner out"], ["\u{1F6CB}\uFE0F", "Uber Eats and chill"],
-    ["\u{1F3AC}", "Movie night out"], ["\u{1F917}", "Surprise me"]
+  // Step 2: where. The third value drives the follow-up question.
+  places: [
+    ["\u{1F306}", "Out on the town", "out"],
+    ["\u{1F3E0}", "At home", "home"],
+    ["\u{1F917}", "Surprise me", "surprise"]
+  ],
+  // Follow-up when she picks "out". A label containing "Uber Eats" or "Cook" changes the later copy.
+  dress: [
+    ["\u{1F60C}", "Comfy and casual"], ["\u2728", "A little cute"],
+    ["\u{1F483}", "Dressed up"], ["\u{1F451}", "Fancy fancy"]
+  ],
+  // Follow-up when she picks "at home".
+  homePlans: [
+    ["\u{1F6CB}\uFE0F", "Uber Eats and chill"], ["\u{1F9D1}\u200D\u{1F373}", "Cook at home together"]
+  ],
+  afters: [
+    ["\u{1F366}", "Dessert"], ["\u{1F319}", "A walk"],
+    ["\u{1F3AC}", "A movie"], ["\u{1F3B2}", "Game night"],
+    ["\u2B50", "Stargazing"], ["\u{1F917}", "Surprise me"]
   ],
   pickup: "6",                       // "be ready by ___"
   psText: "P.S. normal people text. I made a website during lunch, for you. no big deal.",
@@ -163,59 +187,90 @@ const CONFIG = {
 };
 
 /* ---------------- state ---------------- */
-const state = { step: 1, plan: null, date: "", time: "", food: null, noDodges: 0 };
-const TOTAL = 6;
+const state = { i: 0, done: false, where: null, detail: null, date: "", time: "", food: null, after: [], note: "", noDodges: 0, nameTries: 0 };
 const $ = (s, el = document) => el.querySelector(s);
 const card = $("#card");
+const pad = n => String(n).padStart(2, "0");
 
 function nextFriday() {
   const d = new Date(); d.setHours(12);
   do { d.setDate(d.getDate() + 1); } while (d.getDay() !== 5);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 state.date = CONFIG.defaultDate || nextFriday();
 
 function parseDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
 function prettyDate(iso) { return parseDate(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
 function timeLabel(t) { return /whenever/i.test(t) ? "Whenever" : t; }
-function isStayIn() { return !!(state.plan && /uber eats/i.test(state.plan[1])); }
-function herBit() { return CONFIG.herName ? ", " + CONFIG.herName : ""; }
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function isStayIn() { return !!(state.detail && /uber eats/i.test(state.detail[1])); }
+function isCook() { return !!(state.detail && /cook/i.test(state.detail[1])); }
+function planText() {
+  const w = state.where ? state.where[1] : "";
+  if (!state.where || state.where[2] === "surprise") return w || "Surprise me";
+  if (state.where[2] === "home") return state.detail ? state.detail[1] : w;
+  return state.detail ? `${w} (${state.detail[1]})` : w;
+}
+function afterText() { return state.after.map(a => a[1]).join(", "); }
 
-function setStep(n) {
-  state.step = n;
-  $("#count").textContent = n + " / " + TOTAL;
-  $("#progress").style.width = (n / TOTAL * 100) + "%";
+/* The flow adapts to her answers: "Surprise me" skips the follow-up question. */
+function steps() {
+  const s = ["ask", "where"];
+  if (!state.where || state.where[2] !== "surprise") s.push("detail");
+  s.push("when", "food", "after", "note", "glad", "agree");
+  return s;
+}
+function show() {
+  const list = steps();
+  const n = state.done ? list.length : state.i + 1;
+  $("#count").textContent = state.done ? "\u2713" : n + " / " + list.length;
+  $("#progress").style.width = (n / list.length * 100) + "%";
   card.style.animation = "none"; void card.offsetWidth; card.style.animation = "";
   render();
 }
+function next() { state.i++; show(); }
 
 /* ---------------- screens ---------------- */
 function render() {
-  const s = state.step;
-  if (s === 1) {
+  if (state.done) return done();
+  const id = steps()[state.i];
+  if (id === "ask") {
     card.innerHTML = `
       <div class="eyebrow">&#9829; A very important question</div>
-      <h1>Will you go on a date with me${esc(herBit())}?</h1>
+      <h1>Will you go on a date with me, <select class="namepick" id="nm" aria-label="Name">${
+        CONFIG.names.map(n => `<option ${n === CONFIG.herName ? "selected" : ""}>${esc(n)}</option>`).join("")
+      }</select>?</h1>
       <p class="sub">Be honest. There is a right answer, obviously.</p>
       <div class="ask-zone" id="zone">
         <button class="btn yes" id="yes">YES &#10024;</button>
         <button class="btn ghost no" id="no">NO</button>
       </div>
       <div class="tiny" id="shy">psst... the NO button is a little shy</div>`;
-    $("#yes").onclick = () => { burst(); setStep(2); };
+    $("#yes").onclick = () => { burst(); next(); };
+    setupName();
     setupNo();
-  } else if (s === 2) {
+  } else if (id === "where") {
     card.innerHTML = `
       <div class="eyebrow">&#10024; Excellent choice</div>
       <h1>Where are we doing this?</h1>
       <p class="sub">Out on the town or couch mode.</p>
       <div class="grid2" id="opts"></div>
       <button class="btn" id="go" disabled>next &rarr;</button>`;
-    buildChips(CONFIG.plans, "plan");
-    $("#go").onclick = () => setStep(3);
-    syncGo();
-  } else if (s === 3) {
+    buildChips(CONFIG.places, "where", false, () => { state.detail = null; });
+    $("#go").onclick = next;
+    syncGo("where");
+  } else if (id === "detail") {
+    const home = state.where && state.where[2] === "home";
+    card.innerHTML = `
+      <div class="eyebrow">&#10022; ${home ? "Couch mode" : "Details"}</div>
+      <h1>${home ? "What's the move?" : "What's the dress code?"}</h1>
+      <p class="sub">${home ? "Two very good options." : "So I know how hard to impress you."}</p>
+      <div class="grid2" id="opts"></div>
+      <button class="btn" id="go" disabled>next &rarr;</button>`;
+    buildChips(home ? CONFIG.homePlans : CONFIG.dress, "detail");
+    $("#go").onclick = next;
+    syncGo("detail");
+  } else if (id === "when") {
     card.innerHTML = `
       <div class="eyebrow">&#128197; Save the moment</div>
       <h1>So... when are you free?</h1>
@@ -229,29 +284,53 @@ function render() {
     const go = $("#go");
     const check = () => { state.date = $("#d").value; state.time = $("#t").value; go.disabled = !(state.date && state.time); };
     $("#d").onchange = check; $("#t").onchange = check; check();
-    go.onclick = () => setStep(4);
-  } else if (s === 4) {
+    go.onclick = next;
+  } else if (id === "food") {
     card.innerHTML = `
       <div class="eyebrow">&#10022; Date night research</div>
-      <h1>What are we feeling? &#127869;&#10024;</h1>
-      <p class="sub">${isStayIn() ? "pick your order" : "pick your vibe"}</p>
+      <h1>${isCook() ? "What's on the menu?" : "What are we feeling?"} &#127869;&#10024;</h1>
+      <p class="sub">${isStayIn() ? "pick your order" : isCook() ? "pick what we're cooking" : "pick your vibe"}</p>
       <div class="grid2" id="opts"></div>
       <button class="btn" id="go" disabled>this is the vibe &rarr;</button>`;
     buildChips(CONFIG.foods, "food");
-    $("#go").onclick = () => { burst(); setStep(5); };
-    syncGo();
-  } else if (s === 5) {
+    $("#go").onclick = () => { burst(); next(); };
+    syncGo("food");
+  } else if (id === "after") {
+    card.innerHTML = `
+      <div class="eyebrow">&#127769; Plan B, C and D</div>
+      <h1>And what about after?</h1>
+      <p class="sub">pick as many as you want</p>
+      <div class="grid2" id="opts"></div>
+      <button class="btn" id="go" disabled>next &rarr;</button>`;
+    buildChips(CONFIG.afters, "after", true);
+    $("#go").onclick = next;
+    syncGo("after");
+  } else if (id === "note") {
+    card.innerHTML = `
+      <div class="eyebrow">&#128221; Totally optional</div>
+      <h1>Anything I should know?</h1>
+      <p class="sub">Cravings, activities, a show you want to watch. Or skip.</p>
+      <div class="field"><label for="n" class="sr">Note</label>
+        <textarea id="n" rows="4" maxlength="300" placeholder="ex: I want something spicy and we have to watch that new show">${esc(state.note)}</textarea></div>
+      <button class="btn" id="go">${state.note.trim() ? "all set" : "skip"} &rarr;</button>`;
+    const n = $("#n"), go = $("#go");
+    n.oninput = () => { state.note = n.value; go.innerHTML = (n.value.trim() ? "all set" : "skip") + " &rarr;"; };
+    go.onclick = next;
+  } else if (id === "glad") {
+    const msg = isStayIn()
+      ? `glad you didn't say no. Uber Eats is on me, I'm coming over at ${esc(CONFIG.pickup)} &#128715;&#65039;`
+      : isCook()
+        ? `glad you didn't say no. I'm cooking, come over at ${esc(CONFIG.pickup)} and bring your appetite &#127859;`
+        : `glad you didn't say no. be ready by ${esc(CONFIG.pickup)}, I'm coming to get you &#128663;`;
     card.innerHTML = `
       <div style="font-size:64px;line-height:1;margin-bottom:18px">&#128155;</div>
-      <h1>${isStayIn()
-        ? `glad you didn't say no. Uber Eats is on me, I'm coming over at ${esc(CONFIG.pickup)} &#128715;&#65039;`
-        : `glad you didn't say no. be ready by ${esc(CONFIG.pickup)}, I'm coming to get you &#128663;`}</h1>
+      <h1>${msg}</h1>
       <p class="sub" style="font-size:12px;max-width:380px">${esc(CONFIG.psText)}</p>
       <button class="btn" id="go">one tiny detail &rarr;</button>`;
-    $("#go").onclick = () => setStep(6);
-  } else if (s === 6) {
+    $("#go").onclick = next;
+  } else if (id === "agree") {
     const food = state.food ? state.food[1] : "Surprise";
-    const emoji = state.food ? state.food[0] : "\u{1F37D}️";
+    const emoji = state.food ? state.food[0] : "\u{1F37D}\uFE0F";
     card.innerHTML = `
       <div class="paper">
         <svg class="heart" viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.2 2.8 4.5 6.4 4.5c2 0 3.6 1 4.6 2.6l1 1.4 1-1.4c1-1.6 2.6-2.6 4.6-2.6 3.6 0 5.5 3.7 4 7.2C19.5 16.4 12 21 12 21z"/></svg>
@@ -261,68 +340,159 @@ function render() {
         <div class="line"><span>Date Agreement<sup style="font-size:.6em">TM</sup></span><b>${esc(CONFIG.price)}</b></div>
         <div class="fine">one-time fee &middot; non-refundable &middot; absolutely worth it</div>
         <div class="slot"><span>${esc(prettyDate(state.date))} &middot; ${esc(timeLabel(state.time))}</span><span>${emoji} ${esc(food)}</span></div>
+        <div class="slot" style="margin-top:8px"><span>${esc(planText())}</span>${state.after.length ? `<span>+ ${esc(afterText())}</span>` : ""}</div>
         <div class="footnote">${esc(CONFIG.priceNote)}</div>
       </div>
       <button class="btn" id="pay">Pay &amp; Confirm &#9829;</button>`;
     $("#pay").onclick = pay;
-  } else {
-    done();
   }
 }
 
-function buildChips(list, key) {
+/* single or multi select chips. onPick runs when a different single choice is made. */
+function buildChips(list, key, multi, onPick) {
   const box = $("#opts");
-  list.forEach(([emoji, label]) => {
+  const isOn = label => multi ? state[key].some(x => x[1] === label) : !!(state[key] && state[key][1] === label);
+  list.forEach(item => {
     const b = document.createElement("button");
-    b.className = "chip" + (state[key] && state[key][1] === label ? " on" : "");
-    b.innerHTML = `<span>${emoji}</span><span>${esc(label)}</span>`;
+    b.className = "chip" + (isOn(item[1]) ? " on" : "");
+    b.innerHTML = `<span>${item[0]}</span><span>${esc(item[1])}</span>`;
     b.onclick = () => {
-      state[key] = [emoji, label];
-      box.querySelectorAll(".chip").forEach(c => c.classList.remove("on"));
-      b.classList.add("on"); syncGo();
+      if (multi) {
+        const at = state[key].findIndex(x => x[1] === item[1]);
+        if (at >= 0) state[key].splice(at, 1); else state[key].push(item);
+        b.classList.toggle("on", at < 0);
+      } else {
+        if (!state[key] || state[key][1] !== item[1]) { state[key] = item; if (onPick) onPick(); }
+        box.querySelectorAll(".chip").forEach(c => c.classList.remove("on"));
+        b.classList.add("on");
+      }
+      syncGo(key);
     };
     box.appendChild(b);
   });
 }
-function syncGo() {
-  const need = state.step === 2 ? state.plan : state.food;
-  $("#go").disabled = !need;
+function syncGo(key) {
+  const v = state[key];
+  $("#go").disabled = Array.isArray(v) ? v.length === 0 : !v;
+}
+
+/* ---------------- the name gag ---------------- */
+function setupName() {
+  const sel = $("#nm"), shy = $("#shy");
+  const lines = ["nice try. it's still " + CONFIG.herName + ".", "there is only one correct answer here", "I admire the persistence. it's " + CONFIG.herName + "."];
+  sel.onchange = () => {
+    if (sel.value === CONFIG.herName) return;
+    shy.textContent = lines[Math.min(state.nameTries++, lines.length - 1)];
+    setTimeout(() => { sel.value = CONFIG.herName; }, 900);
+  };
 }
 
 /* ---------------- the shy NO button ---------------- */
 function setupNo() {
   const no = $("#no"), zone = $("#zone"), shy = $("#shy");
-  const lines = ["psst... the NO button is a little shy", "it really doesn't want to be clicked", "still shy", "just say yes already \u{1F97A}", "it moved again, huh", "the NO button has left the building"];
+  const lines = ["psst... the NO button is a little shy", "it really doesn't want to be clicked", "still shy", "just say yes already \u{1F97A}", "it's getting smaller", "it moved again, huh", "almost out of energy", "okay fine, you can click it"];
+  let tamed = false, won = false;
+  const tame = () => {
+    tamed = true;
+    no.textContent = "okay fine, you can click me";
+    no.style.transform = "scale(.8)";
+    shy.textContent = lines[lines.length - 1];
+  };
   const dodge = e => {
+    if (tamed) return;
     if (e) e.preventDefault();
-    state.noDodges++;
+    const n = ++state.noDodges;
+    if (n >= 8) return tame();
     const zr = zone.getBoundingClientRect(), br = no.getBoundingClientRect();
     const maxX = Math.max(0, zr.width - br.width), maxY = Math.max(0, zr.height - br.height);
     no.style.right = "auto";
     no.style.left = Math.random() * maxX + "px";
     no.style.top = Math.random() * maxY + "px";
-    shy.textContent = lines[Math.min(state.noDodges, lines.length - 1)];
+    no.style.transform = `scale(${Math.max(.6, 1 - n * .05)})`;
+    shy.textContent = lines[Math.min(n, lines.length - 2)];
   };
   no.addEventListener("pointerenter", dodge);
   no.addEventListener("touchstart", dodge, { passive: false });
-  no.addEventListener("click", dodge);
+  no.addEventListener("click", e => {
+    if (!tamed) return dodge(e);
+    if (won) return;
+    won = true;
+    no.textContent = "YES \u2728";
+    no.className = "btn yes";
+    shy.textContent = "plot twist: that was a YES button all along";
+    burst();
+    setTimeout(next, 1300);
+  });
+}
+
+/* ---------------- calendar ---------------- */
+function startDateTime() {
+  const [y, m, d] = state.date.split("-").map(Number);
+  let h = 19, min = 0;
+  const mt = /^(\d+):(\d+)\s*(AM|PM)/i.exec(state.time);
+  if (mt) { h = (+mt[1]) % 12 + (/pm/i.test(mt[3]) ? 12 : 0); min = +mt[2]; }
+  return new Date(y, m - 1, d, h, min);
+}
+function fmtLocal(dt) { return `${dt.getFullYear()}${pad(dt.getMonth() + 1)}${pad(dt.getDate())}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`; }
+function eventTitle() { return `Date night with ${CONFIG.yourName} \u{1F49B}`; }
+function eventDetails() {
+  const bits = [`Plan: ${planText()}`];
+  if (state.food) bits.push(`Food: ${state.food[1]}`);
+  if (state.after.length) bits.push(`After: ${afterText()}`);
+  if (/whenever/i.test(state.time)) bits.push("Time is flexible, so we'll text.");
+  if (state.note.trim()) bits.push(`Notes: ${state.note.trim()}`);
+  bits.push(`Pickup around ${CONFIG.pickup}.`);
+  return bits.join("\n");
+}
+function icsEsc(s) { return String(s).replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
+function buildIcs() {
+  const start = startDateTime(), end = new Date(start.getTime() + 3 * 3600 * 1000);
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  return [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Swoon//Date Night//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:swoon-${fmtLocal(start)}@thejacobbarney.github.io`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${fmtLocal(start)}`,
+    `DTEND:${fmtLocal(end)}`,
+    `SUMMARY:${icsEsc(eventTitle())}`,
+    `DESCRIPTION:${icsEsc(eventDetails())}`,
+    "BEGIN:VALARM", "TRIGGER:-PT1H", "ACTION:DISPLAY", `DESCRIPTION:${icsEsc(eventTitle())}`, "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR"
+  ].join("\r\n");
+}
+function downloadIcs() {
+  const url = URL.createObjectURL(new Blob([buildIcs()], { type: "text/calendar;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = "date-night.ics";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function googleCalUrl() {
+  const start = startDateTime(), end = new Date(start.getTime() + 3 * 3600 * 1000);
+  const q = new URLSearchParams({ action: "TEMPLATE", text: eventTitle(), dates: `${fmtLocal(start)}/${fmtLocal(end)}`, details: eventDetails() });
+  return "https://calendar.google.com/calendar/render?" + q.toString();
 }
 
 /* ---------------- pay and confirm ---------------- */
 function summary() {
   return {
     from: CONFIG.yourName,
+    to: CONFIG.herName,
     answer: "YES",
-    plan: state.plan ? state.plan[1] : "",
+    plan: planText(),
     date: prettyDate(state.date),
     time: timeLabel(state.time),
     food: state.food ? state.food[1] : "",
+    after: afterText(),
+    note: state.note.trim(),
     noButtonDodges: state.noDodges,
+    nameChangeAttempts: state.nameTries,
     submittedAt: new Date().toLocaleString()
   };
 }
 function smsText(o) {
-  return `YES! Paid in laughs. ${o.date} at ${o.time}, ${o.food}. Plan: ${o.plan}. (${o.noButtonDodges} NO button attempts)`;
+  return `YES! Paid in laughs. ${o.date} at ${o.time}, ${o.food}. Plan: ${o.plan}.${o.after ? " After: " + o.after + "." : ""}${o.note ? " Note: " + o.note : ""} (${o.noButtonDodges} NO button attempts)`;
 }
 
 async function pay() {
@@ -334,13 +504,14 @@ async function pay() {
       const r = await fetch(CONFIG.formEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify({ ...data, _subject: "Swoon: she said YES" })
+        body: JSON.stringify({ ...data, _subject: "Swoon: " + CONFIG.herName + " said YES" })
       });
       state.sent = r.ok;
     } catch (e) { state.sent = false; }
   }
   await new Promise(r => setTimeout(r, 700));
-  burst(); burst(); setStep(7); $("#count").textContent = "✓";
+  burst(); burst();
+  state.done = true; show();
 }
 
 function done() {
@@ -354,17 +525,24 @@ function done() {
     <h1>Payment accepted.</h1>
     <p class="sub">Receipt, for your records:</p>
     <div class="receipt">
+      <div><span>Plan</span><span>${esc(o.plan)}</span></div>
       <div><span>Date</span><span>${esc(o.date)}</span></div>
       <div><span>Time</span><span>${esc(o.time)}</span></div>
       <div><span>Food</span><span>${esc(o.food)}</span></div>
-      <div><span>Plan</span><span>${esc(o.plan)}</span></div>
+      ${o.after ? `<div><span>After</span><span>${esc(o.after)}</span></div>` : ""}
+      ${o.note ? `<div><span>Note</span><span>${esc(o.note)}</span></div>` : ""}
       <hr>
       <div><span>Paid in</span><span>laughs</span></div>
       <div><span>Playlist</span><span>mine</span></div>
     </div>
-    ${sms ? `<a class="btn" style="text-decoration:none;display:inline-block" href="${sms}">text ${esc(CONFIG.yourName)} the receipt</a>` : ""}
+    <div class="btns">
+      <button class="btn" id="ics">add to calendar &#128197;</button>
+      <a class="btn ghost" id="gcal" target="_blank" rel="noopener" href="${esc(googleCalUrl())}">Google Calendar</a>
+    </div>
+    ${sms ? `<a class="link" style="display:inline-block;margin-top:14px" href="${sms}">or text ${esc(CONFIG.yourName)} the receipt</a>` : ""}
     <div class="status">${esc(status)}</div>
-    <div class="tiny">see you at ${esc(CONFIG.pickup)} ${isStayIn() ? "&#128715;&#65039;" : "&#128663;"}</div>`;
+    <div class="tiny">see you at ${esc(CONFIG.pickup)} ${isStayIn() ? "&#128715;&#65039;" : isCook() ? "&#127859;" : "&#128663;"}</div>`;
+  $("#ics").onclick = downloadIcs;
 }
 
 /* ---------------- confetti ---------------- */
@@ -393,7 +571,7 @@ function tick() {
   if (!raf) cx.clearRect(0, 0, cv.width, cv.height);
 }
 
-setStep(1);
+show();
 </script>
 </body>
 </html>
