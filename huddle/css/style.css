@@ -143,6 +143,8 @@ h1, h2, h3 { font-family: "Sora", system-ui, sans-serif; font-weight: 700; margi
 .trade-vs { color: var(--text-on-paper-muted); font-size: 1.1rem; }
 .trade-summary { text-align: center; }
 .trade-summary .badge { margin: 0.6rem auto 0; }
+.trade-suggestion { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+.trade-suggestion-btn { white-space: nowrap; }
 
 /* ── Matchup ────────────────────────────────────────── */
 .matchup-card { text-align: center; }

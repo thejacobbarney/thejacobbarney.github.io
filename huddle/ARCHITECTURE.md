@@ -196,6 +196,25 @@ even" rather than forcing a winner on a close deal; outside that band it says wh
 uneven player count (e.g. 2-for-1) gets a note, since roster-spot cost isn't captured by point value
 alone.
 
+**League-wide trade suggestions** (`trade.js: findLeagueTradeSuggestions()`) run automatically at
+the top of the tab, before you've picked a partner — a proactive scan of every other team's roster
+for a 1-for-1 swap that would improve *both* starting lineups, not just a fair value trade. The
+model: group each team's non-IR players by default position, sorted by `playerValue()`; a position's
+"starter floor" is the value of its worst starter under a standard league's starting lineup
+(`STANDARD_STARTER_COUNTS`: QB 1, RB 2, WR 2, TE 1, D/ST 1, K 1 — FLEX is deliberately not modeled,
+since that needs this league's actual roster/slot settings, which aren't fetched; see the
+simplification note in `trade.js`), and anyone beyond that count is "surplus" — bench depth available
+to trade without touching your own starting lineup. A candidate trade only surfaces when your spare
+at some position would exceed the other team's starter floor there (so it would actually start for
+them) *and* their spare at some other position would exceed your own starter floor (so it would
+actually start for you) — candidates are ranked by combined improvement to both starting lineups,
+deduplicated, and the top few shown with a "Build this" button that loads the exact partner/give/
+receive into the manual builder below, so you can tweak it or run the AI analysis on it like any
+other trade you built by hand. This is a need-fit signal, not a value-fairness one — a suggested
+trade can show "Favors you" or "Favors them" once loaded into the builder below (which compares raw
+value) even though the suggestion engine only cared whether it helps both lineups; that's expected,
+not a contradiction — they're answering different questions.
+
 Selection state (`trade.js`'s module-level `state` object — partner, give set, receive set) lives
 outside React-less render functions the same way `myTeam.js`'s AI cache does: it survives switching
 tabs away and back within a session, but isn't tied to the `league` object, so it persists across a

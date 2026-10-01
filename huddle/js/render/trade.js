@@ -1,6 +1,6 @@
 import { escapeHtml, fmtPts } from '../utils.js';
 import { playerValue } from '../lineup.js';
-import { evaluateTrade } from '../trade.js';
+import { evaluateTrade, findLeagueTradeSuggestions } from '../trade.js';
 import { loadAiConfig } from '../aiConfig.js';
 import { generateTradeAnalysis } from '../report/aiTrade.js';
 
@@ -58,6 +58,30 @@ function playerRow(p, side) {
         ${injury}
       </span>
     </label>`;
+}
+
+function suggestionsHtml(suggestions) {
+  if (suggestions.length === 0) {
+    return `<div class="card"><p class="muted small">No mutually-beneficial trades found across the league right now — every other team's bench depth is either too thin to offer, or wouldn't actually upgrade either side's starting lineup.</p></div>`;
+  }
+  return `
+    <div class="card">
+      <h3>Suggested trades</h3>
+      <p class="muted small">Scanned every team's roster for a bench player on each side that would actually improve the other's starting lineup — not just a fair value swap, a need fit.</p>
+      <ul class="plain-list">
+        ${suggestions
+          .map(
+            (s, i) => `
+          <li class="trade-suggestion">
+            <span>Send <b>${escapeHtml(s.give.name)}</b> (${escapeHtml(s.give.defaultPosition)}) to <b>${escapeHtml(s.partnerName)}</b>,
+              get <b>${escapeHtml(s.receive.name)}</b> (${escapeHtml(s.receive.defaultPosition)}) —
+              upgrades your ${escapeHtml(s.receive.defaultPosition)} spot and their ${escapeHtml(s.give.defaultPosition)} spot.</span>
+            <button type="button" class="btn-ghost trade-suggestion-btn" data-index="${i}">Build this</button>
+          </li>`
+          )
+          .join('')}
+      </ul>
+    </div>`;
 }
 
 function verdictBadgeClass(verdict) {
@@ -133,7 +157,11 @@ export function renderTrade(root, league) {
   const currentKey = JSON.stringify({ partnerId: state.partnerId, give: [...state.give].sort(), receive: [...state.receive].sort() });
   const cachedAi = aiResultKey === currentKey ? aiResult : null;
 
+  const suggestions = findLeagueTradeSuggestions(myRoster, otherTeams);
+
   root.innerHTML = `
+    ${suggestionsHtml(suggestions)}
+
     <div class="card">
       <label class="field">
         <span>Trade partner</span>
@@ -167,6 +195,16 @@ export function renderTrade(root, league) {
         : ''
     }
   `;
+
+  root.querySelectorAll('.trade-suggestion-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const s = suggestions[Number(btn.dataset.index)];
+      state.partnerId = s.partnerId;
+      state.give = new Set([s.give.playerId]);
+      state.receive = new Set([s.receive.playerId]);
+      renderTrade(root, league);
+    });
+  });
 
   root.querySelector('#trade-partner').addEventListener('change', (e) => {
     state.partnerId = Number(e.target.value);
