@@ -5,26 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Swoon</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#faf3df">
+<meta name="theme-color" content="#000000">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%A8%3C/text%3E%3C/svg%3E">
 <style>
   :root {
-    --pink: #b8860b;
-    --pink-dark: #96690a;
-    --pink-soft: #e6cf8e;
-    --ink: #3a2a08;
-    --muted: #6b6470;
-    --card: #fdfbf5;
-    --chip: #f4efe2;
-    --bg1: #f8f5ec;
-    --bg2: #efdfae;
+    --pink: #d4a82b;
+    --pink-dark: #ecc34f;
+    --pink-soft: #7a6120;
+    --ink: #f6ecd0;
+    --muted: #a39679;
+    --card: #14110a;
+    --chip: #231e12;
+    --bg1: #000000;
+    --bg2: #231a06;
   }
+  :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
     color: var(--ink);
-    background: linear-gradient(135deg, var(--bg1) 0%, #f4ecd6 55%, var(--bg2) 100%);
+    background: linear-gradient(135deg, var(--bg1) 0%, #0c0a05 55%, var(--bg2) 100%);
     background-attachment: fixed;
     display: flex; flex-direction: column; align-items: center;
     padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
@@ -35,13 +36,13 @@
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 22px; letter-spacing: -0.03em; }
   .brand svg { width: 28px; height: 28px; fill: var(--pink); }
   .count { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .08em; }
-  .bar { height: 3px; background: rgba(0,0,0,.08); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
+  .bar { height: 3px; background: rgba(255,255,255,.1); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
   .bar i { display: block; height: 100%; width: 0; background: var(--pink); transition: width .45s ease; }
 
   main { flex: 1; display: flex; align-items: center; }
   .card {
     width: 100%; min-height: 440px; background: var(--card); border-radius: 32px;
-    box-shadow: 0 30px 60px -25px rgba(120,85,10,.25), 0 2px 0 rgba(255,255,255,.8) inset;
+    box-shadow: 0 30px 60px -25px rgba(0,0,0,.9), 0 0 0 1px rgba(212,168,43,.18) inset;
     padding: 36px 28px 32px; display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; position: relative; animation: pop .4s ease both;
   }
@@ -54,12 +55,12 @@
 
   .btn {
     appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 800; letter-spacing: .02em;
-    background: var(--pink); color: #fff; padding: 16px 30px; border-radius: 999px; font-size: 15px;
-    box-shadow: 0 12px 24px -10px rgba(184,134,11,.7); transition: transform .15s, background .2s, opacity .2s;
+    background: var(--pink); color: #14110a; padding: 16px 30px; border-radius: 999px; font-size: 15px;
+    box-shadow: 0 12px 24px -10px rgba(212,168,43,.45); transition: transform .15s, background .2s, opacity .2s;
   }
   .btn:hover { transform: translateY(-1px); background: var(--pink-dark); }
   .btn:active { transform: scale(.97); }
-  .btn[disabled] { background: var(--pink-soft); box-shadow: none; cursor: not-allowed; transform: none; }
+  .btn[disabled] { background: #3a2f12; color: #8a7a4a; box-shadow: none; cursor: not-allowed; transform: none; }
   .btn.ghost { background: var(--chip); color: var(--ink); box-shadow: none; }
 
   /* step 1 */
@@ -75,7 +76,7 @@
     display: flex; align-items: center; gap: 10px; transition: transform .15s, border-color .15s, background .15s;
   }
   .chip:hover { transform: translateY(-1px); }
-  .chip.on { border-color: var(--pink); background: #fff; box-shadow: 0 8px 18px -10px rgba(184,134,11,.6); }
+  .chip.on { border-color: var(--pink); background: #2e2614; box-shadow: 0 8px 18px -10px rgba(212,168,43,.4); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 420px; margin-bottom: 26px; }
 
   /* step 3 */
@@ -85,37 +86,37 @@
     width: 100%; font: inherit; font-size: 16px; font-weight: 600; color: var(--ink);
     background: var(--chip); border: 2px solid transparent; border-radius: 16px; padding: 14px 16px; outline: none;
   }
-  .field input:focus, .field select:focus { border-color: var(--pink-soft); background: #fff; }
+  .field input:focus, .field select:focus { border-color: var(--pink); background: #2a2315; }
 
   /* step 6 */
-  .paper { width: 100%; background: #fff; border-radius: 22px; padding: 22px 20px; text-align: left; box-shadow: 0 10px 30px -18px rgba(0,0,0,.3); margin-bottom: 22px; position: relative; }
+  .paper { width: 100%; background: #1b160c; border: 1px solid rgba(212,168,43,.25); border-radius: 22px; padding: 22px 20px; text-align: left; box-shadow: 0 10px 30px -18px rgba(0,0,0,.3); margin-bottom: 22px; position: relative; }
   .paper .heart { position: absolute; top: 18px; right: 18px; width: 18px; fill: var(--pink); }
   .paper .tag { font-size: 10px; font-weight: 800; letter-spacing: .18em; color: var(--pink); }
   .paper h2 { font-size: 34px; letter-spacing: -0.045em; line-height: 1; margin: 6px 0 4px; }
   .paper h2 sup { font-size: .4em; vertical-align: super; }
-  .paper .joke { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #eee; }
+  .paper .joke { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid rgba(212,168,43,.25); }
   .line { display: flex; justify-content: space-between; align-items: baseline; font-weight: 600; }
   .line b { font-size: 17px; }
   .fine { font-size: 12px; color: var(--muted); margin: 4px 0 14px; }
-  .slot { background: #faf6ea; border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; gap: 10px; }
+  .slot { background: #261f10; border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; gap: 10px; }
   .footnote { font-size: 11px; color: var(--muted); margin-top: 14px; }
 
   /* done */
-  .receipt { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #fff; border-radius: 16px; padding: 16px 18px; text-align: left; width: 100%; max-width: 360px; margin: 0 0 20px; box-shadow: 0 10px 30px -18px rgba(0,0,0,.3); }
+  .receipt { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #1b160c; border: 1px solid rgba(212,168,43,.25); border-radius: 16px; padding: 16px 18px; text-align: left; width: 100%; max-width: 360px; margin: 0 0 20px; }
   .receipt div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
-  .receipt hr { border: 0; border-top: 1px dashed #ccc; margin: 8px 0; }
+  .receipt hr { border: 0; border-top: 1px dashed #5b4a1c; margin: 8px 0; }
   .status { font-size: 13px; color: var(--muted); min-height: 18px; margin-top: 10px; }
   .link { color: var(--pink); font-weight: 800; text-decoration: none; }
 
 
   .field textarea { width: 100%; font: inherit; font-size: 16px; font-weight: 600; color: var(--ink); background: var(--chip); border: 2px solid transparent; border-radius: 16px; padding: 14px 16px; outline: none; resize: vertical; }
-  .field textarea:focus { border-color: var(--pink-soft); background: #fff; }
+  .field textarea:focus { border-color: var(--pink); background: #2a2315; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .namepick { font: inherit; letter-spacing: inherit; font-weight: 800; color: var(--pink); background: transparent; border: 0; border-bottom: 3px dashed var(--pink-soft); border-radius: 0; padding: 0 2px; cursor: pointer; outline: none; max-width: 100%; }
   .btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
   .btns .btn { text-decoration: none; display: inline-block; }
 
-  footer { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .18em; color: #6b5d3a; padding: 18px 0 6px; text-transform: uppercase; }
+  footer { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .18em; color: #8b7b50; padding: 18px 0 6px; text-transform: uppercase; }
   footer span { color: var(--pink); }
 
   canvas#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
@@ -180,7 +181,8 @@ const CONFIG = {
     ["\u{1F3AC}", "A movie"], ["\u{1F3B2}", "Game night"],
     ["\u2B50", "Stargazing"], ["\u{1F917}", "Surprise me"]
   ],
-  pickup: "6",                       // "be ready by ___"
+  defaultTime: "7:00 PM",            // used when she picks "whenever, I'm easy"
+  pickupLeadMinutes: 0,              // be ready this many minutes before the time she picks
   psText: "P.S. normal people text. I made a website during lunch, for you. no big deal.",
   price: "$499",
   priceNote: "price may be paid in laughs, good company, and letting me pick the playlist."
@@ -201,7 +203,7 @@ state.date = CONFIG.defaultDate || nextFriday();
 
 function parseDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
 function prettyDate(iso) { return parseDate(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); }
-function timeLabel(t) { return /whenever/i.test(t) ? "Whenever" : t; }
+function timeLabel(t) { return /whenever/i.test(t) || !t ? CONFIG.defaultTime : t; }
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 function isStayIn() { return !!(state.detail && /uber eats/i.test(state.detail[1])); }
 function isCook() { return !!(state.detail && /cook/i.test(state.detail[1])); }
@@ -210,6 +212,11 @@ function planText() {
   if (!state.where || state.where[2] === "surprise") return w || "Surprise me";
   if (state.where[2] === "home") return state.detail ? state.detail[1] : w;
   return state.detail ? `${w} (${state.detail[1]})` : w;
+}
+function pickupLabel() {
+  const t = startDateTime(); t.setMinutes(t.getMinutes() - CONFIG.pickupLeadMinutes);
+  const h = t.getHours() % 12 || 12, m = t.getMinutes();
+  return `${h}${m ? ":" + pad(m) : ""}${t.getHours() < 12 ? " AM" : " PM"}`;
 }
 function afterText() { return state.after.map(a => a[1]).join(", "); }
 
@@ -318,10 +325,10 @@ function render() {
     go.onclick = next;
   } else if (id === "glad") {
     const msg = isStayIn()
-      ? `glad you didn't say no. Uber Eats is on me, I'm coming over at ${esc(CONFIG.pickup)} &#128715;&#65039;`
+      ? `glad you didn't say no. Uber Eats is on me, I'm coming over at ${esc(pickupLabel())} &#128715;&#65039;`
       : isCook()
-        ? `glad you didn't say no. I'm cooking, come over at ${esc(CONFIG.pickup)} and bring your appetite &#127859;`
-        : `glad you didn't say no. be ready by ${esc(CONFIG.pickup)}, I'm coming to get you &#128663;`;
+        ? `glad you didn't say no. I'm cooking, come over at ${esc(pickupLabel())} and bring your appetite &#127859;`
+        : `glad you didn't say no. be ready by ${esc(pickupLabel())}, I'm coming to get you &#128663;`;
     card.innerHTML = `
       <div style="font-size:64px;line-height:1;margin-bottom:18px">&#128155;</div>
       <h1>${msg}</h1>
@@ -429,7 +436,7 @@ function setupNo() {
 function startDateTime() {
   const [y, m, d] = state.date.split("-").map(Number);
   let h = 19, min = 0;
-  const mt = /^(\d+):(\d+)\s*(AM|PM)/i.exec(state.time);
+  const mt = /^(\d+):(\d+)\s*(AM|PM)/i.exec(timeLabel(state.time));
   if (mt) { h = (+mt[1]) % 12 + (/pm/i.test(mt[3]) ? 12 : 0); min = +mt[2]; }
   return new Date(y, m - 1, d, h, min);
 }
@@ -439,9 +446,8 @@ function eventDetails() {
   const bits = [`Plan: ${planText()}`];
   if (state.food) bits.push(`Food: ${state.food[1]}`);
   if (state.after.length) bits.push(`After: ${afterText()}`);
-  if (/whenever/i.test(state.time)) bits.push("Time is flexible, so we'll text.");
   if (state.note.trim()) bits.push(`Notes: ${state.note.trim()}`);
-  bits.push(`Pickup around ${CONFIG.pickup}.`);
+  bits.push(`Pickup around ${pickupLabel()}.`);
   return bits.join("\n");
 }
 function icsEsc(s) { return String(s).replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
@@ -541,7 +547,7 @@ function done() {
     </div>
     ${sms ? `<a class="link" style="display:inline-block;margin-top:14px" href="${sms}">or text ${esc(CONFIG.yourName)} the receipt</a>` : ""}
     <div class="status">${esc(status)}</div>
-    <div class="tiny">see you at ${esc(CONFIG.pickup)} ${isStayIn() ? "&#128715;&#65039;" : isCook() ? "&#127859;" : "&#128663;"}</div>`;
+    <div class="tiny">see you at ${esc(pickupLabel())} ${isStayIn() ? "&#128715;&#65039;" : isCook() ? "&#127859;" : "&#128663;"}</div>`;
   $("#ics").onclick = downloadIcs;
 }
 
@@ -552,7 +558,7 @@ function fit() { cv.width = innerWidth * devicePixelRatio; cv.height = innerHeig
 addEventListener("resize", fit); fit();
 function burst() {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const cols = ["#b8860b", "#e6b422", "#f7d774", "#fff3b0", "#fff"];
+  const cols = ["#d4a82b", "#e6b422", "#f7d774", "#fff3b0", "#ffffff"];
   for (let i = 0; i < 90; i++) {
     bits.push({ x: cv.width / 2, y: cv.height * .55, vx: (Math.random() - .5) * 18 * devicePixelRatio, vy: (-Math.random() * 16 - 6) * devicePixelRatio,
       s: (Math.random() * 7 + 4) * devicePixelRatio, r: Math.random() * 6, vr: (Math.random() - .5) * .4, c: cols[i % cols.length], life: 1 });
