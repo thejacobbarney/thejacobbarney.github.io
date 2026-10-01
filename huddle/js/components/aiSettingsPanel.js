@@ -10,29 +10,35 @@ import { escapeHtml } from '../utils.js';
 
 export function renderAiSettingsPanel(container, { onChange } = {}) {
   const config = loadAiConfig();
+  // Collapsed by default once a key is already saved — no need to re-show
+  // the full setup explanation every visit; open by default for first-time
+  // setup so it isn't hidden behind an extra tap.
+  const alreadySetUp = config.enabled && config.apiKey;
 
   container.innerHTML = `
-    <fieldset class="ai-settings-panel">
-      <legend>AI game plan (optional)</legend>
-      <p class="muted small">Huddle computes every start/sit and waiver comparison in this browser, fully offline. Turning this on additionally sends that computed summary — your roster, matchup, and suggested moves, never your ESPN cookies or league credentials — straight from this browser to Anthropic's API using your own key, to write an actual game plan instead of a bare list of point deltas. Your key is stored only in this browser's local storage and Anthropic bills your account at standard rates. Local storage isn't encrypted, so don't enable this on a shared device.</p>
-      <label class="checkbox-label">
-        <input type="checkbox" class="ai-enabled" ${config.enabled ? 'checked' : ''} /> Use AI assistance
-      </label>
-      <div class="ai-fields" style="${config.enabled ? '' : 'display:none;'}">
-        <label>Anthropic API key
-          <input type="password" class="ai-api-key" value="${escapeHtml(config.apiKey)}" placeholder="sk-ant-…" autocomplete="off" />
+    <details class="ai-settings-panel" ${alreadySetUp ? '' : 'open'}>
+      <summary>AI game plan (optional)${alreadySetUp ? ' <span class="muted small">— configured</span>' : ''}</summary>
+      <div class="ai-settings-body">
+        <p class="muted small">Huddle computes every start/sit and waiver comparison in this browser, fully offline. Turning this on additionally sends that computed summary — your roster, matchup, and suggested moves, never your ESPN cookies or league credentials — straight from this browser to Anthropic's API using your own key, to write an actual game plan instead of a bare list of point deltas. Your key is stored only in this browser's local storage and Anthropic bills your account at standard rates. Local storage isn't encrypted, so don't enable this on a shared device.</p>
+        <label class="checkbox-label">
+          <input type="checkbox" class="ai-enabled" ${config.enabled ? 'checked' : ''} /> Use AI assistance
         </label>
-        <label>Model (advanced, optional)
-          <input type="text" class="ai-model" value="${escapeHtml(config.model)}" />
-        </label>
-        <div class="row">
-          <button type="button" class="btn ai-save-btn">Save AI settings</button>
-          <button type="button" class="btn-ghost ai-test-btn">Test connection</button>
+        <div class="ai-fields" style="${config.enabled ? '' : 'display:none;'}">
+          <label>Anthropic API key
+            <input type="password" class="ai-api-key" value="${escapeHtml(config.apiKey)}" placeholder="sk-ant-…" autocomplete="off" />
+          </label>
+          <label>Model (advanced, optional)
+            <input type="text" class="ai-model" value="${escapeHtml(config.model)}" />
+          </label>
+          <div class="row">
+            <button type="button" class="btn ai-save-btn">Save AI settings</button>
+            <button type="button" class="btn-ghost ai-test-btn">Test connection</button>
+          </div>
+          <span class="muted ai-save-status"></span>
+          <span class="muted ai-test-status"></span>
         </div>
-        <span class="muted ai-save-status"></span>
-        <span class="muted ai-test-status"></span>
       </div>
-    </fieldset>
+    </details>
   `;
 
   const enabledCheckbox = container.querySelector('.ai-enabled');
