@@ -56,17 +56,20 @@ huddle/
                                     offer or checking one someone sent you (see §4)
     utils.js                     escapeHtml, point formatting
     app.js                       Tab routing, load/refresh/cache orchestration
+    perplexityConfig.js          localStorage read/write for the Perplexity key/model (§5c)
     grokConfig.js                localStorage read/write for the Grok key/model (§5b)
     aiConfig.js                  localStorage read/write for the optional bring-your-own-key AI
                                    settings — same contract as Pulse's/Iceberg's aiConfig.js
     aiVerify.js                   "Test connection" — smallest possible live Anthropic API call
     components/
+      perplexitySettingsPanel.js    Perplexity key/model UI (same shape as grokSettingsPanel.js)
       grokSettingsPanel.js          Grok key/model UI (same shape as aiSettingsPanel.js)
       aiSettingsPanel.js            Shared enable/key/model UI, rendered into My Team
     report/
       aiRecommendation.js            generateAiRecommendation() — sends the computed roster/
                                        matchup/waiver summary to Anthropic, gets back a structured
                                        game plan (see §5)
+      perplexityResearch.js          Perplexity trade opinion + waiver check, see §5c
       grokTrade.js                   generateGrokTradeOpinion() / verifyGrokConnection(), see §5b
       aiTrade.js                     generateTradeAnalysis() — same BYOK contract, evaluates a
                                        specific trade against both teams' full rosters (see §4)
@@ -266,6 +269,29 @@ explanation shouldn't be hidden behind a tap) and defaults collapsed once a key 
 (`config.enabled && config.apiKey`), showing "— configured" in the summary line so it's still
 obvious AI is on without expanding it. This is pure presentation — the enable/save/test logic
 underneath is unchanged.
+
+### 5c. Perplexity live research on trades and waivers (optional, bring-your-own-key)
+
+`report/perplexityResearch.js` sends the same computed summaries to Perplexity's Sonar models,
+which search the live web on every request, and returns cited sources alongside the answer. Two
+uses: a **trade second opinion** (same prompt, JSON shape, grades and card as Grok's, shared via
+exports from `grokTrade.js`; `render/trade.js: renderResearchResult()` renders either provider),
+and a **waiver check** on the Waivers tab. The waiver summary is the roster (with season logs),
+the computed add/drop suggestions, and the top five free agents per position. For each
+suggestion it returns news on both the add and the drop, a go / wait / skip verdict, an A+ to F
+grade for the move, and "other pickups" limited to names from the free-agent list sent (so it
+cannot invent players). The prompt repeats the rule against dropping a good player over a
+one-week injury. Config is separate (`perplexityConfig.js`, `components/perplexitySettingsPanel.js`,
+`localStorage['huddle:perplexity-config:v1']`, default model `sonar-pro`). Sources are filtered to
+`http(s)` through `utils.js: sourceLinksHtml()` and `<think>` blocks are stripped from reasoning
+models' replies. The waiver result is cached per fetched `league` object like the AI game plan.
+
+**Unverified:** like §5b this was written without access to Perplexity's docs or API. The
+endpoint (`POST https://api.perplexity.ai/chat/completions`, Bearer auth), the `sonar-pro` model
+name, the `citations` / `search_results` response fields, and whether browsers may call the API
+directly (CORS) are all from memory. JSON is requested in the prompt rather than via
+`response_format`. Test connection and Perplexity's own error text show what is wrong; each
+should be a one-line fix in that file.
 
 ### Trade grades (A+ to F)
 
