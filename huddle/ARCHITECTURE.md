@@ -311,12 +311,13 @@ or the model field.
 
 League config (Worker URL, league ID, year, team ID, and — for private leagues — SWID/espn_s2)
 lives in `localStorage['huddle:config:v1']`, never anywhere else. The last successfully fetched
-league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v4']`
+league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v5']`
 purely so reopening the app on a spotty phone connection shows *something* instantly (with a
 "showing cached data" note) while a fresh fetch runs in the background — same pattern as Pulse's
 `reportCache.js`. (Bumped `v1` → `v2` when the free-agent/bye-week/outlook fields were added, then
 `v2` → `v3` when every team's roster was added for Trade, `v3` → `v4` when the full-season weekly
-`seasonLog` was added to every player — each bump is just a cache key, so
+`seasonLog` was added to every player, `v4` → `v5` when per-week stats were restricted to single-week
+entries (below) — each bump is just a cache key, so
 nothing needed migrating, the old entry is simply never read.)
 
 SWID/espn_s2 cookies are ESPN's own session cookies, not a Huddle-issued credential — they expire
@@ -328,3 +329,22 @@ private-league fields).
 
 Same manual-versioning approach as the rest of the site (see Pulse's ARCHITECTURE.md §8) — bump
 `?v=N` on `css/style.css`'s `<link>` in `index.html` any time the stylesheet changes.
+
+JavaScript is versioned too, via an import map in `index.html` that maps every `js/` module URL to
+the same URL with `?v=N`, plus `?v=N` on the entry `<script>`. Without it a browser (iPhone
+Safari in particular) can keep serving an old copy of one module after a deploy while others are
+new, which showed up as a missing Grok panel. **Whenever any file in `js/` changes, bump N on the
+import map lines and the entry script** (`sed -i 's/?v=7/?v=8/g' index.html` also bumps the CSS
+link, which is fine). A new module file needs a line in the map; one missing from the map still
+works, it is just not versioned. Browsers without import-map support (before Safari 16.4) ignore
+it and behave as before.
+
+### Per-week stats
+
+ESPN's `stats` array on a player holds single-week entries (`statSplitTypeId` 1) alongside
+season-total and rolling-window entries whose `appliedTotal` is a sum over many games. Reading
+them all as weekly points produced a "last 3" of `130.4, 319.5, 22.6` for a quarterback, which
+also skewed `playerValue()`, waiver picks, trade values and grades. `espnClient.js: weeklyOnly()`
+now keeps only split id 1 whenever the field is present at all. Assumption to confirm against a
+real league: that id 1 is the single-week split (from community reverse engineering, not ESPN
+docs). If the "last 3" line goes blank instead of wrong, that assumption is the thing to fix.

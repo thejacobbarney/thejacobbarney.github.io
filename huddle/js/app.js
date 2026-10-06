@@ -14,7 +14,7 @@ const settingsBtn = document.getElementById('settings-btn');
 const refreshBtn = document.getElementById('refresh-btn');
 const statusEl = document.getElementById('status-line');
 
-const CACHE_KEY = 'huddle:cache:v4';
+const CACHE_KEY = 'huddle:cache:v5';
 const TABS = {
   team: { label: 'My Team', render: renderMyTeam },
   matchup: { label: 'Matchup', render: renderMatchup },

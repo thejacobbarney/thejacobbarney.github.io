@@ -56,9 +56,17 @@ function teamDisplayName(team) {
   return combined || `Team ${team.id}`;
 }
 
+/** ESPN mixes single-week entries (statSplitTypeId 1) with season-total and rolling-window
+ *  entries (other split ids, whose values are sums over many games) in one `stats` array. When
+ *  the split id is present at all, only the single-week ones are valid per-week points. */
+function weeklyOnly(stats) {
+  const hasSplit = stats.some((s) => s.statSplitTypeId !== undefined);
+  return hasSplit ? stats.filter((s) => s.statSplitTypeId === 1) : stats;
+}
+
 function findStat(stats, week, statSourceId) {
   if (!Array.isArray(stats)) return null;
-  const entry = stats.find((s) => s.scoringPeriodId === week && s.statSourceId === statSourceId);
+  const entry = weeklyOnly(stats).find((s) => s.scoringPeriodId === week && s.statSourceId === statSourceId);
   return entry && typeof entry.appliedTotal === 'number' ? entry.appliedTotal : null;
 }
 
@@ -66,7 +74,7 @@ function findStat(stats, week, statSourceId) {
  *  already includes in the same payload, just not the current week's single-stat lookup. */
 function recentActualPoints(stats, throughWeek, count = Infinity) {
   if (!Array.isArray(stats) || throughWeek == null) return [];
-  return stats
+  return weeklyOnly(stats)
     .filter(
       (s) =>
         s.statSourceId === STAT_SOURCE.ACTUAL &&
