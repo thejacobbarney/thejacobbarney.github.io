@@ -140,7 +140,7 @@ export async function verifyPerplexityConnection(config) {
     response = await fetch(API_URL, {
       method: 'POST',
       headers: authHeaders(apiKey),
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 8 }),
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 16 }),
     });
   } catch {
     throw new Error('Network error. Could not reach api.perplexity.ai (the browser may be blocking it).');
