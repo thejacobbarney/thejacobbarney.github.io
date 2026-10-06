@@ -45,6 +45,20 @@ function surplusAt(byPos, position) {
   return list.slice(starterCountFor(position));
 }
 
+export const GRADES = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'];
+
+// Net points/game from one side's view needed to move that many steps off the middle grade
+// (C+). The third cutoff is the same band as the "even" verdict, so a roughly-even trade never
+// grades past B or C-. Symmetric on purpose: a trade that grades A+ for one side grades F for the other.
+const GRADE_STEP_CUTOFFS = [0.5, 1, EVEN_THRESHOLD, 3.5, 5, 7];
+const MIDDLE_GRADE = 6;
+
+/** Letter grade for a net points/game change from one side's perspective. */
+export function gradeForDelta(delta) {
+  const steps = GRADE_STEP_CUTOFFS.filter((c) => Math.abs(delta) >= c).length;
+  return GRADES[MIDDLE_GRADE - Math.sign(delta) * steps];
+}
+
 /**
  * Compares two lists of players by the same recent-form `playerValue()` used
  * for waiver suggestions — a season-form signal, not a single week's
@@ -72,6 +86,8 @@ export function evaluateTrade(giving, receiving) {
     receiveValue,
     delta,
     verdict,
+    yourGrade: gradeForDelta(delta),
+    theirGrade: gradeForDelta(-delta),
     countMismatch: giving.length !== receiving.length,
   };
 }

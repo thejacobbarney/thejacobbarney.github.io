@@ -151,6 +151,15 @@ h1, h2, h3 { font-family: "Sora", system-ui, sans-serif; font-weight: 700; margi
 .trade-vs { color: var(--text-on-paper-muted); font-size: 1.1rem; }
 .trade-summary { text-align: center; }
 .trade-summary .badge { margin: 0.6rem auto 0; }
+.trade-grades { display: flex; justify-content: center; gap: 2rem; margin: 0.8rem 0 0.2rem; }
+.trade-grade { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; }
+.grade-letter { font-family: "Sora", sans-serif; font-weight: 700; font-size: 2.2rem; line-height: 1.1; }
+.grade-a { color: var(--success); }
+.grade-b { color: #4d7c2f; }
+.grade-c { color: var(--gold); }
+.grade-d { color: #c2692b; }
+.grade-f { color: var(--danger); }
+.ai-result .trade-grades { justify-content: flex-start; margin-top: 0.4rem; }
 .trade-suggestion { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
 .trade-suggestion-btn { white-space: nowrap; }
 

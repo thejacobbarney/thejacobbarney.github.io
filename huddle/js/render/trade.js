@@ -97,6 +97,18 @@ function suggestionsHtml(suggestions) {
     </div>`;
 }
 
+function gradeClass(grade) {
+  if (!grade) return '';
+  return `grade-${grade[0].toLowerCase()}`;
+}
+
+function gradesHtml(yourGrade, theirGrade) {
+  if (!yourGrade && !theirGrade) return '';
+  const one = (label, g) =>
+    g ? `<div class="trade-grade"><span class="muted small">${label}</span><span class="grade-letter ${gradeClass(g)}">${escapeHtml(g)}</span></div>` : '';
+  return `<div class="trade-grades">${one('Your grade', yourGrade)}${one('Their grade', theirGrade)}</div>`;
+}
+
 function verdictBadgeClass(verdict) {
   if (verdict === 'favors_you') return 'badge-out callout-ok';
   if (verdict === 'favors_them') return 'badge-warn';
@@ -108,6 +120,7 @@ function renderAiResult(result) {
     items && items.length ? `<ul class="plain-list">${items.map((i) => `<li>${render(i)}</li>`).join('')}</ul>` : '';
   return `
     <div class="card ai-result">
+      ${gradesHtml(result.yourGrade, result.theirGrade)}
       <p class="ai-headline">${escapeHtml(result.headline)}</p>
       ${move(result.reasoning, (r) => escapeHtml(r))}
       <div class="ai-move-group">
@@ -146,6 +159,7 @@ function renderGrokResult({ opinion, rawText, sources }) {
   return `
     <div class="card ai-result">
       <h3>Grok second opinion</h3>
+      ${gradesHtml(opinion.yourGrade, opinion.theirGrade)}
       ${opinion.verdict ? `<span class="badge ${verdictBadgeClass(opinion.verdict)}">${VERDICT_LABEL[opinion.verdict]}</span>` : ''}
       <p class="ai-headline">${escapeHtml(opinion.headline)}</p>
       ${updates ? `<div class="ai-move-group"><h4>Latest news</h4>${updates}</div>` : ''}
@@ -198,9 +212,10 @@ export function renderTrade(root, league) {
           <span class="trade-vs">⇄</span>
           <div><span class="muted small">You get</span><div class="num trade-summary-value">${fmtPts(evaluation.receiveValue)}</div></div>
         </div>
+        ${gradesHtml(evaluation.yourGrade, evaluation.theirGrade)}
         <span class="badge ${verdictBadgeClass(evaluation.verdict)}">${VERDICT_LABEL[evaluation.verdict]}</span>
         ${evaluation.countMismatch ? `<p class="muted small">${giving.length}-for-${receiving.length} — uneven player counts affect roster-spot value beyond raw points.</p>` : ''}
-        <p class="muted small">Value is each player's recent scoring average, not a single week's projection.</p>
+        <p class="muted small">Grade is by recent scoring average only, not positional need. Run an AI analysis for a grade that weighs roster fit, injuries, and byes.</p>
       </div>`
     : `<div class="card"><p class="muted">Select players on each side to compare.</p></div>`;
 

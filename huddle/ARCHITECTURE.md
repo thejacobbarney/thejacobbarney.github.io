@@ -267,6 +267,17 @@ explanation shouldn't be hidden behind a tap) and defaults collapsed once a key 
 obvious AI is on without expanding it. This is pure presentation — the enable/save/test logic
 underneath is unchanged.
 
+### Trade grades (A+ to F)
+
+Every trade shows a grade for each side. The always-on one is computed offline in `trade.js:
+gradeForDelta()` from the same value gap `evaluateTrade()` already uses: net points per game
+gained, mapped to 13 letter grades centered on C+ (a straight wash). It is symmetric (an A+ for
+you is an F for them) and its third cutoff is the same 2-point band as the "even" verdict, so a
+roughly-even trade never grades past B or down past C-. It is value only, so the card says it
+ignores positional need. The Claude and Grok analyses each return their own `yourGrade` and
+`theirGrade` that also weigh roster fit, injuries and byes; those are model judgments, shown
+separately and not blended with the offline grade.
+
 ### 5b. Grok second opinion on trades (optional, bring-your-own-key)
 
 `report/grokTrade.js` sends the same trade summary as `aiTrade.js` to xAI's Grok, which unlike

@@ -14,6 +14,8 @@
  * tolerant and errors surface xAI's own message.
  */
 
+import { GRADES } from '../trade.js';
+
 const API_URL = 'https://api.x.ai/v1/responses';
 
 const SYSTEM_PROMPT = `You are an expert fantasy football analyst giving a second opinion on a proposed trade in an ESPN fantasy football league. The user may be considering offering it or deciding whether to accept one they received.
@@ -28,11 +30,14 @@ Rules:
 - If a player's status in the summary conflicts with what you find in search, trust the search and say so.
 - Distinguish confirmed reports from rumor or speculation.
 - If claudeAnalysis is provided, give honest feedback on it: where you agree, where you disagree, and anything it missed. If it is not provided, set feedbackOnOtherAnalysis to null.
+- Grade the trade from each side's perspective on a letter scale: A+ is a clear, lopsided win for that side, B is a modest win, C is a fair trade that roughly breaks even, D is a modest loss, F is a clearly bad trade for that side. Make the two grades consistent with each other, and let injury and role news you found move the grade.
 - Keep it tight. This is read on a phone while deciding whether to accept or counter.
 
 Respond with ONLY a single JSON object, no markdown fences, in exactly this shape:
 {
   "verdict": "favors_you" | "favors_them" | "even",
+  "yourGrade": "A+" | "A" | "A-" | "B+" | "B" | "B-" | "C+" | "C" | "C-" | "D+" | "D" | "D-" | "F",
+  "theirGrade": "same scale, for the other team",
   "headline": "one or two sentence bottom line",
   "playerUpdates": [ { "name": "player name", "status": "short status such as Healthy, Questionable (hamstring), Out", "update": "latest news in one or two sentences, with how fresh it is", "confidence": "confirmed" | "reported" | "rumor" | "no news found" } ],
   "history": [ { "name": "player name", "note": "prior-season and career trend relevant to this trade, one or two sentences" } ],
@@ -138,6 +143,8 @@ export async function generateGrokTradeOpinion(summary, config) {
   const opinion = parsed
     ? {
         verdict: ['favors_you', 'favors_them', 'even'].includes(parsed.verdict) ? parsed.verdict : null,
+        yourGrade: GRADES.includes(parsed.yourGrade) ? parsed.yourGrade : null,
+        theirGrade: GRADES.includes(parsed.theirGrade) ? parsed.theirGrade : null,
         headline: String(parsed.headline || ''),
         playerUpdates: asArray(parsed.playerUpdates),
         history: asArray(parsed.history),
