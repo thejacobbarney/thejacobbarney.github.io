@@ -15,12 +15,16 @@ Do not invent stats that aren't in the summary — every specific number you cit
 
 Never call a player droppable or worthless solely because he's OUT, QUESTIONABLE, or on a bye this single week — check his recent scoring average in the summary first.
 
+Also grade the trade from each side's perspective on a letter scale: A+ is a clear, lopsided win for that side, B is a modest win, C is a fair trade that roughly breaks even, D is a modest loss, and F is a clearly bad trade for that side. Weigh roster fit, depth, injury and bye risk as well as raw value, and make the two grades consistent with each other (a trade that is an A for one side cannot also be an A for the other).
+
 Keep it tight: this is read on a phone while deciding whether to accept or counter, not a research report.`;
 
 const TRADE_SCHEMA = {
   type: 'object',
   properties: {
     verdict: { type: 'string', enum: ['favors_you', 'favors_them', 'even'] },
+    yourGrade: { type: 'string', enum: ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'], description: 'Letter grade of this trade for the user' },
+    theirGrade: { type: 'string', enum: ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'], description: 'Letter grade of this trade for the other team' },
     headline: { type: 'string', description: 'One or two sentences: the bottom line on this trade' },
     reasoning: {
       type: 'array',
@@ -42,7 +46,7 @@ const TRADE_SCHEMA = {
       description: 'Bye-week stacking, injury concentration, or other risks this trade introduces — empty if none',
     },
   },
-  required: ['verdict', 'headline', 'reasoning', 'rosterImpact', 'risks'],
+  required: ['verdict', 'yourGrade', 'theirGrade', 'headline', 'reasoning', 'rosterImpact', 'risks'],
   additionalProperties: false,
 };
 

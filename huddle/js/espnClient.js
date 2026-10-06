@@ -64,7 +64,7 @@ function findStat(stats, week, statSourceId) {
 
 /** Actual points from completed weeks before `throughWeek`, oldest first — trend data ESPN
  *  already includes in the same payload, just not the current week's single-stat lookup. */
-function recentActualPoints(stats, throughWeek, count = 3) {
+function recentActualPoints(stats, throughWeek, count = Infinity) {
   if (!Array.isArray(stats) || throughWeek == null) return [];
   return stats
     .filter(
@@ -92,7 +92,8 @@ function normalizePlayerEntry(entry, week, byeWeekByProTeamId) {
     injuryStatus: player.injuryStatus || null,
     projected: findStat(player.stats, week, STAT_SOURCE.PROJECTED),
     actual: findStat(player.stats, week, STAT_SOURCE.ACTUAL),
-    recentActual: recentActualPoints(player.stats, week),
+    recentActual: recentActualPoints(player.stats, week, 3),
+    seasonLog: recentActualPoints(player.stats, week),
     byeWeek: byeWeekByProTeamId?.get(player.proTeamId) ?? null,
   };
 }

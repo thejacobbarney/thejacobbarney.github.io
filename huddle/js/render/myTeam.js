@@ -3,6 +3,7 @@ import { findStartSitSuggestions, findWaiverUpgrades } from '../lineup.js';
 import { BENCH_SLOT_ID, IR_SLOT_ID } from '../constants.js';
 import { loadAiConfig } from '../aiConfig.js';
 import { renderAiSettingsPanel } from '../components/aiSettingsPanel.js';
+import { renderGrokSettingsPanel } from '../components/grokSettingsPanel.js';
 import { generateAiRecommendation } from '../report/aiRecommendation.js';
 
 const SLOT_ORDER = [0, 2, 3, 4, 5, 6, 23, 7, 16, 17, 18, 8, 9, 10, 11, 12, 13, 14, 15, 19];
@@ -178,6 +179,7 @@ export function renderMyTeam(root, league) {
     </div>
     ${suggestionsHtml}
     <div id="ai-settings-container"></div>
+    <div id="grok-settings-container"></div>
     <div id="ai-generate-row" class="ai-generate-row" hidden>
       <button type="button" id="ai-generate-btn" class="btn">Generate AI Game Plan</button>
       <span id="ai-generate-status" class="muted small"></span>
@@ -201,6 +203,7 @@ export function renderMyTeam(root, league) {
     onChange: syncGenerateVisibility,
   });
   syncGenerateVisibility(aiConfig);
+  renderGrokSettingsPanel(root.querySelector('#grok-settings-container'));
 
   generateBtn.addEventListener('click', async () => {
     const cfg = loadAiConfig();
