@@ -101,6 +101,7 @@ h1, h2, h3 { font-family: "Sora", system-ui, sans-serif; font-weight: 700; margi
 
 .badge { display: inline-block; margin-top: 0.2rem; font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 6px; width: fit-content; }
 .badge-out { background: var(--danger-soft); color: var(--danger); }
+.badge-good { background: var(--accent-soft); color: var(--accent); }
 .badge-warn { background: var(--warn-soft); color: var(--gold); }
 
 .row-mine { background: var(--accent-soft); }
@@ -160,6 +161,7 @@ h1, h2, h3 { font-family: "Sora", system-ui, sans-serif; font-weight: 700; margi
 .grade-d { color: #c2692b; }
 .grade-f { color: var(--danger); }
 .ai-result .trade-grades { justify-content: flex-start; margin-top: 0.4rem; }
+.grade-inline { font-size: 1.1rem; margin-left: 0.3rem; }
 .trade-suggestion { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
 .trade-suggestion-btn { white-space: nowrap; }
 

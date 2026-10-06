@@ -1,10 +1,12 @@
-import { escapeHtml, fmtPts } from '../utils.js';
+import { escapeHtml, fmtPts, sourceLinksHtml } from '../utils.js';
 import { playerValue } from '../lineup.js';
 import { evaluateTrade, findLeagueTradeSuggestions } from '../trade.js';
 import { loadAiConfig } from '../aiConfig.js';
 import { generateTradeAnalysis } from '../report/aiTrade.js';
 import { loadGrokConfig, grokReady } from '../grokConfig.js';
 import { generateGrokTradeOpinion } from '../report/grokTrade.js';
+import { loadPerplexityConfig, perplexityReady } from '../perplexityConfig.js';
+import { generatePerplexityTradeOpinion } from '../report/perplexityResearch.js';
 
 // Module-level so selections survive switching tabs away and back within the
 // same league fetch; a fresh fetch doesn't reset this on purpose (still
@@ -15,6 +17,8 @@ let aiResult = null;
 let aiResultKey = null;
 let grokResult = null;
 let grokResultKey = null;
+let pplxResult = null;
+let pplxResultKey = null;
 
 const VERDICT_LABEL = {
   favors_you: 'Favors you',
@@ -110,7 +114,7 @@ function gradesHtml(yourGrade, theirGrade) {
 }
 
 function verdictBadgeClass(verdict) {
-  if (verdict === 'favors_you') return 'badge-out callout-ok';
+  if (verdict === 'favors_you') return 'badge-good';
   if (verdict === 'favors_them') return 'badge-warn';
   return '';
 }
@@ -132,16 +136,12 @@ function renderAiResult(result) {
     </div>`;
 }
 
-const CONFIDENCE_CLASS = { confirmed: 'badge-out callout-ok', reported: 'badge-warn', rumor: 'badge-out' };
+const CONFIDENCE_CLASS = { confirmed: 'badge-good', reported: 'badge-warn', rumor: 'badge-out' };
 
-function renderGrokResult({ opinion, rawText, sources }) {
-  const sourcesHtml = sources.length
-    ? `<div class="ai-move-group"><h4>Sources</h4><ul class="plain-list">${sources
-        .map((u) => `<li class="small"><a href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(u.replace(/^https?:\/\/(www\.)?/i, '').slice(0, 60))}</a></li>`)
-        .join('')}</ul></div>`
-    : '';
+function renderResearchResult(title, { opinion, rawText, sources }) {
+  const sourcesHtml = sourceLinksHtml(sources);
   if (!opinion) {
-    return `<div class="card ai-result"><h3>Grok second opinion</h3><p class="muted small">Grok's reply wasn't in the expected format, so here it is as written.</p><p style="white-space:pre-wrap">${escapeHtml(rawText)}</p>${sourcesHtml}</div>`;
+    return `<div class="card ai-result"><h3>${escapeHtml(title)}</h3><p class="muted small">The reply wasn't in the expected format, so here it is as written.</p><p style="white-space:pre-wrap">${escapeHtml(rawText)}</p>${sourcesHtml}</div>`;
   }
   const list = (items, render) =>
     items.length ? `<ul class="plain-list">${items.map((i) => `<li>${render(i)}</li>`).join('')}</ul>` : '';
@@ -158,7 +158,7 @@ function renderGrokResult({ opinion, rawText, sources }) {
   );
   return `
     <div class="card ai-result">
-      <h3>Grok second opinion</h3>
+      <h3>${escapeHtml(title)}</h3>
       ${gradesHtml(opinion.yourGrade, opinion.theirGrade)}
       ${opinion.verdict ? `<span class="badge ${verdictBadgeClass(opinion.verdict)}">${VERDICT_LABEL[opinion.verdict]}</span>` : ''}
       <p class="ai-headline">${escapeHtml(opinion.headline)}</p>
@@ -225,6 +225,8 @@ export function renderTrade(root, league) {
   const grokConfig = loadGrokConfig();
   const grokOn = grokReady(grokConfig);
   const cachedGrok = grokResultKey === currentKey ? grokResult : null;
+  const pplxOn = perplexityReady(loadPerplexityConfig());
+  const cachedPplx = pplxResultKey === currentKey ? pplxResult : null;
 
   const suggestions = findLeagueTradeSuggestions(myRoster, otherTeams);
 
@@ -269,7 +271,16 @@ export function renderTrade(root, league) {
                 </div>`
               : '<p class="muted small">Add an xAI key under Grok on the My Team tab for a second opinion with live injury and performance news.</p>'
           }
-          <div id="trade-grok-result">${cachedGrok ? renderGrokResult(cachedGrok) : ''}</div>`
+          <div id="trade-grok-result">${cachedGrok ? renderResearchResult('Grok second opinion', cachedGrok) : ''}</div>
+          ${
+            pplxOn
+              ? `<div class="ai-generate-row">
+                  <button type="button" id="trade-pplx-btn" class="btn">Get Perplexity second opinion</button>
+                  <span id="trade-pplx-status" class="muted small"></span>
+                </div>`
+              : '<p class="muted small">Add a Perplexity key on the My Team tab for a second opinion with live news and cited sources.</p>'
+          }
+          <div id="trade-pplx-result">${cachedPplx ? renderResearchResult('Perplexity second opinion', cachedPplx) : ''}</div>`
         : ''
     }
   `;
@@ -315,7 +326,7 @@ export function renderTrade(root, league) {
         const result = await generateGrokTradeOpinion(summary, loadGrokConfig());
         grokResult = result;
         grokResultKey = currentKey;
-        resultEl.innerHTML = renderGrokResult(result);
+        resultEl.innerHTML = renderResearchResult('Grok second opinion', result);
         statusEl.textContent = '';
         resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (err) {
@@ -323,6 +334,32 @@ export function renderTrade(root, league) {
         statusEl.className = 'muted small status-error';
       } finally {
         grokBtn.disabled = false;
+      }
+    });
+  }
+
+  const pplxBtn = root.querySelector('#trade-pplx-btn');
+  if (pplxBtn) {
+    pplxBtn.addEventListener('click', async () => {
+      const statusEl = root.querySelector('#trade-pplx-status');
+      const resultEl = root.querySelector('#trade-pplx-result');
+      pplxBtn.disabled = true;
+      statusEl.textContent = 'Searching the web…';
+      statusEl.className = 'muted small';
+      try {
+        const claude = aiResultKey === currentKey ? aiResult : null;
+        const summary = buildTradeAiSummary(league, partner, giving, receiving, claude);
+        const result = await generatePerplexityTradeOpinion(summary, loadPerplexityConfig());
+        pplxResult = result;
+        pplxResultKey = currentKey;
+        resultEl.innerHTML = renderResearchResult('Perplexity second opinion', result);
+        statusEl.textContent = '';
+        resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) {
+        statusEl.textContent = `✗ ${err.message}`;
+        statusEl.className = 'muted small status-error';
+      } finally {
+        pplxBtn.disabled = false;
       }
     });
   }

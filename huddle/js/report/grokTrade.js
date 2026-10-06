@@ -18,11 +18,11 @@ import { GRADES } from '../trade.js';
 
 const API_URL = 'https://api.x.ai/v1/responses';
 
-const SYSTEM_PROMPT = `You are an expert fantasy football analyst giving a second opinion on a proposed trade in an ESPN fantasy football league. The user may be considering offering it or deciding whether to accept one they received.
+export const TRADE_SYSTEM_PROMPT = `You are an expert fantasy football analyst giving a second opinion on a proposed trade in an ESPN fantasy football league. The user may be considering offering it or deciding whether to accept one they received.
 
 You are given a JSON summary: both teams' rosters (position, recent scoring average, this week's projection, injury status, bye week, and a season log of weekly points so far this season), the specific players moving each direction, and possibly an analysis another AI already wrote (claudeAnalysis).
 
-Use your search tools before answering. For every player in the trade (and any other player whose status matters to the verdict), search the web and X for the latest injury reports, practice participation, snap-count or role changes, and credible beat-reporter news. Also recall each traded player's prior-season and career performance trend from your own knowledge, and say clearly when you are recalling rather than citing something you found.
+Use your live search before answering. For every player in the trade (and any other player whose status matters to the verdict), search the web (and X, where you can) for the latest injury reports, practice participation, snap-count or role changes, and credible beat-reporter news. Also recall each traded player's prior-season and career performance trend from your own knowledge, and say clearly when you are recalling rather than citing something you found.
 
 Rules:
 - Every number about this season must come from the provided summary. Numbers from search results or memory must be labeled as such.
@@ -88,7 +88,7 @@ function readResponse(data) {
   return { text: texts.join('\n').trim(), sources: safeUrls };
 }
 
-function extractJson(text) {
+export function extractJson(text) {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start === -1 || end <= start) return null;
@@ -100,6 +100,22 @@ function extractJson(text) {
 }
 
 const asArray = (v) => (Array.isArray(v) ? v : []);
+
+export function normalizeTradeOpinion(parsed) {
+  if (!parsed) return null;
+  return {
+    verdict: ['favors_you', 'favors_them', 'even'].includes(parsed.verdict) ? parsed.verdict : null,
+    yourGrade: GRADES.includes(parsed.yourGrade) ? parsed.yourGrade : null,
+    theirGrade: GRADES.includes(parsed.theirGrade) ? parsed.theirGrade : null,
+    headline: String(parsed.headline || ''),
+    playerUpdates: asArray(parsed.playerUpdates),
+    history: asArray(parsed.history),
+    reasoning: asArray(parsed.reasoning).map(String),
+    risks: asArray(parsed.risks).map(String),
+    feedbackOnOtherAnalysis:
+      typeof parsed.feedbackOnOtherAnalysis === 'string' ? parsed.feedbackOnOtherAnalysis : null,
+  };
+}
 
 /**
  * @param {object} summary - see render/trade.js: buildTradeAiSummary(), optionally with claudeAnalysis
@@ -120,7 +136,7 @@ export async function generateGrokTradeOpinion(summary, config) {
       body: JSON.stringify({
         model: config.model || 'grok-4',
         input: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: TRADE_SYSTEM_PROMPT },
           { role: 'user', content: JSON.stringify(summary) },
         ],
         tools: [{ type: 'web_search' }, { type: 'x_search' }],
@@ -139,21 +155,7 @@ export async function generateGrokTradeOpinion(summary, config) {
   const { text, sources } = readResponse(await response.json());
   if (!text) throw new Error('Grok returned no output.');
 
-  const parsed = extractJson(text);
-  const opinion = parsed
-    ? {
-        verdict: ['favors_you', 'favors_them', 'even'].includes(parsed.verdict) ? parsed.verdict : null,
-        yourGrade: GRADES.includes(parsed.yourGrade) ? parsed.yourGrade : null,
-        theirGrade: GRADES.includes(parsed.theirGrade) ? parsed.theirGrade : null,
-        headline: String(parsed.headline || ''),
-        playerUpdates: asArray(parsed.playerUpdates),
-        history: asArray(parsed.history),
-        reasoning: asArray(parsed.reasoning).map(String),
-        risks: asArray(parsed.risks).map(String),
-        feedbackOnOtherAnalysis:
-          typeof parsed.feedbackOnOtherAnalysis === 'string' ? parsed.feedbackOnOtherAnalysis : null,
-      }
-    : null;
+  const opinion = normalizeTradeOpinion(extractJson(text));
 
   return { opinion, rawText: text, sources };
 }

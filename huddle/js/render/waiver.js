@@ -1,5 +1,78 @@
-import { escapeHtml, fmtPts } from '../utils.js';
-import { findWaiverUpgrades } from '../lineup.js';
+import { escapeHtml, fmtPts, sourceLinksHtml } from '../utils.js';
+import { findWaiverUpgrades, playerValue } from '../lineup.js';
+import { loadPerplexityConfig, perplexityReady } from '../perplexityConfig.js';
+import { generatePerplexityWaiverCheck } from '../report/perplexityResearch.js';
+
+// Keyed by league object so a fresh fetch drops a stale check; same pattern as myTeam.js.
+const checkCache = new WeakMap();
+
+const VERDICT_LABEL = { go: 'Go', wait: 'Wait', skip: 'Skip' };
+const VERDICT_CLASS = { go: 'badge-good', wait: 'badge-warn', skip: 'badge-out' };
+
+function compactPlayer(p) {
+  return {
+    name: p.name,
+    position: p.defaultPosition,
+    proTeam: p.proTeam,
+    recentValue: playerValue(p),
+    projected: p.projected,
+    seasonLog: (p.seasonLog || []).map((r) => ({ week: r.week, points: r.points })),
+    injuryStatus: p.injuryStatus,
+    byeWeek: p.byeWeek,
+  };
+}
+
+function buildWaiverSummary(league, suggestions, byPos) {
+  const topAvailable = {};
+  for (const [pos, list] of byPos) topAvailable[pos] = list.slice(0, 5).map(compactPlayer);
+  return {
+    week: league.week,
+    roster: league.myTeam.roster.map(compactPlayer),
+    suggestions: suggestions.map((s) => ({
+      add: compactPlayer(s.add),
+      drop: compactPlayer(s.drop),
+      projectedGain: s.delta,
+    })),
+    topAvailable,
+  };
+}
+
+function gradeClass(grade) {
+  return grade ? `grade-${grade[0].toLowerCase()}` : '';
+}
+
+function renderCheck({ check, rawText, sources }) {
+  const sourcesHtml = sourceLinksHtml(sources);
+  if (!check) {
+    return `<div class="card ai-result"><h3>Perplexity waiver check</h3><p class="muted small">The reply wasn't in the expected format, so here it is as written.</p><p style="white-space:pre-wrap">${escapeHtml(rawText)}</p>${sourcesHtml}</div>`;
+  }
+  const moves = check.moves
+    .map(
+      (m) => `
+      <li>
+        <b>Add ${escapeHtml(m.add)}, drop ${escapeHtml(m.drop)}</b>
+        ${m.verdict ? `<span class="badge ${VERDICT_CLASS[m.verdict]}">${VERDICT_LABEL[m.verdict]}</span>` : ''}
+        ${m.grade ? `<span class="grade-letter grade-inline ${gradeClass(m.grade)}">${escapeHtml(m.grade)}</span>` : ''}
+        <br><span class="muted small"><b>Add:</b> ${escapeHtml(m.newsOnAdd)}</span>
+        <br><span class="muted small"><b>Drop:</b> ${escapeHtml(m.newsOnDrop)}</span>
+        <br><span class="small">${escapeHtml(m.reasoning)}</span>
+      </li>`
+    )
+    .join('');
+  const targets = check.betterTargets
+    .map((t) => `<li><b>${escapeHtml(t.name)}</b>: <span class="muted small">${escapeHtml(t.why)}</span></li>`)
+    .join('');
+  const notes = check.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('');
+  return `
+    <div class="card ai-result">
+      <h3>Perplexity waiver check</h3>
+      <p class="ai-headline">${escapeHtml(check.headline)}</p>
+      ${moves ? `<div class="ai-move-group"><h4>Suggested moves</h4><ul class="plain-list">${moves}</ul></div>` : ''}
+      ${targets ? `<div class="ai-move-group"><h4>Other pickups to consider</h4><ul class="plain-list">${targets}</ul></div>` : ''}
+      ${notes ? `<div class="ai-move-group"><h4>Notes</h4><ul class="plain-list">${notes}</ul></div>` : ''}
+      ${sourcesHtml}
+    </div>`;
+}
 
 const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'D/ST', 'K'];
 
@@ -82,9 +155,47 @@ export function renderWaiver(root, league) {
   const byPos = poolByPosition(league.freeAgents);
   const positions = [...byPos.keys()].sort(posSort);
 
+  const pplxOn = perplexityReady(loadPerplexityConfig());
+  const cached = checkCache.get(league) || null;
+
   root.innerHTML = `
     ${suggestionsHtml(suggestions)}
+    ${
+      pplxOn
+        ? `<div class="ai-generate-row">
+            <button type="button" id="waiver-pplx-btn" class="btn">Check with Perplexity</button>
+            <span id="waiver-pplx-status" class="muted small"></span>
+          </div>`
+        : '<p class="muted small">Add a Perplexity key on the My Team tab to check these moves against live news.</p>'
+    }
+    <div id="waiver-pplx-result">${cached ? renderCheck(cached) : ''}</div>
     <h2>Top available</h2>
     ${positions.map((pos) => poolTable(pos, byPos.get(pos))).join('')}
   `;
+
+  const btn = root.querySelector('#waiver-pplx-btn');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      const statusEl = root.querySelector('#waiver-pplx-status');
+      const resultEl = root.querySelector('#waiver-pplx-result');
+      btn.disabled = true;
+      statusEl.textContent = 'Searching the web…';
+      statusEl.className = 'muted small';
+      try {
+        const result = await generatePerplexityWaiverCheck(
+          buildWaiverSummary(league, suggestions, byPos),
+          loadPerplexityConfig()
+        );
+        checkCache.set(league, result);
+        resultEl.innerHTML = renderCheck(result);
+        statusEl.textContent = '';
+        resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) {
+        statusEl.textContent = `✗ ${err.message}`;
+        statusEl.className = 'muted small status-error';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
 }
