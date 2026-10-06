@@ -3,6 +3,8 @@ import { playerValue } from '../lineup.js';
 import { evaluateTrade, findLeagueTradeSuggestions } from '../trade.js';
 import { loadAiConfig } from '../aiConfig.js';
 import { generateTradeAnalysis } from '../report/aiTrade.js';
+import { loadGrokConfig, grokReady } from '../grokConfig.js';
+import { generateGrokTradeOpinion } from '../report/grokTrade.js';
 
 // Module-level so selections survive switching tabs away and back within the
 // same league fetch; a fresh fetch doesn't reset this on purpose (still
@@ -11,6 +13,8 @@ import { generateTradeAnalysis } from '../report/aiTrade.js';
 const state = { partnerId: null, give: new Set(), receive: new Set() };
 let aiResult = null;
 let aiResultKey = null;
+let grokResult = null;
+let grokResultKey = null;
 
 const VERDICT_LABEL = {
   favors_you: 'Favors you',
@@ -25,13 +29,15 @@ function compactPlayer(p) {
     proTeam: p.proTeam,
     recentValue: playerValue(p),
     projected: p.projected,
+    seasonLog: (p.seasonLog || []).map((r) => ({ week: r.week, points: r.points })),
     injuryStatus: p.injuryStatus,
     byeWeek: p.byeWeek,
   };
 }
 
-function buildTradeAiSummary(league, partner, giving, receiving) {
+function buildTradeAiSummary(league, partner, giving, receiving, claudeAnalysis) {
   return {
+    ...(claudeAnalysis ? { claudeAnalysis } : {}),
     week: league.week,
     you: { team: league.myTeam.name, roster: league.myTeam.roster.map(compactPlayer) },
     them: { team: partner.name, roster: partner.roster.map(compactPlayer) },
@@ -40,6 +46,12 @@ function buildTradeAiSummary(league, partner, giving, receiving) {
       youReceive: receiving.map(compactPlayer),
     },
   };
+}
+
+function seasonLogHtml(log) {
+  if (!log || log.length === 0) return '';
+  const pts = log.map((r) => fmtPts(r.points)).join(', ');
+  return `<span class="muted player-meta">season: ${pts}</span>`;
 }
 
 function playerRow(p, side) {
@@ -55,6 +67,7 @@ function playerRow(p, side) {
       <span class="trade-row-body">
         <span class="player-name">${escapeHtml(p.name)}</span>
         <span class="muted player-meta">${escapeHtml(p.proTeam)} · ${escapeHtml(p.defaultPosition)} · <span class="num">${fmtPts(value)}</span> avg</span>
+        ${seasonLogHtml(p.seasonLog)}
         ${injury}
       </span>
     </label>`;
@@ -103,6 +116,44 @@ function renderAiResult(result) {
         <p><b>Them:</b> ${escapeHtml(result.rosterImpact.them)}</p>
       </div>
       ${result.risks && result.risks.length ? `<div class="ai-move-group"><h4>Risks</h4>${move(result.risks, (r) => escapeHtml(r))}</div>` : ''}
+    </div>`;
+}
+
+const CONFIDENCE_CLASS = { confirmed: 'badge-out callout-ok', reported: 'badge-warn', rumor: 'badge-out' };
+
+function renderGrokResult({ opinion, rawText, sources }) {
+  const sourcesHtml = sources.length
+    ? `<div class="ai-move-group"><h4>Sources</h4><ul class="plain-list">${sources
+        .map((u) => `<li class="small"><a href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(u.replace(/^https?:\/\/(www\.)?/i, '').slice(0, 60))}</a></li>`)
+        .join('')}</ul></div>`
+    : '';
+  if (!opinion) {
+    return `<div class="card ai-result"><h3>Grok second opinion</h3><p class="muted small">Grok's reply wasn't in the expected format, so here it is as written.</p><p style="white-space:pre-wrap">${escapeHtml(rawText)}</p>${sourcesHtml}</div>`;
+  }
+  const list = (items, render) =>
+    items.length ? `<ul class="plain-list">${items.map((i) => `<li>${render(i)}</li>`).join('')}</ul>` : '';
+  const updates = list(
+    opinion.playerUpdates,
+    (u) =>
+      `<b>${escapeHtml(u?.name)}</b>: ${escapeHtml(u?.status)}${
+        u?.confidence ? ` <span class="badge ${CONFIDENCE_CLASS[u.confidence] || ''}">${escapeHtml(u.confidence)}</span>` : ''
+      }<br><span class="muted small">${escapeHtml(u?.update)}</span>`
+  );
+  const history = list(
+    opinion.history,
+    (h) => `<b>${escapeHtml(h?.name)}</b>: <span class="muted small">${escapeHtml(h?.note)}</span>`
+  );
+  return `
+    <div class="card ai-result">
+      <h3>Grok second opinion</h3>
+      ${opinion.verdict ? `<span class="badge ${verdictBadgeClass(opinion.verdict)}">${VERDICT_LABEL[opinion.verdict]}</span>` : ''}
+      <p class="ai-headline">${escapeHtml(opinion.headline)}</p>
+      ${updates ? `<div class="ai-move-group"><h4>Latest news</h4>${updates}</div>` : ''}
+      ${history ? `<div class="ai-move-group"><h4>History (recalled, not from ESPN)</h4>${history}</div>` : ''}
+      ${opinion.reasoning.length ? `<div class="ai-move-group"><h4>Reasoning</h4>${list(opinion.reasoning, (r) => escapeHtml(r))}</div>` : ''}
+      ${opinion.risks.length ? `<div class="ai-move-group"><h4>Risks</h4>${list(opinion.risks, (r) => escapeHtml(r))}</div>` : ''}
+      ${opinion.feedbackOnOtherAnalysis ? `<div class="ai-move-group"><h4>Feedback on the Claude analysis</h4><p>${escapeHtml(opinion.feedbackOnOtherAnalysis)}</p></div>` : ''}
+      ${sourcesHtml}
     </div>`;
 }
 
@@ -156,6 +207,9 @@ export function renderTrade(root, league) {
   const aiConfig = loadAiConfig();
   const currentKey = JSON.stringify({ partnerId: state.partnerId, give: [...state.give].sort(), receive: [...state.receive].sort() });
   const cachedAi = aiResultKey === currentKey ? aiResult : null;
+  const grokConfig = loadGrokConfig();
+  const grokOn = grokReady(grokConfig);
+  const cachedGrok = grokResultKey === currentKey ? grokResult : null;
 
   const suggestions = findLeagueTradeSuggestions(myRoster, otherTeams);
 
@@ -191,7 +245,16 @@ export function renderTrade(root, league) {
             <span id="trade-ai-status" class="muted small"></span>
           </div>
           ${!(aiConfig.enabled && aiConfig.apiKey) ? '<p class="muted small">Enable AI assistance on the My Team tab to get a written analysis here.</p>' : ''}
-          <div id="trade-ai-result">${cachedAi ? renderAiResult(cachedAi) : ''}</div>`
+          <div id="trade-ai-result">${cachedAi ? renderAiResult(cachedAi) : ''}</div>
+          ${
+            grokOn
+              ? `<div class="ai-generate-row">
+                  <button type="button" id="trade-grok-btn" class="btn">Get Grok second opinion</button>
+                  <span id="trade-grok-status" class="muted small"></span>
+                </div>`
+              : '<p class="muted small">Add an xAI key under Grok on the My Team tab for a second opinion with live injury and performance news.</p>'
+          }
+          <div id="trade-grok-result">${cachedGrok ? renderGrokResult(cachedGrok) : ''}</div>`
         : ''
     }
   `;
@@ -222,6 +285,32 @@ export function renderTrade(root, league) {
       renderTrade(root, league);
     });
   });
+
+  const grokBtn = root.querySelector('#trade-grok-btn');
+  if (grokBtn) {
+    grokBtn.addEventListener('click', async () => {
+      const statusEl = root.querySelector('#trade-grok-status');
+      const resultEl = root.querySelector('#trade-grok-result');
+      grokBtn.disabled = true;
+      statusEl.textContent = 'Searching the web and X…';
+      statusEl.className = 'muted small';
+      try {
+        const claude = aiResultKey === currentKey ? aiResult : null;
+        const summary = buildTradeAiSummary(league, partner, giving, receiving, claude);
+        const result = await generateGrokTradeOpinion(summary, loadGrokConfig());
+        grokResult = result;
+        grokResultKey = currentKey;
+        resultEl.innerHTML = renderGrokResult(result);
+        statusEl.textContent = '';
+        resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) {
+        statusEl.textContent = `✗ ${err.message}`;
+        statusEl.className = 'muted small status-error';
+      } finally {
+        grokBtn.disabled = false;
+      }
+    });
+  }
 
   const aiBtn = root.querySelector('#trade-ai-btn');
   if (aiBtn) {

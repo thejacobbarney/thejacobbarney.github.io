@@ -56,15 +56,18 @@ huddle/
                                     offer or checking one someone sent you (see §4)
     utils.js                     escapeHtml, point formatting
     app.js                       Tab routing, load/refresh/cache orchestration
+    grokConfig.js                localStorage read/write for the Grok key/model (§5b)
     aiConfig.js                  localStorage read/write for the optional bring-your-own-key AI
                                    settings — same contract as Pulse's/Iceberg's aiConfig.js
     aiVerify.js                   "Test connection" — smallest possible live Anthropic API call
     components/
+      grokSettingsPanel.js          Grok key/model UI (same shape as aiSettingsPanel.js)
       aiSettingsPanel.js            Shared enable/key/model UI, rendered into My Team
     report/
       aiRecommendation.js            generateAiRecommendation() — sends the computed roster/
                                        matchup/waiver summary to Anthropic, gets back a structured
                                        game plan (see §5)
+      grokTrade.js                   generateGrokTradeOpinion() / verifyGrokConnection(), see §5b
       aiTrade.js                     generateTradeAnalysis() — same BYOK contract, evaluates a
                                        specific trade against both teams' full rosters (see §4)
     render/
@@ -264,15 +267,45 @@ explanation shouldn't be hidden behind a tap) and defaults collapsed once a key 
 obvious AI is on without expanding it. This is pure presentation — the enable/save/test logic
 underneath is unchanged.
 
+### 5b. Grok second opinion on trades (optional, bring-your-own-key)
+
+`report/grokTrade.js` sends the same trade summary as `aiTrade.js` to xAI's Grok, which unlike
+the Claude call can search the live web and X. It returns per-player latest news (with a
+confirmed / reported / rumor / no-news confidence tag), prior-season and career history, reasoning,
+risks, and, when a Claude analysis already exists for the same selection, written feedback on it
+(`claudeAnalysis` is added to the summary only in that case). Its key and model live separately
+in `localStorage['huddle:grok-config:v1']` (`grokConfig.js`, `components/grokSettingsPanel.js`),
+so either provider can be set up or removed on its own. Rendered sources are filtered to
+`http(s)` URLs, and every model-written field goes through `escapeHtml`.
+
+**Historic performance** comes from two places, deliberately labeled differently in the UI.
+In-season weekly points (`seasonLog`, every completed week, derived from the same `stats` array
+as `recentActual`, no extra ESPN request) are shown in each trade row and sent to both models.
+Prior seasons are not fetched from ESPN at all (that needs a different, even less documented
+request); Grok recalls them, and the card says "recalled, not from ESPN" so they aren't mistaken
+for the league's own data.
+
+**Unverified:** this was written without live access to xAI's docs or API (their docs host is
+blocked from the build sandbox). The request is a `POST https://api.x.ai/v1/responses` with
+`tools: [web_search, x_search]` and Bearer auth, the default model is `grok-4`, and the reply
+parser accepts the Responses API `output[].content[].text` shape plus a few fallbacks. The model
+is asked for JSON in the prompt rather than via a strict schema, because it is unknown whether
+a schema can be combined with the search tools; if the reply isn't parseable JSON the card shows
+the raw text instead. Whether `api.x.ai` permits direct browser calls (CORS) is also untested.
+The Test connection button and xAI's own error text (shown on failure) are the way to find out;
+a wrong tool name, model name, or blocked CORS should each be a one-line fix in `grokTrade.js`
+or the model field.
+
 ## 6. Local persistence, no account
 
 League config (Worker URL, league ID, year, team ID, and — for private leagues — SWID/espn_s2)
 lives in `localStorage['huddle:config:v1']`, never anywhere else. The last successfully fetched
-league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v3']`
+league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v4']`
 purely so reopening the app on a spotty phone connection shows *something* instantly (with a
 "showing cached data" note) while a fresh fetch runs in the background — same pattern as Pulse's
 `reportCache.js`. (Bumped `v1` → `v2` when the free-agent/bye-week/outlook fields were added, then
-`v2` → `v3` when every team's roster was added for Trade — each bump is just a cache key, so
+`v2` → `v3` when every team's roster was added for Trade, `v3` → `v4` when the full-season weekly
+`seasonLog` was added to every player — each bump is just a cache key, so
 nothing needed migrating, the old entry is simply never read.)
 
 SWID/espn_s2 cookies are ESPN's own session cookies, not a Huddle-issued credential — they expire
