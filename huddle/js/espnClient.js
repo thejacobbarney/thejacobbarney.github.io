@@ -17,6 +17,18 @@ export async function fetchLeague(config, { week } = {}) {
   return fetchJson(url);
 }
 
+/** Rosters as of one completed week; each player's points for that week are read back out of it. */
+export async function fetchRosterForWeek(config, week) {
+  const url = new URL(config.workerUrl);
+  url.searchParams.set('leagueId', config.leagueId);
+  url.searchParams.set('year', config.year);
+  url.searchParams.append('view', 'mRoster');
+  url.searchParams.set('scoringPeriodId', String(week));
+  if (config.swid) url.searchParams.set('swid', config.swid);
+  if (config.espnS2) url.searchParams.set('espn_s2', config.espnS2);
+  return fetchJson(url);
+}
+
 /** Fetches the pool of unrostered (free agent / waivers) players for waiver suggestions. */
 export async function fetchFreeAgents(config, { week } = {}) {
   const url = new URL(config.workerUrl);

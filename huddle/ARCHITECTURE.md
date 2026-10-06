@@ -337,13 +337,13 @@ or the model field.
 
 League config (Worker URL, league ID, year, team ID, and — for private leagues — SWID/espn_s2)
 lives in `localStorage['huddle:config:v1']`, never anywhere else. The last successfully fetched
-league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v5']`
+league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v6']`
 purely so reopening the app on a spotty phone connection shows *something* instantly (with a
 "showing cached data" note) while a fresh fetch runs in the background — same pattern as Pulse's
 `reportCache.js`. (Bumped `v1` → `v2` when the free-agent/bye-week/outlook fields were added, then
 `v2` → `v3` when every team's roster was added for Trade, `v3` → `v4` when the full-season weekly
 `seasonLog` was added to every player, `v4` → `v5` when per-week stats were restricted to single-week
-entries (below) — each bump is just a cache key, so
+entries (below), `v5` → `v6` when full-season history was added (below) — each bump is just a cache key, so
 nothing needed migrating, the old entry is simply never read.)
 
 SWID/espn_s2 cookies are ESPN's own session cookies, not a Huddle-issued credential — they expire
@@ -374,3 +374,27 @@ also skewed `playerValue()`, waiver picks, trade values and grades. `espnClient.
 now keeps only split id 1 whenever the field is present at all. Assumption to confirm against a
 real league: that id 1 is the single-week split (from community reverse engineering, not ESPN
 docs). If the "last 3" line goes blank instead of wrong, that assumption is the thing to fix.
+
+### Season history (`history.js`)
+
+After single-week filtering, a real league showed only about one weekly score per player ("last 1:
+22.6"), so ESPN's current-week roster payload clearly carries only a week or two of weekly stats.
+`history.js` rebuilds the season log by asking the same roster endpoint for each completed week
+(`fetchRosterForWeek`: `view=mRoster&scoringPeriodId=N`, which the Worker already forwards, so no
+Worker redeploy) and reading each player's points for that week out of the response: the weekly
+`stats` entry if present, otherwise `playerPoolEntry.appliedStatTotal`. Requests run three at a
+time, after the first render, so the app is usable immediately and the My Team/Trade/Waivers data
+fills in a moment later (skipped re-render if an input is focused). Completed weeks never change,
+so each is cached once in `localStorage['huddle:history:v1:<league>:<year>']`; later refreshes make
+no history requests, and a week that failed or had nothing readable is simply retried next time.
+`applyHistory()` then rebuilds `seasonLog` and `recentActual` (last 3) on every rostered player and
+free agent, keeping any weekly points the original payload had for weeks the history lacks.
+
+Two judgment calls to know about: an exact 0 is treated as "did not play" (injury, bye, inactive) and
+left out so a bye week or a one-week injury can't drag a player's recent average down (a true 0.0
+game is rare enough to accept losing); and any value over 100 points is discarded as a misread.
+**Unverified against a real league:** that ESPN returns each player's points for the requested week
+in one of those two fields in this response. A player who wasn't on any roster that week (a free
+agent, or someone picked up since) has no entry for it, so free agents in particular keep a thin
+log. If real history comes back empty the app just behaves as it did before this change.
+
