@@ -295,7 +295,7 @@ one-week injury. Config is separate (`perplexityConfig.js`, `components/perplexi
 `http(s)` through `utils.js: sourceLinksHtml()` and `<think>` blocks are stripped from reasoning
 models' replies. The waiver result is cached per fetched `league` object like the AI game plan.
 
-**Unverified:** like §5b this was written without access to Perplexity's docs or API. The
+**Unverified:** like §5b this was written without access to Perplexity's docs or API. A browser `fetch` that fails with no readable response cannot be told apart from a CORS or network failure, and a real phone showed that a rotated key produced exactly that (while the same browser had earlier read a Perplexity validation error fine), so the Perplexity error text says "invalid, revoked or out of credit" rather than blaming CORS, and a key not starting `pplx-` is rejected before any request. The
 endpoint (`POST https://api.perplexity.ai/chat/completions`, Bearer auth), the `sonar-pro` model
 name, the `citations` / `search_results` response fields, and whether browsers may call the API
 directly (CORS) are all from memory. JSON is requested in the prompt rather than via

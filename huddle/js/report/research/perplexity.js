@@ -14,6 +14,16 @@ import { extractJson } from './normalize.js';
 const API_URL = 'https://api.perplexity.ai/chat/completions';
 const DEFAULT_MODEL = 'sonar-pro';
 
+const UNREADABLE =
+  "Perplexity didn't answer in a way the browser can read. This usually means the key is invalid, revoked, or the account has no API credit (their error replies can leave out the headers browsers need). Copy a fresh key from your Perplexity API settings, check the account has credit, then Save and Test again.";
+
+function keyProblem(apiKey) {
+  const key = String(apiKey || '').trim();
+  if (!key) return 'No API key entered.';
+  if (!key.startsWith('pplx-')) return 'That does not look like a Perplexity key. They start with pplx-. Check you copied the whole key and nothing else.';
+  return null;
+}
+
 const authHeaders = (apiKey) => ({ 'content-type': 'application/json', authorization: `Bearer ${apiKey}` });
 
 async function errorMessage(response, fallback) {
@@ -52,6 +62,8 @@ function readResponse(data) {
 export async function runPerplexity(kind, summary, config) {
   const apiKey = config?.apiKey;
   if (!apiKey) throw new Error('No Perplexity API key configured. Add one in the Perplexity settings on My Team.');
+  const problem = keyProblem(apiKey);
+  if (problem) throw new Error(problem);
   const { prompt, normalize } = RESEARCH_KINDS[kind];
 
   let response;
@@ -68,9 +80,7 @@ export async function runPerplexity(kind, summary, config) {
       }),
     });
   } catch {
-    throw new Error(
-      'Network error reaching api.perplexity.ai. If your key is right, the browser may be blocking the call (CORS).'
-    );
+    throw new Error(UNREADABLE);
   }
   if (!response.ok) {
     throw new Error(await errorMessage(response, `Perplexity API error (HTTP ${response.status})`));
@@ -83,7 +93,8 @@ export async function runPerplexity(kind, summary, config) {
 /** Smallest possible call that proves a key/model pair works. Perplexity requires max_tokens >= 16. */
 export async function verifyPerplexityConnection(config) {
   const apiKey = config?.apiKey;
-  if (!apiKey) throw new Error('No API key entered.');
+  const problem = keyProblem(apiKey);
+  if (problem) throw new Error(problem);
   const model = config.model || DEFAULT_MODEL;
   let response;
   try {
@@ -93,7 +104,7 @@ export async function verifyPerplexityConnection(config) {
       body: JSON.stringify({ model, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 16 }),
     });
   } catch {
-    throw new Error('Network error. Could not reach api.perplexity.ai (the browser may be blocking it).');
+    throw new Error(UNREADABLE);
   }
   if (!response.ok) throw new Error(await errorMessage(response, `HTTP ${response.status}`));
   await response.json();
