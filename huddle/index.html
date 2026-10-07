@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=11" />
+<link rel="stylesheet" href="css/style.css?v=12" />
 </head>
 <body>
   <header class="site-header">
@@ -31,7 +31,7 @@
   <nav class="tab-bar" id="tab-bar" hidden></nav>
 
   <footer class="site-footer">
-    <p>Your league ID, team ID, and (if private) ESPN cookies are saved only in this browser's local storage, and sent only to the Worker URL you configure — never to any other server. The optional AI features on My Team and Trade send only computed summaries (roster/matchup/waiver data, or a proposed trade's rosters) to Anthropic (or, for the optional second opinions, xAI or Perplexity) using your own API key, never ESPN cookies or the raw ESPN response, and only when you turn it on. See <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> for the one-time proxy setup this needs.</p>
+    <p>Your league ID, team ID, and (if private) ESPN cookies are saved only in this browser's local storage, and sent only to the Worker URL you configure — never to any other server. The optional AI features on My Team and Trade send only computed summaries (roster/matchup/waiver data, or a proposed trade's rosters) to Anthropic (or, for the optional second opinions, xAI or Perplexity) using your own API key, never ESPN cookies or the raw ESPN response, and only when you turn it on. The final comparison sends the other AI views' written results to Anthropic too. See <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> for the one-time proxy setup this needs.</p>
   </footer>
 
   <!-- Version every module URL so a deploy is never masked by the browser's cached copy.
@@ -39,34 +39,42 @@
   <script type="importmap">
 {
   "imports": {
-    "./js/aiConfig.js": "./js/aiConfig.js?v=11",
-    "./js/aiVerify.js": "./js/aiVerify.js?v=11",
-    "./js/components/aiSettingsPanel.js": "./js/components/aiSettingsPanel.js?v=11",
-    "./js/components/grokSettingsPanel.js": "./js/components/grokSettingsPanel.js?v=11",
-    "./js/components/perplexitySettingsPanel.js": "./js/components/perplexitySettingsPanel.js?v=11",
-    "./js/constants.js": "./js/constants.js?v=11",
-    "./js/espnClient.js": "./js/espnClient.js?v=11",
-    "./js/grokConfig.js": "./js/grokConfig.js?v=11",
-    "./js/history.js": "./js/history.js?v=11",
-    "./js/lineup.js": "./js/lineup.js?v=11",
-    "./js/perplexityConfig.js": "./js/perplexityConfig.js?v=11",
-    "./js/render/matchup.js": "./js/render/matchup.js?v=11",
-    "./js/render/myTeam.js": "./js/render/myTeam.js?v=11",
-    "./js/render/outlook.js": "./js/render/outlook.js?v=11",
-    "./js/render/setup.js": "./js/render/setup.js?v=11",
-    "./js/render/standings.js": "./js/render/standings.js?v=11",
-    "./js/render/trade.js": "./js/render/trade.js?v=11",
-    "./js/render/waiver.js": "./js/render/waiver.js?v=11",
-    "./js/report/aiRecommendation.js": "./js/report/aiRecommendation.js?v=11",
-    "./js/report/aiTrade.js": "./js/report/aiTrade.js?v=11",
-    "./js/report/grokTrade.js": "./js/report/grokTrade.js?v=11",
-    "./js/report/perplexityResearch.js": "./js/report/perplexityResearch.js?v=11",
-    "./js/storage.js": "./js/storage.js?v=11",
-    "./js/trade.js": "./js/trade.js?v=11",
-    "./js/utils.js": "./js/utils.js?v=11"
+    "./js/aiConfig.js": "./js/aiConfig.js?v=12",
+    "./js/aiVerify.js": "./js/aiVerify.js?v=12",
+    "./js/components/aiSettingsPanel.js": "./js/components/aiSettingsPanel.js?v=12",
+    "./js/components/aiViews.js": "./js/components/aiViews.js?v=12",
+    "./js/components/grokSettingsPanel.js": "./js/components/grokSettingsPanel.js?v=12",
+    "./js/components/perplexitySettingsPanel.js": "./js/components/perplexitySettingsPanel.js?v=12",
+    "./js/components/researchCards.js": "./js/components/researchCards.js?v=12",
+    "./js/constants.js": "./js/constants.js?v=12",
+    "./js/espnClient.js": "./js/espnClient.js?v=12",
+    "./js/grokConfig.js": "./js/grokConfig.js?v=12",
+    "./js/history.js": "./js/history.js?v=12",
+    "./js/lineup.js": "./js/lineup.js?v=12",
+    "./js/perplexityConfig.js": "./js/perplexityConfig.js?v=12",
+    "./js/render/matchup.js": "./js/render/matchup.js?v=12",
+    "./js/render/myTeam.js": "./js/render/myTeam.js?v=12",
+    "./js/render/outlook.js": "./js/render/outlook.js?v=12",
+    "./js/render/setup.js": "./js/render/setup.js?v=12",
+    "./js/render/standings.js": "./js/render/standings.js?v=12",
+    "./js/render/trade.js": "./js/render/trade.js?v=12",
+    "./js/render/waiver.js": "./js/render/waiver.js?v=12",
+    "./js/report/aiRecommendation.js": "./js/report/aiRecommendation.js?v=12",
+    "./js/report/aiSynthesis.js": "./js/report/aiSynthesis.js?v=12",
+    "./js/report/aiTrade.js": "./js/report/aiTrade.js?v=12",
+    "./js/report/aiWaiver.js": "./js/report/aiWaiver.js?v=12",
+    "./js/report/claudeJson.js": "./js/report/claudeJson.js?v=12",
+    "./js/report/research/grok.js": "./js/report/research/grok.js?v=12",
+    "./js/report/research/kinds.js": "./js/report/research/kinds.js?v=12",
+    "./js/report/research/normalize.js": "./js/report/research/normalize.js?v=12",
+    "./js/report/research/perplexity.js": "./js/report/research/perplexity.js?v=12",
+    "./js/report/research/prompts.js": "./js/report/research/prompts.js?v=12",
+    "./js/storage.js": "./js/storage.js?v=12",
+    "./js/trade.js": "./js/trade.js?v=12",
+    "./js/utils.js": "./js/utils.js?v=12"
   }
 }
   </script>
-  <script type="module" src="js/app.js?v=11"></script>
+  <script type="module" src="js/app.js?v=12"></script>
 </body>
 </html>
