@@ -1,0 +1,29 @@
+# Global guardrails. Enforced in code (src/fantasy_ai/guardrails.py), not just by prompt.
+# Announce these to the league.
+
+# Master pause switch. true = every proposed move is rejected and nothing reaches the move sheet.
+paused: false
+
+per_agent_weekly:
+  max_faab_pct_of_budget: 20     # max FAAB an agent may bid in one week, as % of the season budget
+  max_waiver_claims: 4
+  max_trade_proposals: 2
+
+bot_to_bot_trades:
+  max_per_week_league_wide: 1    # total bot-vs-bot trades approved per week
+  max_per_pair_per_season: 1     # same two bots may trade at most once all season
+
+# Trades touching your team (the commissioner's active team)
+my_team_trades:
+  proposal_only: true            # never executed by automation
+  require_outside_approval: true # someone other than you approves, or the league review period applies
+
+# Dropping one of a team's top-N assets (by projected season points) needs a written reason.
+top_asset_rank: 5
+top_asset_drop_min_reason_chars: 40
+
+# Every move needs a one-line reason.
+min_reason_chars: 15
+
+# Commissioner edits are reserved for lineup and IR fixes. Add/drop/trades must be real transactions.
+commissioner_edit_types: [lineup, ir_move]

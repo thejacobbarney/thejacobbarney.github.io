@@ -1,0 +1,10 @@
+# Never commit credentials or league data
+.env
+*.env
+data/*
+!data/.gitkeep
+out/*
+!out/.gitkeep
+__pycache__/
+*.pyc
+.venv/

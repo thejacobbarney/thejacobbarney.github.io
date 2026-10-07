@@ -1,0 +1,13 @@
+# League identity. Cookies (ESPN_S2, ESPN_SWID) are NEVER stored here; they come from env vars.
+league_id: 1301691100
+season: 2026
+
+# Your own team's ESPN team id (integer). Fill in after the first `refresh`.
+my_team_id: null
+
+# Dead teams run by AI managers. Fill in after the first `refresh` (it prints every team id).
+# slug becomes the folder name under agents/. persona must match a file in personas/ (no .md).
+# Example:
+#   3: {slug: team03-quant, persona: quant}
+#   5: {slug: team05-stash-king, persona: stash_king}
+dead_teams: {}
