@@ -1,4 +1,5 @@
 import { loadConfig, hasConfig } from './storage.js';
+import { loadSeasonHistory, applyHistory } from './history.js';
 import { fetchLeague, fetchFreeAgents, normalizeLeague, normalizeFreeAgents } from './espnClient.js';
 import { renderSetup } from './render/setup.js';
 import { renderMyTeam } from './render/myTeam.js';
@@ -14,7 +15,7 @@ const settingsBtn = document.getElementById('settings-btn');
 const refreshBtn = document.getElementById('refresh-btn');
 const statusEl = document.getElementById('status-line');
 
-const CACHE_KEY = 'huddle:cache:v5';
+const CACHE_KEY = 'huddle:cache:v6';
 const TABS = {
   team: { label: 'My Team', render: renderMyTeam },
   matchup: { label: 'Matchup', render: renderMatchup },
@@ -91,6 +92,18 @@ async function loadLeague({ silent } = {}) {
     saveCache(currentLeague);
     statusEl.textContent = '';
     renderActiveTab();
+
+    // Weekly history is best effort and slower than the main load, so it fills in afterward.
+    // The league object is updated in place; skip the re-render if someone is typing.
+    const league = currentLeague;
+    const history = await loadSeasonHistory(config, league.week);
+    if (applyHistory(league, history) && currentLeague === league) {
+      saveCache(league);
+      const el = document.activeElement;
+      if (!(el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA'))) {
+        renderActiveTab();
+      }
+    }
   } catch (err) {
     if (!currentLeague) {
       appRoot.innerHTML = `<div class="card"><p class="error-text">${err.message}</p></div>`;
