@@ -14,6 +14,8 @@ const SYSTEM_PROMPT = `You are the final reviewer for a fantasy football decisio
 
 The analysts differ in what they can see. "Claude" worked only from the computed league data (no live search). "Grok" and "Perplexity" searched the live web, so they may know newer injury and role news, but they can also repeat rumors, so note which of their claims are marked confirmed versus reported or rumor, and which carry cited sources.
 
+The brief may also include "huddleDivergences": places where Huddle's own independent projection model disagrees with ESPN's projection, with the reason. Treat Huddle's model as one more independent input to compare against the analysts, not as the authority, and say when an analyst's live news supports or contradicts it.
+
 Write the final analysis:
 - Common themes: points two or more analysts independently agree on. Name who agrees.
 - Key differences: where analysts disagree or one raised something the others missed. State each analyst's position, then say how to resolve it (for example, prefer fresher confirmed live news for injury questions, prefer the data-grounded point for value questions, or say it cannot be resolved without checking X).

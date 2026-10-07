@@ -180,6 +180,10 @@ h1, h2, h3 { font-family: "Sora", system-ui, sans-serif; font-weight: 700; margi
 .grade-f { color: var(--danger); }
 .ai-result .trade-grades { justify-content: flex-start; margin-top: 0.4rem; }
 .grade-inline { font-size: 1.1rem; margin-left: 0.3rem; }
+.huddle-up { color: var(--success); font-weight: 700; }
+.huddle-down { color: var(--danger); font-weight: 700; }
+.huddle-note { margin-top: 0.15rem; }
+.huddle-card { margin: 0; }
 .trade-suggestion { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
 .trade-suggestion-btn { white-space: nowrap; }
 

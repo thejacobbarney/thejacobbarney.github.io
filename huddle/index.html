@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=12" />
+<link rel="stylesheet" href="css/style.css?v=13" />
 </head>
 <body>
   <header class="site-header">
@@ -39,42 +39,46 @@
   <script type="importmap">
 {
   "imports": {
-    "./js/aiConfig.js": "./js/aiConfig.js?v=12",
-    "./js/aiVerify.js": "./js/aiVerify.js?v=12",
-    "./js/components/aiSettingsPanel.js": "./js/components/aiSettingsPanel.js?v=12",
-    "./js/components/aiViews.js": "./js/components/aiViews.js?v=12",
-    "./js/components/grokSettingsPanel.js": "./js/components/grokSettingsPanel.js?v=12",
-    "./js/components/perplexitySettingsPanel.js": "./js/components/perplexitySettingsPanel.js?v=12",
-    "./js/components/researchCards.js": "./js/components/researchCards.js?v=12",
-    "./js/constants.js": "./js/constants.js?v=12",
-    "./js/espnClient.js": "./js/espnClient.js?v=12",
-    "./js/grokConfig.js": "./js/grokConfig.js?v=12",
-    "./js/history.js": "./js/history.js?v=12",
-    "./js/lineup.js": "./js/lineup.js?v=12",
-    "./js/perplexityConfig.js": "./js/perplexityConfig.js?v=12",
-    "./js/render/matchup.js": "./js/render/matchup.js?v=12",
-    "./js/render/myTeam.js": "./js/render/myTeam.js?v=12",
-    "./js/render/outlook.js": "./js/render/outlook.js?v=12",
-    "./js/render/setup.js": "./js/render/setup.js?v=12",
-    "./js/render/standings.js": "./js/render/standings.js?v=12",
-    "./js/render/trade.js": "./js/render/trade.js?v=12",
-    "./js/render/waiver.js": "./js/render/waiver.js?v=12",
-    "./js/report/aiRecommendation.js": "./js/report/aiRecommendation.js?v=12",
-    "./js/report/aiSynthesis.js": "./js/report/aiSynthesis.js?v=12",
-    "./js/report/aiTrade.js": "./js/report/aiTrade.js?v=12",
-    "./js/report/aiWaiver.js": "./js/report/aiWaiver.js?v=12",
-    "./js/report/claudeJson.js": "./js/report/claudeJson.js?v=12",
-    "./js/report/research/grok.js": "./js/report/research/grok.js?v=12",
-    "./js/report/research/kinds.js": "./js/report/research/kinds.js?v=12",
-    "./js/report/research/normalize.js": "./js/report/research/normalize.js?v=12",
-    "./js/report/research/perplexity.js": "./js/report/research/perplexity.js?v=12",
-    "./js/report/research/prompts.js": "./js/report/research/prompts.js?v=12",
-    "./js/storage.js": "./js/storage.js?v=12",
-    "./js/trade.js": "./js/trade.js?v=12",
-    "./js/utils.js": "./js/utils.js?v=12"
+    "./js/aiConfig.js": "./js/aiConfig.js?v=13",
+    "./js/aiVerify.js": "./js/aiVerify.js?v=13",
+    "./js/components/aiSettingsPanel.js": "./js/components/aiSettingsPanel.js?v=13",
+    "./js/components/aiViews.js": "./js/components/aiViews.js?v=13",
+    "./js/components/grokSettingsPanel.js": "./js/components/grokSettingsPanel.js?v=13",
+    "./js/components/huddleProjection.js": "./js/components/huddleProjection.js?v=13",
+    "./js/components/perplexitySettingsPanel.js": "./js/components/perplexitySettingsPanel.js?v=13",
+    "./js/components/researchCards.js": "./js/components/researchCards.js?v=13",
+    "./js/constants.js": "./js/constants.js?v=13",
+    "./js/context.js": "./js/context.js?v=13",
+    "./js/espnClient.js": "./js/espnClient.js?v=13",
+    "./js/grokConfig.js": "./js/grokConfig.js?v=13",
+    "./js/history.js": "./js/history.js?v=13",
+    "./js/lineup.js": "./js/lineup.js?v=13",
+    "./js/perplexityConfig.js": "./js/perplexityConfig.js?v=13",
+    "./js/projection.js": "./js/projection.js?v=13",
+    "./js/render/matchup.js": "./js/render/matchup.js?v=13",
+    "./js/render/myTeam.js": "./js/render/myTeam.js?v=13",
+    "./js/render/outlook.js": "./js/render/outlook.js?v=13",
+    "./js/render/setup.js": "./js/render/setup.js?v=13",
+    "./js/render/standings.js": "./js/render/standings.js?v=13",
+    "./js/render/trade.js": "./js/render/trade.js?v=13",
+    "./js/render/waiver.js": "./js/render/waiver.js?v=13",
+    "./js/report/aiRecommendation.js": "./js/report/aiRecommendation.js?v=13",
+    "./js/report/aiSynthesis.js": "./js/report/aiSynthesis.js?v=13",
+    "./js/report/aiTrade.js": "./js/report/aiTrade.js?v=13",
+    "./js/report/aiWaiver.js": "./js/report/aiWaiver.js?v=13",
+    "./js/report/claudeJson.js": "./js/report/claudeJson.js?v=13",
+    "./js/report/promptNotes.js": "./js/report/promptNotes.js?v=13",
+    "./js/report/research/grok.js": "./js/report/research/grok.js?v=13",
+    "./js/report/research/kinds.js": "./js/report/research/kinds.js?v=13",
+    "./js/report/research/normalize.js": "./js/report/research/normalize.js?v=13",
+    "./js/report/research/perplexity.js": "./js/report/research/perplexity.js?v=13",
+    "./js/report/research/prompts.js": "./js/report/research/prompts.js?v=13",
+    "./js/storage.js": "./js/storage.js?v=13",
+    "./js/trade.js": "./js/trade.js?v=13",
+    "./js/utils.js": "./js/utils.js?v=13"
   }
 }
   </script>
-  <script type="module" src="js/app.js?v=12"></script>
+  <script type="module" src="js/app.js?v=13"></script>
 </body>
 </html>

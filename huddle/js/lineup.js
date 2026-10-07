@@ -9,6 +9,9 @@ function benchEligibleFor(starter, benchPlayers) {
   return benchPlayers.filter((p) => p.defaultPosition === starter.defaultPosition);
 }
 
+/** Huddle's projection when it has one, otherwise ESPN's: lets the same suggestion logic run on either. */
+export const huddleProj = (p) => (typeof p.huddle?.value === 'number' ? p.huddle.value : p.projected);
+
 /**
  * Compares each started player against the bench players who could legally
  * take their spot, using projected points for the week. Only returns cases
@@ -16,19 +19,20 @@ function benchEligibleFor(starter, benchPlayers) {
  * verdict, so it deliberately says nothing about players it can't compare
  * (missing projections, bye weeks with no stat line at all, etc.).
  */
-export function findStartSitSuggestions(roster) {
+export function findStartSitSuggestions(roster, projOf = (p) => p.projected) {
   const starters = roster.filter((p) => p.slotId !== BENCH_SLOT_ID && p.slotId !== IR_SLOT_ID);
   const bench = roster.filter((p) => p.slotId === BENCH_SLOT_ID);
 
   const suggestions = [];
   for (const starter of starters) {
-    if (typeof starter.projected !== 'number') continue;
+    const starterProj = projOf(starter);
+    if (typeof starterProj !== 'number') continue;
     const candidates = benchEligibleFor(starter, bench).filter(
-      (p) => typeof p.projected === 'number' && p.projected > starter.projected
+      (p) => typeof projOf(p) === 'number' && projOf(p) > starterProj
     );
     if (candidates.length === 0) continue;
-    const best = candidates.reduce((a, b) => (b.projected > a.projected ? b : a));
-    suggestions.push({ starter, upgrade: best, delta: best.projected - starter.projected });
+    const best = candidates.reduce((a, b) => (projOf(b) > projOf(a) ? b : a));
+    suggestions.push({ starter, upgrade: best, delta: projOf(best) - starterProj });
   }
   return suggestions.sort((a, b) => b.delta - a.delta);
 }
@@ -58,7 +62,7 @@ export function playerValue(player) {
  * "your OUT stud is droppable" trap: a good recent-form average protects a
  * temporarily-injured player from looking like the weakest link.
  */
-export function findWaiverUpgrades(roster, freeAgents) {
+export function findWaiverUpgrades(roster, freeAgents, projOf = (p) => p.projected) {
   const rosteredByPos = new Map();
   for (const p of roster) {
     if (p.slotId === IR_SLOT_ID || playerValue(p) === null) continue;
@@ -69,7 +73,7 @@ export function findWaiverUpgrades(roster, freeAgents) {
 
   const faByPos = new Map();
   for (const p of freeAgents) {
-    if (typeof p.projected !== 'number') continue;
+    if (typeof projOf(p) !== 'number') continue;
     const list = faByPos.get(p.defaultPosition) || [];
     list.push(p);
     faByPos.set(p.defaultPosition, list);
@@ -79,10 +83,10 @@ export function findWaiverUpgrades(roster, freeAgents) {
   for (const [pos, rosteredList] of rosteredByPos) {
     const weakest = rosteredList.reduce((a, b) => (playerValue(b) < playerValue(a) ? b : a));
     const weakestValue = playerValue(weakest);
-    const candidates = (faByPos.get(pos) || []).filter((fa) => fa.projected > weakestValue);
+    const candidates = (faByPos.get(pos) || []).filter((fa) => projOf(fa) > weakestValue);
     if (candidates.length === 0) continue;
-    const best = candidates.reduce((a, b) => (b.projected > a.projected ? b : a));
-    suggestions.push({ drop: weakest, add: best, delta: best.projected - weakestValue });
+    const best = candidates.reduce((a, b) => (projOf(b) > projOf(a) ? b : a));
+    suggestions.push({ drop: weakest, add: best, delta: projOf(best) - weakestValue });
   }
   return suggestions.sort((a, b) => b.delta - a.delta);
 }

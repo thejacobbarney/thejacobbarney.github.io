@@ -1,5 +1,7 @@
 import { escapeHtml, fmtPts } from '../utils.js';
-import { findStartSitSuggestions, findWaiverUpgrades } from '../lineup.js';
+import { findStartSitSuggestions, findWaiverUpgrades, huddleProj } from '../lineup.js';
+import { standingsContext } from '../context.js';
+import { huddleCell, huddleNote, huddleCard, compactHuddle, divergenceBrief } from '../components/huddleProjection.js';
 import { BENCH_SLOT_ID, IR_SLOT_ID } from '../constants.js';
 import { loadAiConfig } from '../aiConfig.js';
 import { renderAiSettingsPanel } from '../components/aiSettingsPanel.js';
@@ -52,10 +54,12 @@ function playerRow(p, week) {
         <span class="player-name">${escapeHtml(p.name)}</span>
         <span class="muted player-meta">${escapeHtml(p.proTeam)} · ${escapeHtml(p.defaultPosition)}</span>
         ${trendText(p.recentActual)}
+        ${huddleNote(p)}
         ${injuryBadge(p.injuryStatus)}
         ${byeBadge(p.byeWeek, week)}
       </td>
       <td class="num col-num">${fmtPts(p.projected)}</td>
+      <td class="num col-num">${huddleCell(p)}</td>
       <td class="num col-num">${fmtPts(p.actual)}</td>
     </tr>`;
 }
@@ -66,7 +70,7 @@ function table(title, players, week) {
     <div class="roster-group">
       <h3>${escapeHtml(title)}</h3>
       <table class="roster-table">
-        <thead><tr><th>Slot</th><th>Player</th><th class="num">Proj</th><th class="num">Actual</th></tr></thead>
+        <thead><tr><th>Slot</th><th>Player</th><th class="num">ESPN</th><th class="num">Huddle</th><th class="num">Actual</th></tr></thead>
         <tbody>${players
           .slice()
           .sort(slotSort)
@@ -85,6 +89,7 @@ function compactPlayer(p) {
     proTeam: p.proTeam,
     projected: p.projected,
     recentActual: p.recentActual,
+    ...compactHuddle(p),
     seasonLog: (p.seasonLog || []).map((r) => ({ week: r.week, points: r.points })),
     injuryStatus: p.injuryStatus,
     byeWeek: p.byeWeek,
@@ -122,6 +127,7 @@ function buildAiSummary(league, startSitSuggestions) {
         }))
       : [],
     upcomingSchedule: league.upcomingMatchups || [],
+    standings: standingsContext(league),
   };
 }
 
@@ -138,6 +144,25 @@ export function renderMyTeam(root, league) {
   const bench = roster.filter((p) => p.slotId === BENCH_SLOT_ID);
   const ir = roster.filter((p) => p.slotId === IR_SLOT_ID);
   const suggestions = findStartSitSuggestions(roster);
+
+  const huddleOnly = findStartSitSuggestions(roster, huddleProj).filter(
+    (h) => !suggestions.some((e) => e.upgrade.playerId === h.upgrade.playerId && e.starter.playerId === h.starter.playerId)
+  );
+  const huddleSuggestionsHtml = huddleOnly.length
+    ? `
+      <div class="card callout">
+        <h3>Start/Sit by Huddle's projection: ${huddleOnly.length} different call${huddleOnly.length > 1 ? 's' : ''}</h3>
+        <ul class="plain-list">
+          ${huddleOnly
+            .map(
+              (x) => `<li><b>${escapeHtml(x.upgrade.name)}</b> over <b>${escapeHtml(x.starter.name)}</b> at ${escapeHtml(x.starter.slotLabel)}
+                <span class="num">+${fmtPts(x.delta)}</span> by Huddle<br><span class="muted small">ESPN has ${escapeHtml(x.upgrade.name)} at ${fmtPts(x.upgrade.projected)} vs ${fmtPts(x.starter.projected)}. ${escapeHtml(x.upgrade.huddle?.components.slice(1).map((c) => c.label)[0] || 'Recent form')}</span></li>`
+            )
+            .join('')}
+        </ul>
+        <p class="muted small">Calls only Huddle's own estimate makes. Check the reasons before acting.</p>
+      </div>`
+    : '';
 
   const suggestionsHtml = suggestions.length
     ? `
@@ -164,6 +189,8 @@ export function renderMyTeam(root, league) {
       ${league.week ? `<span class="muted">Week ${league.week}</span>` : ''}
     </div>
     ${suggestionsHtml}
+    ${huddleSuggestionsHtml}
+    ${huddleCard(league)}
     <div id="ai-settings-container"></div>
     <div id="grok-settings-container"></div>
     <div id="perplexity-settings-container"></div>
@@ -212,6 +239,7 @@ export function renderMyTeam(root, league) {
     getBrief: () => ({
       week: league.week,
       opponent: league.matchup?.opponent?.name ?? null,
+      huddleDivergences: divergenceBrief(league.myTeam.roster),
       precomputedStartSit: suggestions.map((x) => ({ upgrade: x.upgrade.name, overStarter: x.starter.name, delta: x.delta })),
     }),
     providers: [

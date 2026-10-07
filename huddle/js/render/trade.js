@@ -8,6 +8,8 @@ import { loadGrokConfig, grokReady } from '../grokConfig.js';
 import { runGrok } from '../report/research/grok.js';
 import { loadPerplexityConfig, perplexityReady } from '../perplexityConfig.js';
 import { runPerplexity } from '../report/research/perplexity.js';
+import { standingsContext } from '../context.js';
+import { compactHuddle, divergenceBrief } from '../components/huddleProjection.js';
 import { renderAiViews } from '../components/aiViews.js';
 import { renderTradeCard, gradesHtml, verdictBadgeClass, VERDICT_LABEL } from '../components/researchCards.js';
 
@@ -26,6 +28,7 @@ function compactPlayer(p) {
     proTeam: p.proTeam,
     recentValue: playerValue(p),
     projected: p.projected,
+    ...compactHuddle(p),
     seasonLog: (p.seasonLog || []).map((r) => ({ week: r.week, points: r.points })),
     injuryStatus: p.injuryStatus,
     byeWeek: p.byeWeek,
@@ -36,6 +39,7 @@ function buildTradeAiSummary(league, partner, giving, receiving, claudeAnalysis)
   return {
     ...(claudeAnalysis ? { claudeAnalysis } : {}),
     week: league.week,
+    standings: standingsContext(league),
     you: { team: league.myTeam.name, roster: league.myTeam.roster.map(compactPlayer) },
     them: { team: partner.name, roster: partner.roster.map(compactPlayer) },
     trade: {
@@ -250,6 +254,7 @@ export function renderTrade(root, league) {
         youReceive: receiving.map((p) => `${p.name} (${p.defaultPosition})`),
         offlineValuePerGame: { youGive: evaluation.giveValue, youReceive: evaluation.receiveValue },
         offlineGrades: { you: evaluation.yourGrade, them: evaluation.theirGrade },
+        huddleDivergences: divergenceBrief([...giving, ...receiving]),
       }),
       providers: [
         {

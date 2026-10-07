@@ -99,7 +99,13 @@ function recentActualPoints(stats, throughWeek, count = Infinity) {
     .reverse();
 }
 
-function normalizePlayerEntry(entry, week, byeWeekByProTeamId) {
+/** This week's opponent abbreviation and home/away for an NFL team, or nulls if the schedule is unknown. */
+function gameFor(proInfo, proTeamId, week) {
+  const g = proInfo?.schedule?.[proTeamId]?.[week];
+  return g ? { opponent: proTeamAbbrev(g.opp), home: g.home } : { opponent: null, home: null };
+}
+
+function normalizePlayerEntry(entry, week, proInfo) {
   const player = entry?.playerPoolEntry?.player || entry?.player;
   if (!player) return null;
   return {
@@ -114,23 +120,46 @@ function normalizePlayerEntry(entry, week, byeWeekByProTeamId) {
     actual: findStat(player.stats, week, STAT_SOURCE.ACTUAL),
     recentActual: recentActualPoints(player.stats, week, 3),
     seasonLog: recentActualPoints(player.stats, week),
-    byeWeek: byeWeekByProTeamId?.get(player.proTeamId) ?? null,
+    proTeamId: player.proTeamId ?? null,
+    byeWeek: proInfo?.byeWeeks?.[player.proTeamId] ?? null,
+    ...gameFor(proInfo, player.proTeamId, week),
   };
 }
 
-/** ESPN's `view=proTeams` response — sourced defensively since this isn't documented anywhere;
- *  if the shape doesn't match, bye-week features just render nothing instead of breaking. */
-function buildByeWeekMap(raw) {
+/**
+ * ESPN's `view=proTeams` response: each NFL team's bye week and, per scoring period, its game
+ * (opponent and home/away). Undocumented, so every field is read defensively; anything missing
+ * just means the matching feature (byes, opponent, home/road) renders nothing instead of breaking.
+ * Returns plain objects so it survives the localStorage cache.
+ */
+export function buildProInfo(raw) {
   const proTeams = raw?.settings?.proTeams || raw?.proTeams;
-  const map = new Map();
+  const byeWeeks = {};
+  const schedule = {};
+  const weeksWithGames = new Set();
   if (Array.isArray(proTeams)) {
     for (const t of proTeams) {
-      if (t && typeof t.id === 'number' && typeof t.byeWeek === 'number') {
-        map.set(t.id, t.byeWeek);
+      if (!t || typeof t.id !== 'number') continue;
+      if (typeof t.byeWeek === 'number') byeWeeks[t.id] = t.byeWeek;
+      for (const [weekKey, games] of Object.entries(t.proGamesByScoringPeriod || {})) {
+        const week = Number(weekKey);
+        const game = Array.isArray(games) ? games[0] : null;
+        if (!game || !Number.isFinite(week)) continue;
+        const home = game.homeProTeamId === t.id;
+        const opp = home ? game.awayProTeamId : game.homeProTeamId;
+        if (typeof opp !== 'number') continue;
+        (schedule[t.id] ||= {})[week] = { opp, home };
+        weeksWithGames.add(week);
       }
     }
+    // No explicit bye field: a week the league plays but this team doesn't is its bye.
+    for (const t of proTeams) {
+      if (!t || typeof t.id !== 'number' || byeWeeks[t.id] !== undefined || !schedule[t.id]) continue;
+      const gap = [...weeksWithGames].filter((w) => !schedule[t.id][w]);
+      if (gap.length === 1) byeWeeks[t.id] = gap[0];
+    }
   }
-  return map;
+  return { byeWeeks, schedule };
 }
 
 /** Turns the raw ESPN payload into the small shape every render/*.js module works from. */
@@ -138,7 +167,7 @@ export function normalizeLeague(raw, config) {
   const week = raw?.scoringPeriodId ?? raw?.status?.currentMatchupPeriod ?? null;
   const rawTeams = Array.isArray(raw?.teams) ? raw.teams : [];
 
-  const byeWeekByProTeamId = buildByeWeekMap(raw);
+  const proInfo = buildProInfo(raw);
 
   // Every team's roster, not just mine — `view=mRoster` returns the whole
   // league's rosters in one payload, not a per-team filtered one, which is
@@ -157,7 +186,7 @@ export function normalizeLeague(raw, config) {
     pointsFor: t.record?.overall?.pointsFor ?? null,
     pointsAgainst: t.record?.overall?.pointsAgainst ?? null,
     roster: (t.roster?.entries || [])
-      .map((e) => normalizePlayerEntry(e, week, byeWeekByProTeamId))
+      .map((e) => normalizePlayerEntry(e, week, proInfo))
       .filter(Boolean),
   }));
 
@@ -197,6 +226,7 @@ export function normalizeLeague(raw, config) {
 
   return {
     week,
+    proInfo,
     teams,
     myTeam: myRawTeam ? { id: myRawTeam.id, name: teamDisplayName(myRawTeam), roster } : null,
     matchup,
@@ -206,8 +236,9 @@ export function normalizeLeague(raw, config) {
 
 /** Normalizes the free-agent/waiver pool response (a differently-shaped payload from the
  *  roster one — see worker/espn-proxy.js's `players=freeagents` handling). */
-export function normalizeFreeAgents(raw, week) {
+export function normalizeFreeAgents(raw, week, proInfo) {
   const list = Array.isArray(raw?.players) ? raw.players : [];
-  const byeWeekByProTeamId = buildByeWeekMap(raw);
-  return list.map((entry) => normalizePlayerEntry(entry, week, byeWeekByProTeamId)).filter(Boolean);
+  // The free-agent payload usually carries no proTeams, so reuse the league payload's.
+  const info = proInfo && Object.keys(proInfo.byeWeeks || {}).length + Object.keys(proInfo.schedule || {}).length > 0 ? proInfo : buildProInfo(raw);
+  return list.map((entry) => normalizePlayerEntry(entry, week, info)).filter(Boolean);
 }

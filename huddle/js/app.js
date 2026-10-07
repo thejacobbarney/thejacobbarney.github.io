@@ -1,5 +1,6 @@
 import { loadConfig, hasConfig } from './storage.js';
 import { loadSeasonHistory, applyHistory } from './history.js';
+import { annotateProjections } from './projection.js';
 import { fetchLeague, fetchFreeAgents, normalizeLeague, normalizeFreeAgents } from './espnClient.js';
 import { renderSetup } from './render/setup.js';
 import { renderMyTeam } from './render/myTeam.js';
@@ -15,7 +16,7 @@ const settingsBtn = document.getElementById('settings-btn');
 const refreshBtn = document.getElementById('refresh-btn');
 const statusEl = document.getElementById('status-line');
 
-const CACHE_KEY = 'huddle:cache:v6';
+const CACHE_KEY = 'huddle:cache:v7';
 const TABS = {
   team: { label: 'My Team', render: renderMyTeam },
   matchup: { label: 'Matchup', render: renderMatchup },
@@ -76,6 +77,7 @@ async function loadLeague({ silent } = {}) {
   try {
     const raw = await fetchLeague(config);
     currentLeague = normalizeLeague(raw, config);
+    annotateProjections(currentLeague, {});
     showTabBar(true);
     renderActiveTab();
 
@@ -83,12 +85,13 @@ async function loadLeague({ silent } = {}) {
     // even if this one fails (e.g. the deployed Worker predates waiver support).
     try {
       const rawFreeAgents = await fetchFreeAgents(config, { week: currentLeague.week });
-      currentLeague.freeAgents = normalizeFreeAgents(rawFreeAgents, currentLeague.week);
+      currentLeague.freeAgents = normalizeFreeAgents(rawFreeAgents, currentLeague.week, currentLeague.proInfo);
     } catch (faErr) {
       currentLeague.freeAgents = null;
       currentLeague.freeAgentsError = faErr.message;
     }
 
+    annotateProjections(currentLeague, {});
     saveCache(currentLeague);
     statusEl.textContent = '';
     renderActiveTab();
@@ -98,6 +101,7 @@ async function loadLeague({ silent } = {}) {
     const league = currentLeague;
     const history = await loadSeasonHistory(config, league.week);
     if (applyHistory(league, history) && currentLeague === league) {
+      annotateProjections(league, history);
       saveCache(league);
       const el = document.activeElement;
       if (!(el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA'))) {

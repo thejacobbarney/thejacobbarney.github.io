@@ -57,12 +57,15 @@ huddle/
     utils.js                     escapeHtml, point formatting
     app.js                       Tab routing, load/refresh/cache orchestration
     perplexityConfig.js          localStorage read/write for the Perplexity key/model (§5c)
+    projection.js                Huddle's own projection, accuracy backtest, opportunity calibration (§5e)
+    context.js                   Standings context for AI summaries
     grokConfig.js                localStorage read/write for the Grok key/model (§5b)
     aiConfig.js                  localStorage read/write for the optional bring-your-own-key AI
                                    settings — same contract as Pulse's/Iceberg's aiConfig.js
     aiVerify.js                   "Test connection" — smallest possible live Anthropic API call
     components/
       perplexitySettingsPanel.js    Perplexity key/model UI (same shape as grokSettingsPanel.js)
+      huddleProjection.js           Huddle column/note/card and compact fields for AI summaries (§5e)
       aiViews.js                    "Other AI views" dropdown + "Compare all AI views" (all 3 tabs)
       researchCards.js              Result cards for every AI view and the final analysis
       grokSettingsPanel.js          Grok key/model UI (same shape as aiSettingsPanel.js)
@@ -327,6 +330,51 @@ different trade starts clean, and a refresh drops everything next to the new num
 persisted. What gets sent: the other views' structured results and the short brief go to Anthropic
 for the comparison; the footer says so.
 
+### 5e. Huddle's own projection (independent of ESPN's)
+
+ESPN's projection is a black box that can lag events: a starting RB is ruled out and his backup's
+number doesn't move. `projection.js` builds a separate estimate, shown next to ESPN's (a Huddle
+column on My Team and Waivers, a collapsible "Huddle vs ESPN projections" card, and extra start/sit
+and waiver calls that only Huddle's number sees). Components, each listed with its point effect in
+the player's `huddle.components` so a gap is always explained:
+
+- **Base:** the last three games weighted 50/30/20, blended 65/35 with the season average once there
+  are four games. With under three games it is blended with ESPN's projection instead.
+- **Opportunity:** when a same-position teammate on the same NFL team (rostered or free agent) is
+  out or hurt, a share of the production he is missing is redistributed among the healthy ones,
+  weighted by their own value, capped at 8 points. This is the backup-RB effect. The share starts at
+  RB 50% / WR 35% / TE 45% and is **recalibrated from this league's own history** by
+  `opportunityShares()`: weeks where a productive player scored 0 while his team played, and how
+  many extra points his teammates scored over their own averages. It is shrunk toward the default
+  (five events' worth of weight), so a handful of cases can't swing it.
+- **Matchup:** how each NFL defense has treated each position so far, from the league's players'
+  points relative to their own averages, shrunk for small samples, capped at +/-12%, shown only with
+  four or more games. **Home/road:** +3% / -3%. **Availability:** OUT and IR are 0, DOUBTFUL 25%,
+  QUESTIONABLE 90%. **Bye:** 0.
+
+Opponent and home/away come from `buildProInfo()` reading `proGamesByScoringPeriod` in the existing
+`view=proTeams` request (bye weeks are derived from schedule gaps if the explicit field is absent).
+**Unverified against a real league:** those schedule field names are from memory of community
+projects; if absent, matchup and home/road adjustments simply don't appear. The free-agent request
+returns no schedule, so free agents reuse the league payload's.
+
+**Validation** (`backtest()`): for each completed week, Huddle's base estimate computed from only the
+games before it is compared with ESPN's projection (stored per week by `history.js`, cache `v2`)
+against what each player actually scored, skipping weeks a player didn't play. Mean miss, bias and
+the share of games Huddle was closer on are shown in the card, per league and per position in the
+data. It tests the base estimate only: past injuries and matchups aren't recorded, so the
+opportunity and matchup adjustments cannot be replayed; the opportunity share is instead checked by
+the calibration above. Every constant here is a stated assumption, and the card says which numbers
+came from the data versus the defaults.
+
+The AI views receive all of it: each player carries `huddleProjection`, its adjustments, opponent
+and home/away, and each summary carries `standings` (`context.js`: record, rank, points-for rank,
+this week's opponent's record). The prompts (`promptNotes.js`) tell the models to treat Huddle's
+number as one more opinion to weigh, to use standings for strategy, and tell the live-search ones
+to research opponent defense, home/road, weather, and depth-chart changes, including treating a
+teammate's injury as a reason a backup's role may grow. The final comparison's brief includes the
+Huddle-versus-ESPN gaps for the players involved.
+
 ### Trade grades (A+ to F)
 
 Every trade shows a grade for each side. The always-on one is computed offline in `trade.js:
@@ -371,13 +419,13 @@ or the model field.
 
 League config (Worker URL, league ID, year, team ID, and — for private leagues — SWID/espn_s2)
 lives in `localStorage['huddle:config:v1']`, never anywhere else. The last successfully fetched
-league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v6']`
+league snapshot (including the free-agent pool) is cached in `localStorage['huddle:cache:v7']`
 purely so reopening the app on a spotty phone connection shows *something* instantly (with a
 "showing cached data" note) while a fresh fetch runs in the background — same pattern as Pulse's
 `reportCache.js`. (Bumped `v1` → `v2` when the free-agent/bye-week/outlook fields were added, then
 `v2` → `v3` when every team's roster was added for Trade, `v3` → `v4` when the full-season weekly
 `seasonLog` was added to every player, `v4` → `v5` when per-week stats were restricted to single-week
-entries (below), `v5` → `v6` when full-season history was added (below) — each bump is just a cache key, so
+entries (below), `v5` → `v6` when full-season history was added (below), `v6` → `v7` when Huddle's projections, opponent and home/away were added to every player (§5e) — each bump is just a cache key, so
 nothing needed migrating, the old entry is simply never read.)
 
 SWID/espn_s2 cookies are ESPN's own session cookies, not a Huddle-issued credential — they expire

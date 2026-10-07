@@ -15,7 +15,7 @@ import { STAT_SOURCE } from './constants.js';
 const CONCURRENCY = 3;
 const MAX_WEEKLY_POINTS = 100; // no single player scores this in one week; guards a misread field
 
-const cacheKey = (config) => `huddle:history:v1:${config.leagueId}:${config.year}`;
+const cacheKey = (config) => `huddle:history:v2:${config.leagueId}:${config.year}`;
 
 function readCache(config) {
   try {
@@ -34,7 +34,11 @@ function writeCache(config, history) {
   }
 }
 
-/** Points per playerId for one week, read from a roster payload requested for that week. */
+/**
+ * Per playerId for one week, read from a roster payload requested for that week:
+ * `{ a: actual points, p: ESPN's projection for that week or null }`. The projection is kept so
+ * Huddle can later check how accurate ESPN's numbers were (see projection.js: backtest()).
+ */
 export function extractWeekPoints(raw, week) {
   const points = {};
   for (const team of Array.isArray(raw?.teams) ? raw.teams : []) {
@@ -44,17 +48,22 @@ export function extractWeekPoints(raw, week) {
       if (player?.id == null) continue;
 
       const stats = Array.isArray(player.stats) ? player.stats : [];
-      const weekly = stats.find(
-        (s) =>
-          s.scoringPeriodId === week &&
-          s.statSourceId === STAT_SOURCE.ACTUAL &&
-          (s.statSplitTypeId === undefined || s.statSplitTypeId === 1) &&
-          typeof s.appliedTotal === 'number'
-      );
-      let value = weekly ? weekly.appliedTotal : null;
-      if (value === null && typeof pool?.appliedStatTotal === 'number') value = pool.appliedStatTotal;
+      const weeklyStat = (source) =>
+        stats.find(
+          (s) =>
+            s.scoringPeriodId === week &&
+            s.statSourceId === source &&
+            (s.statSplitTypeId === undefined || s.statSplitTypeId === 1) &&
+            typeof s.appliedTotal === 'number'
+        );
+      const actual = weeklyStat(STAT_SOURCE.ACTUAL);
+      let a = actual ? actual.appliedTotal : null;
+      if (a === null && typeof pool?.appliedStatTotal === 'number') a = pool.appliedStatTotal;
+      if (a === null || Math.abs(a) > MAX_WEEKLY_POINTS) continue;
 
-      if (value !== null && Math.abs(value) <= MAX_WEEKLY_POINTS) points[player.id] = value;
+      const proj = weeklyStat(STAT_SOURCE.PROJECTED);
+      const p = proj && Math.abs(proj.appliedTotal) <= MAX_WEEKLY_POINTS ? proj.appliedTotal : null;
+      points[player.id] = { a, p };
     }
   }
   return points;
@@ -62,7 +71,7 @@ export function extractWeekPoints(raw, week) {
 
 /**
  * Loads (and caches) points for every completed week before `currentWeek`.
- * @returns {Promise<Record<number, Record<number, number>>>} week -> playerId -> points
+ * @returns {Promise<Record<number, Record<number, {a:number,p:number|null}>>>} week -> playerId -> points
  */
 export async function loadSeasonHistory(config, currentWeek) {
   if (!currentWeek || currentWeek < 2) return {};
@@ -104,7 +113,7 @@ export function applyHistory(league, history) {
     const byWeek = new Map();
     for (const r of p.seasonLog || []) byWeek.set(r.week, r.points);
     for (const w of weeks) {
-      const v = history[w][p.playerId];
+      const v = history[w][p.playerId]?.a;
       if (typeof v === 'number') byWeek.set(Number(w), v);
     }
     const log = [...byWeek]

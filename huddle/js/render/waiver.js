@@ -1,5 +1,7 @@
 import { escapeHtml, fmtPts } from '../utils.js';
-import { findWaiverUpgrades, playerValue } from '../lineup.js';
+import { findWaiverUpgrades, playerValue, huddleProj } from '../lineup.js';
+import { standingsContext } from '../context.js';
+import { huddleCell, huddleNote, compactHuddle, divergenceBrief } from '../components/huddleProjection.js';
 import { loadAiConfig } from '../aiConfig.js';
 import { generateClaudeWaiverCheck } from '../report/aiWaiver.js';
 import { generateSynthesis } from '../report/aiSynthesis.js';
@@ -20,6 +22,7 @@ function compactPlayer(p) {
     proTeam: p.proTeam,
     recentValue: playerValue(p),
     projected: p.projected,
+    ...compactHuddle(p),
     seasonLog: (p.seasonLog || []).map((r) => ({ week: r.week, points: r.points })),
     injuryStatus: p.injuryStatus,
     byeWeek: p.byeWeek,
@@ -38,6 +41,7 @@ function buildWaiverSummary(league, suggestions, byPos) {
       projectedGain: s.delta,
     })),
     topAvailable,
+    standings: standingsContext(league),
   };
 }
 
@@ -87,7 +91,7 @@ function poolTable(position, players) {
     <div class="roster-group">
       <h3>${escapeHtml(position)}</h3>
       <table class="roster-table">
-        <thead><tr><th>Player</th><th class="num">Proj</th></tr></thead>
+        <thead><tr><th>Player</th><th class="num">ESPN</th><th class="num">Huddle</th></tr></thead>
         <tbody>
           ${players
             .slice(0, 8)
@@ -96,8 +100,10 @@ function poolTable(position, players) {
                 <td class="col-player">
                   <span class="player-name">${escapeHtml(p.name)}</span>
                   <span class="muted player-meta">${escapeHtml(p.proTeam)}</span>
+                  ${huddleNote(p)}
                 </td>
                 <td class="num col-num">${fmtPts(p.projected)}</td>
+                <td class="num col-num">${huddleCell(p)}</td>
               </tr>`
             )
             .join('')}
@@ -121,6 +127,24 @@ export function renderWaiver(root, league) {
   const suggestions = findWaiverUpgrades(league.myTeam.roster, league.freeAgents);
   const byPos = poolByPosition(league.freeAgents);
   const positions = [...byPos.keys()].sort(posSort);
+  const huddleOnly = findWaiverUpgrades(league.myTeam.roster, league.freeAgents, huddleProj).filter(
+    (h) => !suggestions.some((e) => e.add.playerId === h.add.playerId && e.drop.playerId === h.drop.playerId)
+  );
+  const huddleHtml = huddleOnly.length
+    ? `
+    <div class="card callout">
+      <h3>${huddleOnly.length} more by Huddle's projection</h3>
+      <ul class="plain-list">
+        ${huddleOnly
+          .map(
+            (x) => `<li><b>Add ${escapeHtml(x.add.name)}</b> (${escapeHtml(x.add.proTeam)} ${escapeHtml(x.add.defaultPosition)}) <span class="num">+${fmtPts(x.delta)}</span> over dropping <b>${escapeHtml(x.drop.name)}</b>
+              <br><span class="muted small">ESPN has him at ${fmtPts(x.add.projected)}. ${escapeHtml(x.add.huddle?.components.slice(1).map((c) => c.label)[0] || 'Recent form')}</span></li>`
+          )
+          .join('')}
+      </ul>
+      <p class="muted small">Moves only Huddle's own estimate sees. Check the reasons and the news before acting.</p>
+    </div>`
+    : '';
   const claudeOn = () => {
     const c = loadAiConfig();
     return Boolean(c.enabled && c.apiKey);
@@ -130,6 +154,7 @@ export function renderWaiver(root, league) {
 
   root.innerHTML = `
     ${suggestionsHtml(suggestions)}
+    ${huddleHtml}
     ${
       claudeOn()
         ? `<div class="ai-generate-row">
@@ -152,6 +177,7 @@ export function renderWaiver(root, league) {
     claudeReady: claudeOn,
     getBrief: () => ({
       week: league.week,
+      huddleDivergences: divergenceBrief(suggestions.flatMap((s) => [s.add, s.drop])),
       suggestedMoves: suggestions.map((s) => ({ add: s.add.name, drop: s.drop.name, projectedGain: s.delta })),
     }),
     providers: [
