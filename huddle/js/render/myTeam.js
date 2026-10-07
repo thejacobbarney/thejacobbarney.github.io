@@ -6,6 +6,13 @@ import { renderAiSettingsPanel } from '../components/aiSettingsPanel.js';
 import { renderGrokSettingsPanel } from '../components/grokSettingsPanel.js';
 import { renderPerplexitySettingsPanel } from '../components/perplexitySettingsPanel.js';
 import { generateAiRecommendation } from '../report/aiRecommendation.js';
+import { generateSynthesis } from '../report/aiSynthesis.js';
+import { loadGrokConfig, grokReady } from '../grokConfig.js';
+import { runGrok } from '../report/research/grok.js';
+import { loadPerplexityConfig, perplexityReady } from '../perplexityConfig.js';
+import { runPerplexity } from '../report/research/perplexity.js';
+import { renderAiViews } from '../components/aiViews.js';
+import { renderLineupCard } from '../components/researchCards.js';
 
 const SLOT_ORDER = [0, 2, 3, 4, 5, 6, 23, 7, 16, 17, 18, 8, 9, 10, 11, 12, 13, 14, 15, 19];
 
@@ -78,6 +85,7 @@ function compactPlayer(p) {
     proTeam: p.proTeam,
     projected: p.projected,
     recentActual: p.recentActual,
+    seasonLog: (p.seasonLog || []).map((r) => ({ week: r.week, points: r.points })),
     injuryStatus: p.injuryStatus,
     byeWeek: p.byeWeek,
   };
@@ -117,30 +125,7 @@ function buildAiSummary(league, startSitSuggestions) {
   };
 }
 
-function moveList(title, items, renderItem) {
-  if (!items || items.length === 0) return '';
-  return `<div class="ai-move-group"><h4>${escapeHtml(title)}</h4><ul class="plain-list">${items
-    .map((i) => `<li>${renderItem(i)}</li>`)
-    .join('')}</ul></div>`;
-}
-
-function renderAiResult(rec) {
-  return `
-    <div class="card ai-result">
-      <p class="ai-headline">${escapeHtml(rec.headline)}</p>
-      ${moveList(
-        'Lineup',
-        rec.lineupMoves,
-        (m) => `<b>${escapeHtml(m.action.toUpperCase())}</b> ${escapeHtml(m.player)} — ${escapeHtml(m.reasoning)}`
-      )}
-      ${moveList(
-        'Waiver wire',
-        rec.waiverMoves,
-        (m) => `Add <b>${escapeHtml(m.add)}</b>, drop <b>${escapeHtml(m.drop)}</b> — ${escapeHtml(m.reasoning)}`
-      )}
-      ${moveList('Watch before lineups lock', rec.watchList, (w) => escapeHtml(w))}
-    </div>`;
-}
+const renderAiResult = (rec) => renderLineupCard('', { data: rec, rawText: '', sources: [] });
 
 export function renderMyTeam(root, league) {
   if (!league.myTeam) {
@@ -187,6 +172,7 @@ export function renderMyTeam(root, league) {
       <span id="ai-generate-status" class="muted small"></span>
     </div>
     <div id="ai-result-container">${cachedAiResult ? renderAiResult(cachedAiResult) : ''}</div>
+    <div id="ai-views-container"></div>
     ${table('Starters', starters, league.week)}
     ${table('Bench', bench, league.week)}
     ${table('IR', ir, league.week)}
@@ -201,12 +187,51 @@ export function renderMyTeam(root, league) {
     generateRow.hidden = !(cfg.enabled && cfg.apiKey);
   }
 
+  let viewsApi = null;
+  const refreshViews = () => viewsApi && viewsApi.refresh();
   const aiConfig = renderAiSettingsPanel(root.querySelector('#ai-settings-container'), {
-    onChange: syncGenerateVisibility,
+    onChange: (cfg) => {
+      syncGenerateVisibility(cfg);
+      refreshViews();
+    },
   });
   syncGenerateVisibility(aiConfig);
-  renderGrokSettingsPanel(root.querySelector('#grok-settings-container'));
-  renderPerplexitySettingsPanel(root.querySelector('#perplexity-settings-container'));
+  renderGrokSettingsPanel(root.querySelector('#grok-settings-container'), { onChange: refreshViews });
+  renderPerplexitySettingsPanel(root.querySelector('#perplexity-settings-container'), { onChange: refreshViews });
+
+  const summaryNow = () => buildAiSummary(league, suggestions);
+  viewsApi = renderAiViews(root.querySelector('#ai-views-container'), {
+    scope: league,
+    key: 'lineup',
+    decision: "this week's lineup and waiver plan",
+    getClaude: () => aiResultCache.get(league) || null,
+    claudeReady: () => {
+      const c = loadAiConfig();
+      return Boolean(c.enabled && c.apiKey);
+    },
+    getBrief: () => ({
+      week: league.week,
+      opponent: league.matchup?.opponent?.name ?? null,
+      precomputedStartSit: suggestions.map((x) => ({ upgrade: x.upgrade.name, overStarter: x.starter.name, delta: x.delta })),
+    }),
+    providers: [
+      {
+        id: 'grok',
+        label: 'Grok',
+        ready: () => grokReady(loadGrokConfig()),
+        run: () => runGrok('lineup', summaryNow(), loadGrokConfig()),
+        render: (res) => renderLineupCard('Grok lineup check', res),
+      },
+      {
+        id: 'perplexity',
+        label: 'Perplexity',
+        ready: () => perplexityReady(loadPerplexityConfig()),
+        run: () => runPerplexity('lineup', summaryNow(), loadPerplexityConfig()),
+        render: (res) => renderLineupCard('Perplexity lineup check', res),
+      },
+    ],
+    synthesize: (brief, views) => generateSynthesis("this week's lineup and waiver plan", brief, views, loadAiConfig()),
+  });
 
   generateBtn.addEventListener('click', async () => {
     const cfg = loadAiConfig();
@@ -218,6 +243,7 @@ export function renderMyTeam(root, league) {
       const rec = await generateAiRecommendation(summary, cfg);
       aiResultCache.set(league, rec);
       resultContainer.innerHTML = renderAiResult(rec);
+      refreshViews();
       statusEl.textContent = '';
       resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {

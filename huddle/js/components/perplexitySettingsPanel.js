@@ -4,7 +4,7 @@
  */
 
 import { loadPerplexityConfig, savePerplexityConfig, perplexityReady } from '../perplexityConfig.js';
-import { verifyPerplexityConnection } from '../report/perplexityResearch.js';
+import { verifyPerplexityConnection } from '../report/research/perplexity.js';
 import { escapeHtml } from '../utils.js';
 
 export function renderPerplexitySettingsPanel(container, { onChange } = {}) {

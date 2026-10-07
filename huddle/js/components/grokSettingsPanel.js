@@ -4,7 +4,7 @@
  */
 
 import { loadGrokConfig, saveGrokConfig, grokReady } from '../grokConfig.js';
-import { verifyGrokConnection } from '../report/grokTrade.js';
+import { verifyGrokConnection } from '../report/research/grok.js';
 import { escapeHtml } from '../utils.js';
 
 export function renderGrokSettingsPanel(container, { onChange } = {}) {

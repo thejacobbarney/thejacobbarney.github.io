@@ -111,14 +111,32 @@ h1, h2, h3 { font-family: "Sora", system-ui, sans-serif; font-weight: 700; margi
   border: 1px solid var(--paper-border); border-radius: 12px; padding: 0.85rem 1.1rem;
   background: var(--paper-raised); margin: 0;
 }
-.ai-settings-panel summary {
+.ai-settings-panel summary,
+.ai-views > summary,
+.ai-view > summary {
   font-family: "Sora", sans-serif; font-weight: 700; font-size: 0.9rem;
   cursor: pointer; list-style: none; display: flex; align-items: center; gap: 0.4rem;
 }
-.ai-settings-panel summary::-webkit-details-marker { display: none; }
-.ai-settings-panel summary::before { content: "▸"; color: var(--accent); font-size: 0.75rem; }
-.ai-settings-panel[open] summary::before { content: "▾"; }
+.ai-settings-panel summary::-webkit-details-marker,
+.ai-views > summary::-webkit-details-marker,
+.ai-view > summary::-webkit-details-marker { display: none; }
+.ai-settings-panel summary::before,
+.ai-views > summary::before,
+.ai-view > summary::before { content: "▸"; color: var(--accent); font-size: 0.75rem; }
+.ai-settings-panel[open] summary::before,
+.ai-views[open] > summary::before,
+.ai-view[open] > summary::before { content: "▾"; }
 .ai-settings-panel summary .small { font-weight: 400; }
+.ai-views {
+  border: 1px solid var(--paper-border); border-radius: 12px; padding: 0.85rem 1.1rem;
+  background: var(--paper-raised); margin: 0;
+}
+.ai-views-body { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.ai-views-body .row { margin-top: 0; }
+.ai-view > summary { font-size: 0.85rem; margin-bottom: 0.5rem; }
+.ai-view { margin-top: 0.4rem; }
+.ai-final { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.4rem; }
+.ai-final-result { border-left-color: var(--gold); }
 .ai-settings-body { margin-top: 0.85rem; }
 .ai-settings-body label { display: block; margin-top: 0.75rem; font-size: 0.85rem; font-weight: 600; }
 .ai-settings-body label input {
