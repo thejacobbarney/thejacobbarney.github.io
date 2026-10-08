@@ -1,8 +1,8 @@
 """Synthetic 4-team league so everything can be tested without ESPN."""
 
 
-def player(pid, name, pos, proj, slot="BE", injury="ACTIVE"):
-    return {"id": pid, "name": name, "position": pos, "pro_team": "XXX", "injury_status": injury,
+def player(pid, name, pos, proj, slot="BE", injury="ACTIVE", week_proj="auto", bye_week=None):
+    return {"week_projected": proj / 17 if week_proj == "auto" else week_proj, "bye_week": bye_week,"id": pid, "name": name, "position": pos, "pro_team": "XXX", "injury_status": injury,
             "lineup_slot": slot, "pos_rank": 1, "percent_owned": 50.0, "total_points": proj / 2,
             "projected_total_points": proj, "avg_points": proj / 17, "projected_avg_points": proj / 17,
             "eligible_slots": [pos, "BE"], "stats_weeks": {}}

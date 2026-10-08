@@ -11,7 +11,7 @@ Flow per phase:
 """
 import json
 
-from . import decision_log, guardrails, move_sheet
+from . import availability, decision_log, guardrails, move_sheet
 from .config import dead_teams, league_cfg, rules_cfg
 from .espn_client import load_snapshot
 from .paths import AGENTS, week_dir
@@ -52,6 +52,7 @@ SCHEMA = """```json
   "phase": "wednesday",
   "moves": [
     {"type": "waiver_claim", "add": {"id": 0, "name": ""}, "drop": {"id": 0, "name": ""}, "faab_bid": 0,
+     "gap_check": {"cause": "bye | injury | injury_risk", "evidence": "required if the drop has a projection gap"},
      "reason": "one line, >= 15 chars", "top_asset_drop_reason": "only if dropping a top-5 asset"},
     {"type": "lineup", "changes": [{"player": {"id": 0, "name": ""}, "from_slot": "BE", "to_slot": "RB"}],
      "reason": ""},
@@ -68,10 +69,14 @@ def _read(path):
     return path.read_text() if path.exists() else ""
 
 
-def _slim_player(p):
-    keys = ("id", "name", "position", "pro_team", "injury_status", "lineup_slot",
-            "projected_total_points", "total_points", "avg_points", "percent_owned")
-    return {k: p.get(k) for k in keys}
+def _slim_player(p, week=None):
+    keys = ("id", "name", "position", "pro_team", "injury_status", "lineup_slot", "week_projected",
+            "bye_week", "projected_total_points", "projected_avg_points", "total_points", "avg_points",
+            "percent_owned")
+    out = {k: p.get(k) for k in keys}
+    if week is not None:
+        out.update(availability.annotate(p, week))
+    return out
 
 
 def build_bundle(phase, team_id, entry, snapshot, rules, week):
@@ -79,12 +84,12 @@ def build_bundle(phase, team_id, entry, snapshot, rules, week):
     adir = AGENTS / slug
     me = next(t for t in snapshot["teams"] if t["team_id"] == team_id)
     others = [{"team_id": t["team_id"], "name": t["name"], "record": f"{t['wins']}-{t['losses']}",
-               "owners": t["owners"], "roster": [_slim_player(p) for p in t["roster"]]}
+               "owners": t["owners"], "roster": [_slim_player(p, week) for p in t["roster"]]}
               for t in snapshot["teams"] if t["team_id"] != team_id]
     matchup = next((m for m in snapshot["matchups"]
                     if team_id in (m.get("home_team_id"), m.get("away_team_id"))), None)
     mine = {k: v for k, v in me.items() if k != "roster"}
-    mine["roster"] = [_slim_player(p) for p in me["roster"]]
+    mine["roster"] = [_slim_player(p, week) for p in me["roster"]]
     top = sorted(snapshot["free_agents"],
                  key=lambda p: p.get("projected_total_points") or 0, reverse=True)[:60]
     info = PHASES[phase]
@@ -127,7 +132,7 @@ anything that violates them is rejected.
 
 ## Best free agents (by projected points)
 ```json
-{json.dumps([_slim_player(p) for p in top], indent=2)}
+{json.dumps([_slim_player(p, week) for p in top], indent=2)}
 ```
 
 ## Other teams (for trades)
@@ -137,6 +142,11 @@ anything that violates them is rejected.
 
 ## Recent league activity
 {chr(10).join('- ' + a for a in snapshot.get('recent_activity', [])) or '(none)'}
+
+## Before you propose a drop
+If a player you want to drop has `gap_cause` set, their week projection is missing or zero. Find out why:
+`bye` is NOT a reason to drop (judge on per-game / rest of season), `injury` and `injury_risk` are real
+concerns, `unexplained` means stop and find the cause. Put your finding in the claim's `gap_check`.
 
 ## Output
 Write ONLY a JSON file at out/week-{week:02d}/moves/{slug}.{phase}.json matching this schema.

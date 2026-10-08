@@ -60,6 +60,10 @@ agent's own persona, rules and memory, and the league data, and nothing from oth
 - Dropping a top-5 asset (by projected season points) requires a logged `top_asset_drop_reason`.
 - Bot-to-bot trades: 1 per week league-wide, and each pair of bots may trade once per season.
 - Trades touching your team are proposal-only and flagged "needs outside approval".
+- Drop-for-higher-projection check: if the player being dropped has a missing or zero week projection, the
+  agent must report why in `gap_check`. Code compares it with ESPN's schedule and injury data. A bye week is
+  never a reason to drop (judged on per-game value instead), an injury is a real concern, and an unexplained
+  gap blocks the drop.
 - Every move needs a one-line reason, logged to `agents/<slug>/decision_log.jsonl`.
 - Pause switch: set `paused: true` in `config/rules.yaml`. Everything is rejected until you flip it back.
 - Real waiver claims for add/drops. Commissioner edits are reserved for lineup and IR fixes.

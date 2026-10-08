@@ -5,7 +5,7 @@ validate(doc, snapshot, rules, cfg, state) -> (approved, rejected)
   rejected: list of {"move": ..., "violations": [...]}
 `state` carries cross-agent counters for the week (bot-to-bot trades so far).
 """
-from . import decision_log
+from . import availability, decision_log
 from .config import dead_teams
 
 MOVE_TYPES = {"waiver_claim", "lineup", "ir_move", "trade_proposal"}
@@ -34,6 +34,37 @@ def top_assets(team, n):
 
 def _rostered_ids(snapshot):
     return {p["id"]: t["team_id"] for t in snapshot["teams"] for p in t["roster"]}
+
+
+def _gap_check(move, drop_p, add_p, week, rules):
+    """Return a list of violations for dropping a player whose week projection is missing or zero.
+
+    The agent must say why (bye / injury). We compute the real cause from ESPN data and compare.
+    A bye week is never a reason to drop: judge the pair on per-game value instead.
+    """
+    cfg = rules.get("drop_gap_check") or {}
+    if not cfg.get("require_gap_check") or not availability.has_gap(drop_p):
+        return []
+    name = drop_p.get("name", drop_p["id"])
+    actual = availability.gap_cause(drop_p, week)
+    if actual == "unexplained":
+        return [f"{name} has no projection this week and is not on a bye or injured: "
+                "unexplained data gap, find the cause before dropping"]
+    claimed = ((move.get("gap_check") or {}).get("cause") or "").strip().lower()
+    if not claimed:
+        return [f"{name} has a projection gap ({actual}); gap_check.cause is required"]
+    if claimed != actual:
+        return [f"gap_check says {claimed!r} but ESPN data says {name} is {actual!r}"]
+    if actual == "bye":
+        edge = (add_p or {}).get("projected_avg_points") or 0
+        base = drop_p.get("projected_avg_points") or 0
+        need = cfg.get("min_per_game_edge_when_bye", 1.0)
+        if not add_p or not edge or not base:
+            return [f"{name} is on a bye (not a problem); no per-game projections to justify the drop"]
+        if edge - base < need:
+            return [f"{name} is on a bye: the zero projection is a schedule artifact. Per-game edge of "
+                    f"{edge - base:+.1f} is below the {need} needed to justify the drop"]
+    return []
 
 
 def validate(doc, snapshot, rules, cfg, state):
@@ -94,6 +125,10 @@ def validate(doc, snapshot, rules, cfg, state):
                 elif drop["id"] in top and len((m.get("top_asset_drop_reason") or "").strip()) < rules["top_asset_drop_min_reason_chars"]:
                     why.append(f"dropping a top-{rules['top_asset_rank']} asset needs top_asset_drop_reason "
                                f"(>= {rules['top_asset_drop_min_reason_chars']} chars)")
+            drop_p = next((p for p in team["roster"] if drop and p["id"] == drop.get("id")), None)
+            if drop_p:
+                add_p = next((p for p in snapshot["free_agents"] if p.get("id") == add.get("id")), None)
+                why += _gap_check(m, drop_p, add_p, snapshot["current_week"], rules)
             if s.get("faab"):
                 if bid < (s.get("minimum_bid") or 0):
                     why.append(f"bid {bid} below minimum {s.get('minimum_bid')}")

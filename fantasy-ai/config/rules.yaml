@@ -27,3 +27,10 @@ min_reason_chars: 15
 
 # Commissioner edits are reserved for lineup and IR fixes. Add/drop/trades must be real transactions.
 commissioner_edit_types: [lineup, ir_move]
+
+# Dropping a player whose current-week projection is missing or zero (a "data gap"):
+# the agent must first verify WHY (bye, injury) in `gap_check`, and code checks that against ESPN data.
+# A bye week is never a reason to drop. Byes are judged on per-game value instead.
+drop_gap_check:
+  require_gap_check: true
+  min_per_game_edge_when_bye: 1.0   # add must beat the bye-week player's projected points per game by this much

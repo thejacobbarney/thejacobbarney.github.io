@@ -44,10 +44,35 @@ def get_league(league_id, season):
     raise last
 
 
-def _player(p):
+def _pro_byes(league):
+    """{pro team abbrev: bye week}, from ESPN's pro schedule (a week with no game is the bye)."""
+    from espn_api.football.constant import PRO_TEAM_MAP
+
+    byes = {}
+    try:
+        for team_id, games in league._get_all_pro_schedule().items():
+            if team_id == 0:
+                continue
+            missing = [w for w in range(1, 19) if not games.get(str(w))]
+            if len(missing) == 1:
+                byes[PRO_TEAM_MAP[team_id]] = missing[0]
+    except Exception:
+        pass
+    return byes
+
+
+def _week_projection(p, week):
+    if hasattr(p, "projected_points"):  # BoxPlayer (free agents)
+        return p.projected_points
+    return ((getattr(p, "stats", {}) or {}).get(week) or {}).get("projected_points")
+
+
+def _player(p, week=None, byes=None):
     g = lambda name, default=None: getattr(p, name, default)
     stats = g("stats", {}) or {}
     return {
+        "week_projected": _week_projection(p, week),
+        "bye_week": (byes or {}).get(g("proTeam")),
         "id": g("playerId"),
         "name": g("name"),
         "position": g("position"),
@@ -68,6 +93,7 @@ def _player(p):
 def build_snapshot(league, league_id, season, fa_per_position=40):
     s = league.settings
     week = league.current_week
+    byes = _pro_byes(league)
     budget = getattr(s, "acquisition_budget", 0) or 0
 
     teams = []
@@ -95,7 +121,7 @@ def build_snapshot(league, league_id, season, fa_per_position=40):
                 "drops": t.drops,
                 "trades": t.trades,
                 "streak": f"{t.streak_type} {t.streak_length}",
-                "roster": [_player(p) for p in t.roster],
+                "roster": [_player(p, week, byes) for p in t.roster],
             }
         )
 
@@ -122,7 +148,7 @@ def build_snapshot(league, league_id, season, fa_per_position=40):
             for p in league.free_agents(week=week, size=fa_per_position, position=pos):
                 if p.playerId not in seen:
                     seen.add(p.playerId)
-                    free_agents.append(_player(p))
+                    free_agents.append(_player(p, week, byes))
         except Exception as e:
             free_agents.append({"error": f"{pos}: {e}"})
 
@@ -156,6 +182,7 @@ def build_snapshot(league, league_id, season, fa_per_position=40):
                 for x in getattr(s, "scoring_format", [])
             ],
         },
+        "pro_byes": byes,
         "teams": teams,
         "matchups": matchups,
         "free_agents": free_agents,

@@ -16,9 +16,23 @@ RULES = yaml.safe_load((ROOT / "config" / "rules.yaml").read_text())
 R = "a reason that is long enough"
 
 
-def run(moves, team_id=2, rules=RULES, state=None):
+def run(moves, team_id=2, rules=RULES, state=None, snap=None):
     doc = {"team_id": team_id, "week": 5, "phase": "wednesday", "moves": moves}
-    return guardrails.validate(doc, fixtures.snapshot(), rules, fixtures.CFG, state or guardrails.new_state())
+    return guardrails.validate(doc, snap or fixtures.snapshot(), rules, fixtures.CFG, state or guardrails.new_state())
+
+
+def gap_snapshot(**changes):
+    """Team 2's player 206 gets a missing week projection (plus any other field changes)."""
+    snap = fixtures.snapshot()
+    p = next(x for x in snap["teams"][1]["roster"] if x["id"] == 206)
+    p.update({"week_projected": 0, **changes})
+    return snap
+
+
+def claim(add_avg=None, **extra):
+    add = {"id": 900, "name": "Waiver Guy"}
+    mv = {"type": "waiver_claim", "add": add, "drop": {"id": 206}, "faab_bid": 5, "reason": R, **extra}
+    return mv
 
 
 class GuardrailTests(unittest.TestCase):
@@ -87,6 +101,59 @@ class GuardrailTests(unittest.TestCase):
         ok, bad = run([{"type": "trade_proposal", "to_team_id": 1, "give": [{"id": 999}], "get": [{"id": 100}],
                         "reason": R}])
         self.assertEqual(len(ok), 0)
+
+
+class DropGapTests(unittest.TestCase):
+    """Dropping a player with a missing week projection: bye is not a problem, injury is, unexplained is blocked."""
+
+    def snap_with_add(self, add_avg, **drop_changes):
+        snap = gap_snapshot(**drop_changes)
+        next(x for x in snap["free_agents"] if x["id"] == 900)["projected_avg_points"] = add_avg
+        return snap
+
+    def test_bye_with_per_game_edge_is_approved(self):
+        snap = self.snap_with_add(12.0, bye_week=5, projected_avg_points=4.0)
+        ok, bad = run([claim(gap_check={"cause": "bye", "evidence": "BYE wk5"})], snap=snap)
+        self.assertEqual((len(ok), len(bad)), (1, 0))
+
+    def test_bye_without_per_game_edge_is_rejected(self):
+        # Higher this-week projection only because the dropped player is on bye.
+        snap = self.snap_with_add(4.3, bye_week=5, projected_avg_points=4.0)
+        ok, bad = run([claim(gap_check={"cause": "bye", "evidence": "BYE wk5"})], snap=snap)
+        self.assertEqual(len(ok), 0)
+        self.assertIn("bye", bad[0]["violations"][0])
+        self.assertIn("schedule artifact", bad[0]["violations"][0])
+
+    def test_injury_gap_is_allowed_when_verified(self):
+        snap = self.snap_with_add(8.0, injury_status="OUT", projected_avg_points=4.0)
+        ok, bad = run([claim(gap_check={"cause": "injury", "evidence": "OUT, hamstring, 4 weeks"})], snap=snap)
+        self.assertEqual((len(ok), len(bad)), (1, 0))
+
+    def test_bye_mislabelled_as_injury_is_rejected(self):
+        snap = self.snap_with_add(12.0, bye_week=5, projected_avg_points=4.0)
+        ok, bad = run([claim(gap_check={"cause": "injury", "evidence": "he looked hurt"})], snap=snap)
+        self.assertEqual(len(ok), 0)
+        self.assertIn("ESPN data says", bad[0]["violations"][0])
+
+    def test_unexplained_gap_is_rejected_even_with_gap_check(self):
+        snap = self.snap_with_add(12.0)
+        ok, bad = run([claim(gap_check={"cause": "bye", "evidence": "trust me"})], snap=snap)
+        self.assertEqual(len(ok), 0)
+        self.assertIn("unexplained", bad[0]["violations"][0])
+
+    def test_missing_gap_check_is_rejected(self):
+        snap = self.snap_with_add(12.0, bye_week=5, projected_avg_points=4.0)
+        ok, bad = run([claim()], snap=snap)
+        self.assertIn("gap_check.cause is required", bad[0]["violations"][0])
+
+    def test_player_out_on_bye_counts_as_injury(self):
+        snap = self.snap_with_add(12.0, bye_week=5, injury_status="OUT", projected_avg_points=4.0)
+        ok, bad = run([claim(gap_check={"cause": "injury", "evidence": "OUT"})], snap=snap)
+        self.assertEqual(len(ok), 1)
+
+    def test_normal_drop_needs_no_gap_check(self):
+        ok, bad = run([claim()])
+        self.assertEqual((len(ok), len(bad)), (1, 0))
 
 
 if __name__ == "__main__":
