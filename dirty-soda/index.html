@@ -231,7 +231,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     [/sprite|7 ?up|starry|sierra mist|lemon-lime/, "Lemon-Lime"],
     [/root ?beer|barq|\bmug\b/, "Root Beer"], [/fresca/, "Fresca"], [/ginger ?ale/, "Ginger Ale"],
     [/orange soda|orange crush|fanta/, "Orange Soda"], [/cream soda|big red/, "Cream Soda"],
-    [/gatorade|powerade/, "Sports Drink"], [/lemonade/, "Lemonade"], [/\btea\b/, "Tea"],
+    [/gatorade|powerade/, "Sports Drink"], [/smoothie|freeze|frappe/, "Frozen"], [/lemonade/, "Lemonade"], [/\btea\b/, "Tea"],
     [/sparkling|seltzer|club soda|\bwater\b/, "Water"],
     [/red ?bull|monster|vibe|reviver|swig energy|energy|celsius|\bbang\b/, "Energy"], [/protein/, "Protein"]
   ];
@@ -259,7 +259,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   function label(k) { return LABEL_FIX[k] || k.replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
 
   var TAG_RULES = {
-    tropical: /coconut|pineapple|mango|passion|guava|curacao|pina colada|tangerine|kiwi|papaya|tiger/,
+    tropical: /coconut|banana|pineapple|mango|passion|guava|curacao|pina colada|tangerine|kiwi|papaya|tiger/,
     creamy: /cream|half & half|cold foam|coconut milk|cheesecake|horchata|irish/,
     dessert: /vanilla|caramel|butterscotch|marshmallow|s'mores|chocolate|cupcake|birthday cake|toffee|almond|pecan|cinnamon|maple|cheesecake|gummy|brown sugar|chai|coffee|popping/,
     tart: /^lime$|lemon|grapefruit|cranberry|pomegranate|green apple|blood orange|^sour$|tangerine|^apple$/,
@@ -287,7 +287,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     { id: "light", label: "Light and refreshing", e: "💧", fam: { "Water": 2.5, "Tea": 1.5, "Lemonade": 1.5, "Lemon-Lime": .5 }, sf: 1, neg: { creamy: 1.5 } },
     { id: "classic", label: "Classic comfort", e: "🥤", fam: { "Dr Pepper": 1, "Root Beer": 1.5, "Coke": 1 }, tags: { creamy: .5, dessert: .5 } }
   ];
-  var BASE_ORDER = ["Dr Pepper", "Coke", "Pepsi", "Mtn Dew", "Lemon-Lime", "Root Beer", "Fresca", "Ginger Ale", "Lemonade", "Orange Soda", "Cream Soda", "Tea", "Water", "Energy", "Protein", "Sports Drink"];
+  var BASE_ORDER = ["Dr Pepper", "Coke", "Pepsi", "Mtn Dew", "Lemon-Lime", "Root Beer", "Fresca", "Ginger Ale", "Lemonade", "Orange Soda", "Cream Soda", "Tea", "Water", "Energy", "Protein", "Sports Drink", "Frozen"];
 
   /* ---------- parsing ---------- */
   function makeItem(shop, cat, line, isCustom) {

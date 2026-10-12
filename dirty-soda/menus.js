@@ -324,7 +324,7 @@ window.BUILTIN_MENUS = [
   },
   {
     shop: "FiiZ",
-    note: "Photo of the in-store menu board and a small full-menu poster. Add-ons: puree shots $0.50, syrup shots $0.25, cream or whip $0.59, fresh fruit $0.29. Some lines on the poster were too small to read.",
+    note: "Photo of the in-store menu board and a small full-menu poster. Add-ons: puree shots $0.50, syrup shots $0.25, cream or whip $0.59, fresh fruit $0.29. Kids cups have no recipes listed, so they are left out.",
     groups: [
       { cat: "Dirty Soda", items: [
         "Cocalada|Coke|Pineapple, Coconut, Sweet Cream",
@@ -386,7 +386,20 @@ window.BUILTIN_MENUS = [
         "Chipper Chandler|Monster|Coconut, Pineapple, Strawberry",
         "Btown Mind|Monster|Blackberry, Pomegranate, Watermelon",
         "Gold Digger|Monster|Blood Orange, Sour, Tangerine",
-        "Zippy Zen|Monster|Guava, Pineapple, Cucumber, Pear, Fresh Lemon"
+        "Zippy Zen|Monster|Guava, Pineapple, Cucumber, Pear, Fresh Lemon",
+        "Shamrock|Monster|Blue Curacao, Passionfruit",
+        "Monster in Paradise|Monster|Pineapple, Mango, Guava",
+        "For the Bros|Monster|Grapefruit, Coconut, Pineapple, Sweet Cream",
+        "Flyin' Hawaiian|Monster|Peach Puree, Mango Puree, Coconut, Fresh Lime",
+        "Jamaican Me Crazy|Monster|Strawberry, Orange, Guava, Fresh Lemon",
+        "Monster Smoothie Original|Monster|Peach Puree|blended",
+        "Pipeline Punch|Monster|Peach Puree, Raspberry Puree|blended",
+        "Mango Loco|Monster|Passionfruit Puree|blended",
+        "Ultra Fiesta|Monster Ultra|Strawberry Puree, Peach Puree|blended",
+        "Ultra Red|Monster Ultra|Raspberry Puree, Strawberry Puree|blended",
+        "Ultra Violet|Monster Ultra|Strawberry Puree|blended",
+        "Ultra Sunrise|Monster Ultra|Strawberry Puree, Passionfruit Puree|blended",
+        "Ultra Paradise|Monster Ultra|Mango Puree|blended"
       ]},
       { cat: "Italian Soda", items: [
         "Summer Nights|Sparkling Water|Peach Puree, Raspberry, Whipped Cream",
@@ -409,7 +422,30 @@ window.BUILTIN_MENUS = [
         "Raspberry Zest|Water|Raspberry Puree, Raspberry, Fresh Lemon",
         "Beachy Keen|Water|Peach Puree, Strawberry Puree, Vanilla, Fresh Lemon",
         "Blue Lagoon|Water|Coconut, Vanilla, Blue Curacao, Fresh Lemon",
-        "Washed Up|Water|Peach Puree, Mango Puree, Coconut, Fresh Lime"
+        "Washed Up|Water|Peach Puree, Mango Puree, Coconut, Fresh Lime",
+        "Strawberry Splash|Water|Strawberry Puree, Sugar-Free Coconut, Sugar-Free Vanilla, Coconut Cream|sf",
+        "Raspberry Splash|Water|Raspberry Puree, Sugar-Free Coconut, Sugar-Free Vanilla, Coconut Cream|sf",
+        "Mango Splash|Water|Mango Puree, Sugar-Free Coconut, Sugar-Free Vanilla, Coconut Cream|sf",
+        "Peach Splash|Water|Peach Puree, Sugar-Free Coconut, Sugar-Free Vanilla, Coconut Cream|sf"
+      ]},
+      { cat: "Frozen", items: [
+        "Frosted Strawberry Lemonade|Lemonade/Freeze|Strawberry Puree, Ice Cream|blended",
+        "Frosted Lemonade|Lemonade/Freeze|Ice Cream|blended",
+        "Frozen Butterbeer|Freeze|Salted Caramel, Vanilla, Butterscotch, Whipped Cream|blended",
+        "Miami Ice Freeze|Freeze|Pina Colada, Strawberry, Whipped Cream|blended",
+        "Dreamsicle Freeze|Freeze|Orange, Coconut, Vanilla, Sweet Cream, Whipped Cream|blended",
+        "Bingham|Freeze|Blue Raspberry, Cotton Candy, Ice Cream, Whipped Cream|blended",
+        "Peach Frappe|Freeze|Peach, Vanilla, Ice Cream, Whipped Cream|blended",
+        "Caramel Apple Frappe|Freeze|Green Apple, Vanilla, Ice Cream, Whipped Cream, Caramel|blended",
+        "Strawberry Banana Swirl|Smoothie|Strawberry, Banana, Ice Cream|blended",
+        "Just Peachy Smoothie|Smoothie|Peach, Mango|blended",
+        "Mighty Mango|Smoothie|Mango, Strawberry|blended",
+        "Strawberry Swirl|Smoothie|Strawberry, Ice Cream|blended",
+        "Beach Bum Smoothie|Smoothie|Pina Colada, Mango, Banana|blended",
+        "Hippie Chick|Smoothie|Mango, Strawberry, Raspberry|blended",
+        "Strawberry Blonde|Smoothie|Strawberry, Raspberry, Passionfruit|blended",
+        "Mango Swirl|Smoothie|Mango, Ice Cream|blended",
+        "Manic Monkey|Smoothie|Raspberry, Mango, Banana|blended"
       ]}
     ]
   }
