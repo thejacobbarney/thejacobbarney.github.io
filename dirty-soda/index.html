@@ -86,7 +86,7 @@
   .ideas { display: grid; gap: 8px; margin-top: 8px; }
   .idea { border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 12px; background: var(--soft); }
   .idea b.t { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
-  .chip.pur { border-color: var(--accent); }
+  .chip.f-puree, .chip.f-frozen, .chip.f-fruit, .chip.f-fresh, .chip.f-pearls, .chip.f-sf { border-color: var(--accent); }
   .chip.new { border-color: var(--good); color: var(--good); font-weight: 700; }
   .chip.gone { text-decoration: line-through; opacity: .6; }
   .chip.off { opacity: .5; cursor: default; text-decoration: line-through; }
@@ -136,9 +136,21 @@
         <div class="row" id="f-moods"></div>
       </div>
       <div class="section">
-        <h2>Fruit puree</h2>
-        <div class="row"><button class="chip" id="o-pur" aria-pressed="false">🍓 Only drinks with fruit puree</button></div>
-        <div class="row hidden" id="f-pur-of" style="margin-top:8px"></div>
+        <h2>Form of the fruit or flavor</h2>
+        <div class="row" id="f-forms"></div>
+        <div class="row hidden" id="f-form-of" style="margin-top:8px"></div>
+        <details>
+          <summary>What do these mean?</summary>
+          <ul>
+            <li><b>Flavor shot</b>: a syrup pumped into the drink, like peach flavor.</li>
+            <li><b>Puree</b>: blended fruit, thicker and more natural, like peach puree.</li>
+            <li><b>Frozen or real fruit</b>: actual fruit pieces in the cup, like frozen peach.</li>
+            <li><b>Fresh fruit</b>: cut or squeezed fresh, mostly lime, lemon and orange.</li>
+            <li><b>Sugar-free flavor</b>: a sugar-free syrup shot.</li>
+            <li><b>Popping pearls</b>: juice balls that pop when you bite them.</li>
+          </ul>
+          <p class="muted" style="margin:6px 0 0">When a menu just says "Peach," it is treated as a flavor shot.</p>
+        </details>
       </div>
       <details class="more section" id="f-more">
         <summary>More filters (base, must have, skip, caffeine)</summary>
@@ -286,14 +298,37 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     "mixed berries": "mixed berries", "cream": "sweet cream", "sweet cream": "sweet cream", "lime wedge": "lime", "lemon wedge": "lemon"
   };
   function canon(raw) {
-    var s = raw.toLowerCase().replace(/[’`]/g, "'").trim(), sf = false;
-    if (/^(sugar[- ]?free|sf)\s+/.test(s)) { sf = true; s = s.replace(/^(sugar[- ]?free|sf)\s+/, ""); }
-    s = s.replace(/\(.*?\)/g, "").replace(/\b(fresh|frozen|real|swig|diced|double|extra|lite|light|your choice of)\b\s*/g, "").trim();
+    var s = raw.toLowerCase().replace(/[’`]/g, "'").trim(), form = "flavor";
+    if (/^(sugar[- ]?free|sf)\s+/.test(s)) { form = "sf"; s = s.replace(/^(sugar[- ]?free|sf)\s+/, ""); }
+    s = s.replace(/\(.*?\)/g, "");
+    if (/\b(frozen|diced)\b/.test(s)) form = "frozen";
+    if (/\bfresh\b/.test(s)) form = "fresh";
+    s = s.replace(/\b(fresh|frozen|real|swig|diced|double|extra|lite|light|your choice of)\b\s*/g, "").trim();
     s = s.replace(/passion fruit/g, "passionfruit").replace(/blue cura[cç]ao/g, "blue curacao");
-    var pu = /\bpuree\b/.test(s);
-    s = s.replace(/\s+(puree|fruit|syrup|shot)s?$/, "").replace(/\s+/g, " ").trim();
+    if (/\s+popping pearls?$/.test(s)) { s = s.replace(/\s+popping pearls?$/, ""); form = "pearls"; }
+    else if (/\s+puree$/.test(s)) { s = s.replace(/\s+puree$/, ""); form = "puree"; }
+    else if (/\s+fruit$/.test(s) && !/passion fruit/.test(s)) { s = s.replace(/\s+fruit$/, ""); if (form === "flavor") form = "fruit"; }
+    else if (/\s+(lime|lemon) wedge$/.test(s)) { s = s.replace(/\s+wedge$/, ""); form = "fresh"; }
+    s = s.replace(/\s+(syrup|shot)s?$/, "").replace(/\s+/g, " ").trim();
     if (SYN[s]) s = SYN[s];
-    return { k: s, sf: sf, pu: pu };
+    return { k: s, sf: form === "sf", form: form };
+  }
+  var FRUITISH = /peach|strawberry|raspberry|blackberry|blueberry|huckleberry|mango|pineapple|passionfruit|guava|kiwi|watermelon|lime$|lemon$|orange|grapefruit|pear|apple|cherry|cranberry|pomegranate|^grape$|tangerine|banana|coconut$|pina colada|berries|tiger/;
+  function isFlavorKey(k) { return !/cream|half & half|cold foam|milk|ice cream|cheesecake|sauce|stick|drizzle|gummy|protein|sour$/.test(k); }
+  var FORM_HELP = { flavor: "a syrup shot", sf: "a sugar-free syrup shot", puree: "blended fruit puree", frozen: "frozen fruit pieces", fruit: "real fruit pieces", fresh: "fresh cut or squeezed fruit", pearls: "popping pearls" };
+  var FORM_GROUPS = [["flavor", "Flavor shot", ["flavor"]], ["sf", "Sugar-free flavor", ["sf"]], ["puree", "Puree", ["puree"]], ["fruit", "Frozen or real fruit", ["frozen", "fruit"]], ["fresh", "Fresh fruit", ["fresh"]], ["pearls", "Popping pearls", ["pearls"]]];
+  function allowedForms() { var a = []; FORM_GROUPS.forEach(function (g) { if (F.forms.indexOf(g[0]) >= 0) a = a.concat(g[2]); }); return a; }
+  function chipText(k, f) {
+    var L = label(k);
+    switch (f) {
+      case "puree": return L + " Puree";
+      case "frozen": return "Frozen " + L;
+      case "fresh": return "Fresh " + L;
+      case "fruit": return L + " Fruit";
+      case "sf": return "Sugar-Free " + L;
+      case "pearls": return L + " Popping Pearls";
+      default: return FRUITISH.test(k) ? L + " Flavor" : L;
+    }
   }
   var LABEL_FIX = { "tiger's blood": "Tiger's Blood", "half & half": "Half & Half", "s'mores": "S'mores", "pina colada": "Pina Colada" };
   function label(k) { return LABEL_FIX[k] || k.replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
@@ -416,14 +451,14 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     var bases = rawBase ? rawBase.split("/").map(function (x) { return x.trim(); }).filter(Boolean) : [];
     var fams = [];
     bases.forEach(function (b) { var f = baseFamily(b); if (f && fams.indexOf(f) < 0) fams.push(f); });
-    var ings = [], keys = [], pur = [], sfAny = flags.indexOf("sf") >= 0;
+    var ings = [], keys = [], forms = {}, sfAny = flags.indexOf("sf") >= 0;
     rawIngs.split(",").forEach(function (r) {
       r = r.trim(); if (!r) return;
       var c = canon(r);
       if (!c.k) return;
       if (c.sf) sfAny = true;
-      if (keys.indexOf(c.k) < 0) { keys.push(c.k); ings.push(c.k); }
-      if (c.pu && pur.indexOf(c.k) < 0) pur.push(c.k);
+      if (keys.indexOf(c.k) < 0) { keys.push(c.k); ings.push(c.k); forms[c.k] = []; }
+      if (forms[c.k].indexOf(c.form) < 0) forms[c.k].push(c.form);
     });
     if (bases.some(function (b) { return /diet|zero|sugar[- ]?free|\bsf\b/i.test(b); })) sfAny = true;
     var caf = fams.some(function (f) { return CAFFEINATED[f]; }) && !bases.some(function (b) { return /caffeine[- ]?free/i.test(b); });
@@ -436,8 +471,8 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
       id: id, shop: shop, cat: cat, name: name, bases: bases, fams: fams, ings: ings,
       sf: sfAny, caf: caf, seasonal: flags.indexOf("seasonal") >= 0 || flags.indexOf("limited") >= 0,
       blended: flags.indexOf("blended") >= 0, board: flags.indexOf("board") >= 0, tags: tagCount, custom: !!isCustom,
-      pur: pur,
-      hay: (name + " " + bases.join(" ") + " " + ings.join(" ") + " " + pur.map(function (k) { return k + " puree"; }).join(" ") + " " + shop).toLowerCase()
+      forms: forms,
+      hay: (name + " " + bases.join(" ") + " " + ings.map(function (k) { return forms[k].map(function (f) { return chipText(k, f); }).join(" "); }).join(" ") + " " + shop).toLowerCase()
     };
   }
 
@@ -488,7 +523,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   function shopStyle(s) { return "background:hsl(" + hue(s) + " 55% 38%)"; }
 
   /* ---------- filter state ---------- */
-  var F = Object.assign({ shops: [], moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, puree: false, pureeOf: [], board: false, q: "", vibe: "", sort: "match" }, saved);
+  var F = Object.assign({ shops: [], moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, forms: [], formOf: [], board: false, q: "", vibe: "", sort: "match" }, saved);
   function persist() { store.set("ds_filters", F); }
   var shown = 30, pick = null;
 
@@ -512,13 +547,16 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     [["o-sf", "sf"], ["o-caf", "caf"], ["o-nocaf", "nocaf"], ["o-fav", "fav"], ["o-new", "fresh"]].forEach(function (p) { $("#" + p[0]).setAttribute("aria-pressed", String(!!F[p[1]])); });
     if (document.activeElement !== $("#f-vibe")) $("#f-vibe").value = F.vibe;
     $("#f-vibe-ex").innerHTML = '<span class="muted">Try:</span> ' + VIBE_EXAMPLES.map(function (v) { return '<button class="chip" data-vibe="' + esc(v) + '" aria-pressed="' + (norm(F.vibe) === v) + '">' + esc(v) + "</button>"; }).join("");
-    $("#o-pur").setAttribute("aria-pressed", String(!!F.puree));
     $("#o-board").setAttribute("aria-pressed", String(!!F.board));
-    var pc = {};
-    ALL.forEach(function (d) { if (!disabled[d.shop] && (!F.shops.length || F.shops.indexOf(d.shop) >= 0)) d.pur.forEach(function (k) { pc[k] = (pc[k] || 0) + 1; }); });
-    var pk = Object.keys(pc).sort(function (a, b) { return pc[b] - pc[a] || (a < b ? -1 : 1); });
-    $("#f-pur-of").classList.toggle("hidden", !F.puree);
-    $("#f-pur-of").innerHTML = '<span class="muted">Puree flavor:</span> ' + pk.map(function (k) { return '<button class="chip" data-pureeof="' + esc(k) + '" aria-pressed="' + (F.pureeOf.indexOf(k) >= 0) + '">' + esc(label(k)) + ' <span class="muted">' + pc[k] + "</span></button>"; }).join("");
+    $("#f-forms").innerHTML = FORM_GROUPS.map(function (g) { return '<button class="chip" data-formg="' + g[0] + '" aria-pressed="' + (F.forms.indexOf(g[0]) >= 0) + '">' + g[1] + "</button>"; }).join("");
+    var okf = allowedForms(), fcount = {};
+    ALL.forEach(function (d) {
+      if (disabled[d.shop] || (F.shops.length && F.shops.indexOf(d.shop) < 0)) return;
+      d.ings.forEach(function (k) { if (isFlavorKey(k) && d.forms[k].some(function (f) { return okf.indexOf(f) >= 0; })) fcount[k] = (fcount[k] || 0) + 1; });
+    });
+    var fkeys = Object.keys(fcount).sort(function (a, b) { return fcount[b] - fcount[a] || (a < b ? -1 : 1); }).slice(0, 18);
+    $("#f-form-of").classList.toggle("hidden", !F.forms.length);
+    $("#f-form-of").innerHTML = '<span class="muted">Which fruit or flavor:</span> ' + fkeys.map(function (k) { return '<button class="chip" data-formof="' + esc(k) + '" aria-pressed="' + (F.formOf.indexOf(k) >= 0) + '">' + esc(label(k)) + ' <span class="muted">' + fcount[k] + "</span></button>"; }).join("");
     $("#f-q").value = F.q; $("#f-sort").value = F.sort;
     // pairings: what usually goes with the chosen base(s)
     var pairs = {}, pool = ALL.filter(function (d) { return !F.bases.length || d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; }); });
@@ -550,12 +588,18 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
 
   var CREAMS = ["vanilla cream", "coconut cream", "sweet cream", "half & half"], BRIGHTS = ["lime", "lemon"];
   var FAM_LABEL = { "Lemon-Lime": "Sprite / 7Up", "Orange Soda": "Orange soda", "Cream Soda": "Cream soda" };
+  function formCounts(scope) {
+    var c = {};
+    scope.forEach(function (d) { d.ings.forEach(function (k) { d.forms[k].forEach(function (f) { (c[k] = c[k] || {})[f] = (c[k][f] || 0) + 1; }); }); });
+    return c;
+  }
+  function domForm(fc, k) { var o = fc[k]; if (!o) return "flavor"; return Object.keys(o).sort(function (a, b) { return o[b] - o[a]; })[0]; }
   function renderVibe() {
     var out = $("#f-vibe-out");
     if (!PROF) { out.innerHTML = ""; return; }
     if (PROF.empty) { out.innerHTML = '<div class="panel muted">No flavor profile for "' + esc(F.vibe) + '" yet, so I tried a plain name and ingredient search. Try a dessert, a drink, a place or a season.</div>'; return; }
     var scope = ALL.filter(function (d) { return !disabled[d.shop] && (!F.shops.length || F.shops.indexOf(d.shop) >= 0); });
-    var avail = {}, shopIngs = {}, scopeFams = {};
+    var avail = {}, shopIngs = {}, scopeFams = {}, fc = formCounts(scope);
     scope.forEach(function (d) { (shopIngs[d.shop] = shopIngs[d.shop] || {}); d.ings.forEach(function (k) { avail[k] = 1; shopIngs[d.shop][k] = 1; }); d.fams.forEach(function (b) { scopeFams[b] = 1; }); });
     var keys = Object.keys(PROF.w).sort(function (a, b) { return PROF.w[b] - PROF.w[a]; });
     var ranked = keys.filter(function (k) { return avail[k]; });
@@ -571,7 +615,8 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     if (anchor) scope.forEach(function (d) { if (d.ings.indexOf(anchor) >= 0) d.ings.forEach(function (k) { if (k !== anchor) pairs[k] = (pairs[k] || 0) + 1; }); });
     var pairList = Object.keys(pairs).sort(function (a, b) { return pairs[b] - pairs[a] || (a < b ? -1 : 1); }).slice(0, 6);
     var chips = keys.slice(0, 10).map(function (k) {
-      return avail[k] ? '<button class="chip" data-addmust="' + esc(k) + '" aria-pressed="false" title="Only show drinks with ' + esc(label(k)) + '">' + esc(label(k)) + "</button>" : '<span class="chip static off" title="Not on the selected menus">' + esc(label(k)) + "</span>";
+      var df = domForm(fc, k);
+      return avail[k] ? '<button class="chip f-' + df + '" data-addmust="' + esc(k) + '" aria-pressed="false" title="Usually ' + esc(FORM_HELP[df]) + ' on these menus. Tap to only show drinks with ' + esc(label(k)) + '">' + esc(chipText(k, df)) + "</button>" : '<span class="chip static off" title="Not on the selected menus">' + esc(label(k)) + "</span>";
     }).join("");
     var ideas = [];
     function shopsWith(list) { return Object.keys(shopIngs).filter(function (s) { return list.every(function (k) { return shopIngs[s][k]; }); }); }
@@ -598,7 +643,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
       (missing.length ? '<p class="muted" style="margin:8px 0 0">Not on ' + (F.shops.length ? "the selected menus" : "any menu here") + ": " + esc(missing.map(label).join(", ")) + ".</p>" : "") +
       (ideas.length ? '<h2 style="margin-top:14px">Ideas to try</h2><div class="ideas">' + ideas.map(function (i) {
         return '<div class="idea"><b class="t">' + esc(i.title) + '</b><div class="recipe"><span class="base">' + esc(FAM_LABEL[i.base] || i.base) + "</span>" +
-          i.list.map(function (k) { return '<span class="plus">+</span><span class="chip static">' + esc(label(k)) + "</span>"; }).join("") + "</div>" +
+          i.list.map(function (k) { var df = domForm(fc, k); return '<span class="plus">+</span><span class="chip static f-' + df + '">' + esc(chipText(k, df)) + "</span>"; }).join("") + "</div>" +
           '<div class="muted" style="margin-top:6px;font-size:13px">' + (i.shops.length ? "All of these add-ins appear on the menu at " + esc(i.shops.join(", ")) + "." : "Mixes add-ins from different menus.") + " You may need to order it custom.</div></div>";
       }).join("") + "</div>" : "") + "</div>";
   }
@@ -611,7 +656,10 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
       if (F.bases.length && !d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; })) return false;
       if (F.must.some(function (k) { return d.ings.indexOf(k) < 0; })) return false;
       if (F.avoid.some(function (k) { return d.ings.indexOf(k) >= 0; })) return false;
-      if (F.puree && (!d.pur.length || (F.pureeOf.length && !d.pur.some(function (k) { return F.pureeOf.indexOf(k) >= 0; })))) return false;
+      if (F.forms.length) {
+        var okForms = allowedForms();
+        if (!d.ings.some(function (k) { return isFlavorKey(k) && (!F.formOf.length || F.formOf.indexOf(k) >= 0) && d.forms[k].some(function (f) { return okForms.indexOf(f) >= 0; }); })) return false;
+      }
       if (F.board && BOARD_SHOPS[d.shop] && !d.board) return false;
       if (F.sf && !d.sf) return false;
       if (F.caf && !d.caf) return false;
@@ -638,8 +686,10 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
 
   function cardHTML(d, why, isPick) {
     var rec = '<span class="base">' + esc(d.bases.join(" + ")) + "</span>" + d.ings.map(function (k) {
-      var lab = label(k) + (d.pur.indexOf(k) >= 0 ? " Puree" : "");
-      return '<span class="plus">+</span><button class="chip ing' + (d.pur.indexOf(k) >= 0 ? " pur" : "") + '" data-addmust="' + esc(k) + '" aria-pressed="false" title="Only show drinks with ' + esc(label(k)) + '">' + esc(lab) + "</button>";
+      return d.forms[k].map(function (f) {
+        var tip = isFlavorKey(k) ? " (" + FORM_HELP[f] + ")" : "";
+        return '<span class="plus">+</span><button class="chip ing f-' + f + '" data-addmust="' + esc(k) + '" aria-pressed="false" title="' + esc(label(k) + tip + ". Tap to only show drinks with " + label(k)) + '">' + esc(chipText(k, f)) + "</button>";
+      }).join("");
     }).join("");
     var badges = [];
     if (BOARD_SHOPS[d.shop] && !d.board) badges.push('<span class="badge" title="Not on the most recent menu board photo for this shop">Not on current board</span>');
@@ -700,9 +750,11 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   }
 
   /* ---------- remix generator ---------- */
-  var PAIR = {}, FAMPAIR = {}, REP_BASE = {}, EXIST = {}, POP = {};
+  var PAIR = {}, FAMPAIR = {}, REP_BASE = {}, EXIST = {}, POP = {}, SCOPEFORM = {};
   function pk(a, b) { return a < b ? a + "|" + b : b + "|" + a; }
-  function sig(fam, ings) { return fam + "|" + ings.slice().sort().join(","); }
+  function fkey(k, forms) { return k + ":" + (forms[k] || ["flavor"]).slice().sort().join("+"); }
+  function sig(fam, ings, forms) { return fam + "|" + ings.map(function (k) { return fkey(k, forms); }).sort().join(","); }
+  function copyForms(f) { var o = {}; Object.keys(f || {}).forEach(function (k) { o[k] = f[k].slice(); }); return o; }
   function buildRemixIndex() {
     PAIR = {}; FAMPAIR = {}; REP_BASE = {}; EXIST = {}; POP = {};
     var baseCount = {};
@@ -710,7 +762,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
       for (var i = 0; i < d.ings.length; i++) for (var j = i + 1; j < d.ings.length; j++) { var key = pk(d.ings[i], d.ings[j]); PAIR[key] = (PAIR[key] || 0) + 1; }
       d.fams.forEach(function (f) { d.ings.forEach(function (k) { FAMPAIR[f + "|" + k] = (FAMPAIR[f + "|" + k] || 0) + 1; }); });
       if (d.fams.length === 1 && d.bases.length === 1) { var c = (baseCount[d.fams[0]] = baseCount[d.fams[0]] || {}); c[d.bases[0]] = (c[d.bases[0]] || 0) + 1; }
-      d.fams.forEach(function (f) { EXIST[sig(f, d.ings)] = 1; });
+      d.fams.forEach(function (f) { EXIST[sig(f, d.ings, d.forms)] = 1; });
     });
     Object.keys(baseCount).forEach(function (f) { var c = baseCount[f]; REP_BASE[f] = Object.keys(c).sort(function (a, b) { return c[b] - c[a]; })[0]; });
   }
@@ -731,15 +783,22 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     return ADJ[rand(ADJ.length)] + " " + lead + " " + NOUN[rand(NOUN.length)];
   }
   var TOPPING = /stick|drizzle|gummy|popping|protein|sauce|foam|whipped|ice cream|^sour$/;
-  var RMODES = [["any", "Surprise me"], ["add", "Add a flavor"], ["swap", "Swap a flavor"], ["remove", "Remove a flavor"], ["base", "Swap the soda"]];
+  var RMODES = [["any", "Surprise me"], ["add", "Add a flavor"], ["swap", "Swap a flavor"], ["remove", "Remove a flavor"], ["form", "Change the form"], ["base", "Swap the soda"]];
   var R = { mode: "any", seed: null, results: [] };
   var remixes = store.get("ds_remixes", []);
 
   function remixScope() {
     return ALL.filter(function (d) { return !disabled[d.shop] && (!F.shops.length || F.shops.indexOf(d.shop) >= 0); });
   }
+  function srcForm(src, k) { return (src.forms && src.forms[k] && src.forms[k][0]) || "flavor"; }
+  function pickForm(k, prefer) {
+    var o = SCOPEFORM[k]; if (!o) return prefer || "flavor";
+    if (prefer && o[prefer]) return prefer;
+    return pickW(Object.keys(o), function (f) { return o[f]; }) || "flavor";
+  }
   function remixOnce(src, mode, scope, avail, scopeFams) {
-    var out = { src: src, fam: src.fams[0], base: src.bases.join(" + "), ings: src.ings.slice(), added: [], removed: [], swapped: [], baseChange: null };
+    var out = { src: src, fam: src.fams[0], base: src.bases.join(" + "), ings: src.ings.slice(), forms: copyForms(src.forms), added: [], removed: [], swapped: [], changed: [], baseChange: null };
+    src.ings.forEach(function (k) { if (!out.forms[k]) out.forms[k] = ["flavor"]; });
     function weight(k, others) {
       var w = 0; others.forEach(function (i) { w += PAIR[pk(i, k)] || 0; });
       if (w <= 0) return 0;
@@ -757,22 +816,33 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
         return weight(k, others) > 0;
       });
     }
-    var op = mode === "any" ? ["add", "swap", "remove", "base", "swap", "add"][rand(6)] : mode;
+    var op = mode === "any" ? ["add", "swap", "remove", "base", "swap", "add", "form"][rand(7)] : mode;
     if (op === "add") {
       if (src.ings.length >= 5) return null;
       var k = pickW(cands(src.ings, src.ings), function (x) { return weight(x, src.ings); }); if (!k) return null;
-      out.ings.push(k); out.added.push(k);
+      var fk = pickForm(k); out.ings.push(k); out.forms[k] = [fk]; out.added.push([k, fk]);
     } else if (op === "remove") {
       if (src.ings.length < 3) return null;
       var r = src.ings[rand(src.ings.length)];
-      out.ings = src.ings.filter(function (x) { return x !== r; }); out.removed.push(r);
+      out.ings = src.ings.filter(function (x) { return x !== r; }); out.removed.push([r, srcForm(src, r)]); delete out.forms[r];
     } else if (op === "swap") {
       if (!src.ings.length) return null;
       var rm = src.ings[rand(src.ings.length)], rest = src.ings.filter(function (x) { return x !== rm; }), tg = tagsOf(rm);
       var pool = cands(src.ings, rest, tg.length ? tg : null);
       if (!pool.length) pool = cands(src.ings, rest, null);
       var nk = pickW(pool, function (x) { return weight(x, rest); }); if (!nk) return null;
-      out.ings = rest.concat(nk); out.swapped.push([rm, nk]);
+      var of = srcForm(src, rm), nf2 = pickForm(nk, of);
+      out.ings = rest.concat(nk); delete out.forms[rm]; out.forms[nk] = [nf2]; out.swapped.push([rm, of, nk, nf2]);
+    } else if (op === "form") {
+      var opts = src.ings.filter(function (k) {
+        if (!isFlavorKey(k)) return false;
+        var o = SCOPEFORM[k]; return o && Object.keys(o).some(function (f) { return out.forms[k].indexOf(f) < 0; });
+      });
+      if (!opts.length) return null;
+      var ck = opts[rand(opts.length)], cur = out.forms[ck][0], o2 = SCOPEFORM[ck];
+      var alts = Object.keys(o2).filter(function (f) { return out.forms[ck].indexOf(f) < 0; });
+      var nfm = pickW(alts, function (f) { return o2[f]; });
+      out.forms[ck] = [nfm]; out.changed.push([ck, cur, nfm]);
     } else {
       var skip = ["Protein", "Frozen", "Sports Drink", "Hot Chocolate", "Energy"];
       if (skip.indexOf(src.fams[0]) >= 0) return null;
@@ -782,15 +852,16 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     }
     if (out.ings.some(function (k) { return F.avoid.indexOf(k) >= 0; })) return null;
     if (!out.ings.length) return null;
-    out.sig = sig(out.fam, out.ings);
-    if (EXIST[out.sig] || out.sig === sig(src.fams[0], src.ings)) return null;
+    out.sig = sig(out.fam, out.ings, out.forms);
+    if (EXIST[out.sig] || out.sig === sig(src.fams[0], src.ings, src.forms || {})) return null;
     return out;
   }
   function describeChange(r) {
     var p = [];
-    r.added.forEach(function (k) { p.push("Added " + label(k)); });
-    r.removed.forEach(function (k) { p.push("Removed " + label(k)); });
-    r.swapped.forEach(function (s) { p.push("Swapped " + label(s[0]) + " for " + label(s[1])); });
+    r.added.forEach(function (a) { p.push("Added " + chipText(a[0], a[1])); });
+    r.removed.forEach(function (a) { p.push("Removed " + chipText(a[0], a[1])); });
+    r.swapped.forEach(function (s) { p.push("Swapped " + chipText(s[0], s[1]) + " for " + chipText(s[2], s[3])); });
+    r.changed.forEach(function (c) { p.push("Changed " + chipText(c[0], c[1]) + " to " + chipText(c[0], c[2])); });
     if (r.baseChange) p.push("Swapped " + r.baseChange[0] + " for " + r.baseChange[1]);
     return p.join(", ");
   }
@@ -799,23 +870,25 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     var scope = remixScope(), avail = {}, scopeFams = {};
     scope.forEach(function (d) { d.ings.forEach(function (k) { avail[k] = 1; }); d.fams.forEach(function (f) { scopeFams[f] = 1; }); });
     avail = Object.keys(avail);
+    SCOPEFORM = formCounts(scope);
     var sources = R.seed ? [R.seed] : scope.filter(function (d) { return d.ings.length >= 2 && d.fams.length && ["Protein", "Hot Chocolate", "Frozen"].indexOf(d.fams[0]) < 0 && (!F.bases.length || d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; })); });
     var res = [], seen = {}, tries = 0;
-    while (res.length < 4 && tries < 400 && sources.length) {
+    while (res.length < 4 && tries < 500 && sources.length) {
       tries++;
       var src = R.seed ? R.seed : pickW(sources, popularity);
       var r = remixOnce(src, R.mode, scope, avail, scopeFams);
       if (!r || seen[r.sig]) continue;
-      if (tries < 250 && F.must.some(function (k) { return r.ings.indexOf(k) < 0; })) continue;
+      if (tries < 300 && F.must.some(function (k) { return r.ings.indexOf(k) < 0; })) continue;
       seen[r.sig] = 1; r.name = nameFor(r.ings); res.push(r);
     }
     R.results = res;
   }
   function shopsWithAll(list) {
-    var by = {}; ALL.forEach(function (d) { if (disabled[d.shop]) return; var s = (by[d.shop] = by[d.shop] || {}); d.ings.forEach(function (k) { s[k] = 1; }); });
-    return Object.keys(by).filter(function (s) { return list.every(function (k) { return by[s][k]; }); });
+    var by = {}; ALL.forEach(function (d) { if (disabled[d.shop]) return; var s = (by[d.shop] = by[d.shop] || {}); d.ings.forEach(function (k) { d.forms[k].forEach(function (f) { s[k + ":" + f] = 1; }); }); });
+    return Object.keys(by).filter(function (s) { return list.every(function (kf) { return by[s][kf]; }); });
   }
-  function orderText(base, ings) { return base + " with " + ings.map(label).join(", "); }
+  function ingPairs(ings, forms) { var out = []; ings.forEach(function (k) { (forms[k] || ["flavor"]).forEach(function (f) { out.push([k, f]); }); }); return out; }
+  function orderText(base, ings, forms) { return base + " with " + ingPairs(ings, forms || {}).map(function (p) { return chipText(p[0], p[1]); }).join(", "); }
   function renderRemix() {
     $("#r-modes").innerHTML = RMODES.map(function (m) { return '<button class="chip" data-rmode="' + m[0] + '" aria-pressed="' + (R.mode === m[0]) + '">' + m[1] + "</button>"; }).join("");
     var bits = [];
@@ -829,22 +902,24 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     if (R.seed) $("#r-scope").innerHTML = esc(bits.join(" · ")) + ". Remixing <b>" + esc(R.seed.name) + "</b>" + (R.seed.shop ? " (" + esc(R.seed.shop) + ")" : "") + ".";
     $("#r-clear").classList.toggle("hidden", !R.seed);
     $("#r-results").innerHTML = R.results.length ? R.results.map(function (r, i) {
-      var shops = shopsWithAll(r.ings);
-      var chips = r.ings.map(function (k) {
-        var isNew = r.added.indexOf(k) >= 0 || r.swapped.some(function (s) { return s[1] === k; });
-        var pu = r.src.pur && r.src.pur.indexOf(k) >= 0 ? " Puree" : "";
-        return '<span class="plus">+</span><span class="chip static' + (isNew ? " new" : "") + '">' + esc(label(k) + pu) + (isNew ? " (new)" : "") + "</span>";
+      var newK = {};
+      r.added.forEach(function (a) { newK[a[0]] = 1; }); r.swapped.forEach(function (s) { newK[s[2]] = 1; }); r.changed.forEach(function (c) { newK[c[0]] = 1; });
+      var chips = ingPairs(r.ings, r.forms).map(function (p) {
+        var isNew = !!newK[p[0]];
+        return '<span class="plus">+</span><span class="chip static f-' + p[1] + (isNew ? " new" : "") + '" title="' + esc(FORM_HELP[p[1]]) + '">' + esc(chipText(p[0], p[1])) + (isNew ? " (new)" : "") + "</span>";
       }).join("");
-      var gone = r.removed.concat(r.swapped.map(function (s) { return s[0]; })).map(function (k) { return '<span class="chip static gone">' + esc(label(k)) + "</span>"; }).join(" ");
+      var goneList = r.removed.map(function (a) { return [a[0], a[1]]; }).concat(r.swapped.map(function (s) { return [s[0], s[1]]; })).concat(r.changed.map(function (c) { return [c[0], c[1]]; }));
+      var gone = goneList.map(function (p) { return '<span class="chip static gone">' + esc(chipText(p[0], p[1])) + "</span>"; }).join(" ");
+      var shops = shopsWithAll(ingPairs(r.ings, r.forms).map(function (p) { return p[0] + ":" + p[1]; }));
       return '<article class="card pick"><div class="top"><h3>' + esc(r.name) + "</h3></div>" +
         '<div class="meta"><span>Remix of <b>' + esc(r.src.name) + "</b>" + (r.src.shop ? " (" + esc(r.src.shop) + ")" : "") + "</span></div>" +
-        '<div class="recipe"><span class="base' + (r.baseChange ? " " : "") + '">' + esc(r.base) + "</span>" + chips + "</div>" +
+        '<div class="recipe"><span class="base">' + esc(r.base) + "</span>" + chips + "</div>" +
         '<div class="why">' + esc(describeChange(r)) + "</div>" + (gone ? '<div style="margin-top:6px">' + gone + "</div>" : "") +
-        '<div class="muted" style="margin-top:6px;font-size:13px">' + (shops.length ? "Every ingredient is on the menu at " + esc(shops.join(", ")) + "." : "Mixes ingredients from different menus.") + " You may need to order it custom.</div>" +
+        '<div class="muted" style="margin-top:6px;font-size:13px">' + (shops.length ? "Each ingredient is used in this exact form at " + esc(shops.join(", ")) + "." : "Mixes forms and ingredients from different menus.") + " You may need to order it custom.</div>" +
         '<div class="row" style="margin-top:8px"><button class="btn small" data-rsave="' + i + '">♡ Save</button><button class="btn small" data-rcopy="' + i + '">Copy order</button><button class="btn small" data-ragain="' + i + '">Remix this one</button></div></article>';
     }).join("") : '<div class="panel muted">Tap Remix to generate new drinks.</div>';
     $("#r-saved").innerHTML = remixes.length ? remixes.map(function (s, i) {
-      return '<div class="menu-row"><div><b>' + esc(s.name) + '</b><div class="note">' + esc(orderText(s.base, s.ings)) + "</div><div class=\"note\">From " + esc(s.from) + ": " + esc(s.change) + '</div></div><div class="row"><button class="btn small" data-rscopy="' + i + '">Copy</button><button class="btn small danger" data-rsdel="' + i + '">Delete</button></div></div>';
+      return '<div class="menu-row"><div><b>' + esc(s.name) + '</b><div class="note">' + esc(orderText(s.base, s.ings, s.forms)) + "</div><div class=\"note\">From " + esc(s.from) + ": " + esc(s.change) + '</div></div><div class="row"><button class="btn small" data-rscopy="' + i + '">Copy</button><button class="btn small danger" data-rsdel="' + i + '">Delete</button></div></div>';
     }).join("") : '<p class="muted" style="margin:0">Nothing saved yet.</p>';
   }
   function copyText(t, btn) {
@@ -859,12 +934,13 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     var d = t.dataset;
     if (d.rmode) { R.mode = d.rmode; runRemix(); }
     else if (d.remix) { var sd = ALL.filter(function (x) { return x.id === d.remix; })[0]; if (sd) { R.seed = sd; showTab("remix"); runRemix(); window.scrollTo(0, 0); } }
-    else if (d.ragain) { var rr = R.results[+d.ragain]; if (rr) { R.seed = { name: rr.name, shop: "", bases: [rr.base], fams: [rr.fam], ings: rr.ings.slice(), pur: rr.src.pur || [] }; runRemix(); window.scrollTo(0, 0); } }
-    else if (d.rsave) { var sv = R.results[+d.rsave]; if (sv) { remixes.unshift({ name: sv.name, base: sv.base, ings: sv.ings, from: sv.src.name + (sv.src.shop ? " (" + sv.src.shop + ")" : ""), change: describeChange(sv) }); remixes = remixes.slice(0, 50); store.set("ds_remixes", remixes); t.textContent = "♥ Saved"; renderRemix(); } }
-    else if (d.rcopy) { var cv = R.results[+d.rcopy]; if (cv) copyText(orderText(cv.base, cv.ings), t); }
-    else if (d.rscopy) { var cs = remixes[+d.rscopy]; if (cs) copyText(orderText(cs.base, cs.ings), t); }
+    else if (d.ragain) { var rr = R.results[+d.ragain]; if (rr) { R.seed = { name: rr.name, shop: "", bases: [rr.base], fams: [rr.fam], ings: rr.ings.slice(), forms: copyForms(rr.forms) }; runRemix(); window.scrollTo(0, 0); } }
+    else if (d.rsave) { var sv = R.results[+d.rsave]; if (sv) { remixes.unshift({ name: sv.name, base: sv.base, ings: sv.ings, forms: copyForms(sv.forms), from: sv.src.name + (sv.src.shop ? " (" + sv.src.shop + ")" : ""), change: describeChange(sv) }); remixes = remixes.slice(0, 50); store.set("ds_remixes", remixes); t.textContent = "♥ Saved"; renderRemix(); } }
+    else if (d.rcopy) { var cv = R.results[+d.rcopy]; if (cv) copyText(orderText(cv.base, cv.ings, cv.forms), t); }
+    else if (d.rscopy) { var cs = remixes[+d.rscopy]; if (cs) copyText(orderText(cs.base, cs.ings, cs.forms), t); }
     else if (d.rsdel) { remixes.splice(+d.rsdel, 1); store.set("ds_remixes", remixes); renderRemix(); }
-    else if (d.pureeof) { toggleIn(F.pureeOf, d.pureeof); pick = null; shown = 30; refresh(); }
+    else if (d.formg) { toggleIn(F.forms, d.formg); if (!F.forms.length) F.formOf = []; pick = null; shown = 30; refresh(); }
+    else if (d.formof) { toggleIn(F.formOf, d.formof); pick = null; shown = 30; refresh(); }
     else if (d.vibe) { F.vibe = norm(F.vibe) === d.vibe ? "" : d.vibe; pick = null; shown = 30; refresh(); }
     else if (d.shop) { toggleIn(F.shops, d.shop); pick = null; shown = 30; refresh(); }
     else if (d.mood) { toggleIn(F.moods, d.mood); if (F.moods.length && F.sort === "az") F.sort = "match"; pick = null; shown = 30; refresh(); }
@@ -901,12 +977,11 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   addTyped("#f-must-in", function () { return F.must; });
   addTyped("#f-avoid-in", function () { return F.avoid; });
   $("#o-board").addEventListener("click", function () { F.board = !F.board; pick = null; shown = 30; refresh(); });
-  $("#o-pur").addEventListener("click", function () { F.puree = !F.puree; if (!F.puree) F.pureeOf = []; pick = null; shown = 30; refresh(); });
   $("#f-vibe").addEventListener("input", function (e) { F.vibe = e.target.value; pick = null; shown = 30; persist(); renderControls(); renderResults(); });
   $("#f-q").addEventListener("input", function (e) { F.q = e.target.value; pick = null; shown = 30; persist(); renderResults(); });
   $("#f-sort").addEventListener("change", function (e) { F.sort = e.target.value; refresh(); });
   $("#b-more").addEventListener("click", function () { shown += 30; renderResults(); });
-  $("#b-reset").addEventListener("click", function () { F = { shops: F.shops, moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, puree: false, pureeOf: [], board: false, q: "", vibe: "", sort: "match" }; pick = null; shown = 30; refresh(); });
+  $("#b-reset").addEventListener("click", function () { F = { shops: F.shops, moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, forms: [], formOf: [], board: false, q: "", vibe: "", sort: "match" }; pick = null; shown = 30; refresh(); });
   $("#b-surprise").addEventListener("click", function () {
     var pool = renderList.length ? renderList : []; if (!pool.length) return;
     // weight toward better matches when moods are chosen

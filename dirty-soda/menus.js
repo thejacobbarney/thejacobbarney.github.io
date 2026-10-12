@@ -183,7 +183,7 @@ window.BUILTIN_MENUS = [
         "Big Al|Diet Coke|Coconut, Fresh Lime",
         "This Bliss|Diet Coke|Cranberry, Fresh Lime|board",
         "The Founder|Diet Coke|Sugar-Free Coconut, Fresh Lime, Coconut Cream|board",
-        "Just Peachy|Coke Zero|Pineapple, Peach Puree, Lime, Coconut Cream|board",
+        "Just Peachy|Coke Zero|Pineapple, Peach Puree, Fresh Lime, Coconut Cream|board",
         "Waikiki|Coke|Pineapple, Coconut Cream|board",
         "Cherry Bomb|Pepsi|Cherry, Coconut, Vanilla Cream|board",
         "Beach Babe|Mtn Dew|Raspberry, Peach, Vanilla Cream|board",
@@ -269,7 +269,7 @@ window.BUILTIN_MENUS = [
         "Neopolitan|Dr Pepper|Chocolate, Strawberry, Vanilla Cream",
         "The Pedro|Dr Pepper|Coconut, Fresh Lime",
         "Peaches N' Dreams|Dr Pepper|Peach, Vanilla, Heavy Cream",
-        "XOXO|Dr Pepper|Cherry, Vanilla Cream, Cherry",
+        "XOXO|Dr Pepper|Cherry, Vanilla Cream, Cherry Fruit",
         "Bigfoot|Root Beer|S'mores, Vanilla Cream",
         "Cordially Yours|Root Beer|Cherry, Chocolate, Vanilla Cream",
         "The King|Root Beer|Butterscotch, Vanilla Cream",
@@ -287,7 +287,7 @@ window.BUILTIN_MENUS = [
         "Yabba Dabba Dew|Mtn Dew|Peach, Pineapple, Coconut Cream",
         "Emerald City|Mtn Dew|Pina Colada Puree, Blue Curacao, Passionfruit",
         "XD|Mtn Dew|Fresh Lime, Pomegranate",
-        "Cherry Jubilee|Starry|Cherry, Lime, Cherry",
+        "Cherry Jubilee|Starry|Cherry, Lime, Cherry Fruit",
         "Cloud Nine|Starry|Blue Curacao, Coconut Cream",
         "Frog Prince|Starry|Strawberry, Coconut Cream, Gummy Frog",
         "Prickly Juice|Starry|Mango, Orange, Pineapple",
@@ -319,12 +319,12 @@ window.BUILTIN_MENUS = [
         "Pom Blitz|Monster|Pomegranate, Coconut, Coconut Milk"
       ]},
       { cat: "Refresher", items: [
-        "Amber's Hawaiian Water|Water|Strawberry, Guava, Strawberry, Lite Coconut Cream",
+        "Amber's Hawaiian Water|Water|Strawberry, Guava, Strawberry Fruit, Lite Coconut Cream",
         "The Crum Sister|Water|Sugar-Free Peach, Sugar-Free Raspberry, Pineapple, Coconut Cream|sf",
-        "Strawberry Rush|Water|Strawberry Puree, Strawberry, Strawberry, Vanilla Cream",
-        "Mango Latta|Water|Mango, Passionfruit, Guava, Mango",
-        "Angel's Dream|Water|Sugar-Free Raspberry, Raspberry, Coconut Cream|sf",
-        "June Bug Juice|Water|Blue Curacao, Mango, Coconut Cream"
+        "Strawberry Rush|Water|Strawberry Puree, Strawberry, Strawberry Fruit, Vanilla Cream",
+        "Mango Latta|Water|Mango, Passionfruit, Guava, Mango Fruit",
+        "Angel's Dream|Water|Sugar-Free Raspberry, Raspberry Fruit, Coconut Cream|sf",
+        "June Bug Juice|Water|Blue Curacao, Mango Fruit, Coconut Cream"
       ]}
     ]
   },
