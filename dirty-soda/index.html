@@ -86,6 +86,7 @@
   .ideas { display: grid; gap: 8px; margin-top: 8px; }
   .idea { border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 12px; background: var(--soft); }
   .idea b.t { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
+  .chip.pur { border-color: var(--accent); }
   .chip.off { opacity: .5; cursor: default; text-decoration: line-through; }
   details.more > summary { font-weight: 600; color: var(--ink); padding: 4px 0; }
   details.more[open] > summary { margin-bottom: 10px; }
@@ -129,6 +130,11 @@
       <div class="section">
         <h2>What's the mood?</h2>
         <div class="row" id="f-moods"></div>
+      </div>
+      <div class="section">
+        <h2>Fruit puree</h2>
+        <div class="row"><button class="chip" id="o-pur" aria-pressed="false">🍓 Only drinks with fruit puree</button></div>
+        <div class="row hidden" id="f-pur-of" style="margin-top:8px"></div>
       </div>
       <details class="more section" id="f-more">
         <summary>More filters (base, must have, skip, caffeine)</summary>
@@ -261,9 +267,10 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     if (/^(sugar[- ]?free|sf)\s+/.test(s)) { sf = true; s = s.replace(/^(sugar[- ]?free|sf)\s+/, ""); }
     s = s.replace(/\(.*?\)/g, "").replace(/\b(fresh|frozen|real|swig|diced|double|extra|lite|light|your choice of)\b\s*/g, "").trim();
     s = s.replace(/passion fruit/g, "passionfruit").replace(/blue cura[cç]ao/g, "blue curacao");
+    var pu = /\bpuree\b/.test(s);
     s = s.replace(/\s+(puree|fruit|syrup|shot)s?$/, "").replace(/\s+/g, " ").trim();
     if (SYN[s]) s = SYN[s];
-    return { k: s, sf: sf };
+    return { k: s, sf: sf, pu: pu };
   }
   var LABEL_FIX = { "tiger's blood": "Tiger's Blood", "half & half": "Half & Half", "s'mores": "S'mores", "pina colada": "Pina Colada" };
   function label(k) { return LABEL_FIX[k] || k.replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
@@ -386,13 +393,14 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     var bases = rawBase ? rawBase.split("/").map(function (x) { return x.trim(); }).filter(Boolean) : [];
     var fams = [];
     bases.forEach(function (b) { var f = baseFamily(b); if (f && fams.indexOf(f) < 0) fams.push(f); });
-    var ings = [], keys = [], sfAny = flags.indexOf("sf") >= 0;
+    var ings = [], keys = [], pur = [], sfAny = flags.indexOf("sf") >= 0;
     rawIngs.split(",").forEach(function (r) {
       r = r.trim(); if (!r) return;
       var c = canon(r);
       if (!c.k) return;
       if (c.sf) sfAny = true;
       if (keys.indexOf(c.k) < 0) { keys.push(c.k); ings.push(c.k); }
+      if (c.pu && pur.indexOf(c.k) < 0) pur.push(c.k);
     });
     if (bases.some(function (b) { return /diet|zero|sugar[- ]?free|\bsf\b/i.test(b); })) sfAny = true;
     var caf = fams.some(function (f) { return CAFFEINATED[f]; }) && !bases.some(function (b) { return /caffeine[- ]?free/i.test(b); });
@@ -405,7 +413,8 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
       id: id, shop: shop, cat: cat, name: name, bases: bases, fams: fams, ings: ings,
       sf: sfAny, caf: caf, seasonal: flags.indexOf("seasonal") >= 0 || flags.indexOf("limited") >= 0,
       blended: flags.indexOf("blended") >= 0, tags: tagCount, custom: !!isCustom,
-      hay: (name + " " + bases.join(" ") + " " + ings.join(" ") + " " + shop).toLowerCase()
+      pur: pur,
+      hay: (name + " " + bases.join(" ") + " " + ings.join(" ") + " " + pur.map(function (k) { return k + " puree"; }).join(" ") + " " + shop).toLowerCase()
     };
   }
 
@@ -453,7 +462,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   function shopStyle(s) { return "background:hsl(" + hue(s) + " 55% 38%)"; }
 
   /* ---------- filter state ---------- */
-  var F = Object.assign({ shops: [], moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, q: "", vibe: "", sort: "match" }, saved);
+  var F = Object.assign({ shops: [], moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, puree: false, pureeOf: [], q: "", vibe: "", sort: "match" }, saved);
   function persist() { store.set("ds_filters", F); }
   var shown = 30, pick = null;
 
@@ -477,6 +486,12 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     [["o-sf", "sf"], ["o-caf", "caf"], ["o-nocaf", "nocaf"], ["o-fav", "fav"], ["o-new", "fresh"]].forEach(function (p) { $("#" + p[0]).setAttribute("aria-pressed", String(!!F[p[1]])); });
     if (document.activeElement !== $("#f-vibe")) $("#f-vibe").value = F.vibe;
     $("#f-vibe-ex").innerHTML = '<span class="muted">Try:</span> ' + VIBE_EXAMPLES.map(function (v) { return '<button class="chip" data-vibe="' + esc(v) + '" aria-pressed="' + (norm(F.vibe) === v) + '">' + esc(v) + "</button>"; }).join("");
+    $("#o-pur").setAttribute("aria-pressed", String(!!F.puree));
+    var pc = {};
+    ALL.forEach(function (d) { if (!disabled[d.shop] && (!F.shops.length || F.shops.indexOf(d.shop) >= 0)) d.pur.forEach(function (k) { pc[k] = (pc[k] || 0) + 1; }); });
+    var pk = Object.keys(pc).sort(function (a, b) { return pc[b] - pc[a] || (a < b ? -1 : 1); });
+    $("#f-pur-of").classList.toggle("hidden", !F.puree);
+    $("#f-pur-of").innerHTML = '<span class="muted">Puree flavor:</span> ' + pk.map(function (k) { return '<button class="chip" data-pureeof="' + esc(k) + '" aria-pressed="' + (F.pureeOf.indexOf(k) >= 0) + '">' + esc(label(k)) + ' <span class="muted">' + pc[k] + "</span></button>"; }).join("");
     $("#f-q").value = F.q; $("#f-sort").value = F.sort;
     // pairings: what usually goes with the chosen base(s)
     var pairs = {}, pool = ALL.filter(function (d) { return !F.bases.length || d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; }); });
@@ -569,6 +584,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
       if (F.bases.length && !d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; })) return false;
       if (F.must.some(function (k) { return d.ings.indexOf(k) < 0; })) return false;
       if (F.avoid.some(function (k) { return d.ings.indexOf(k) >= 0; })) return false;
+      if (F.puree && (!d.pur.length || (F.pureeOf.length && !d.pur.some(function (k) { return F.pureeOf.indexOf(k) >= 0; })))) return false;
       if (F.sf && !d.sf) return false;
       if (F.caf && !d.caf) return false;
       if (F.nocaf && d.caf) return false;
@@ -594,7 +610,8 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
 
   function cardHTML(d, why, isPick) {
     var rec = '<span class="base">' + esc(d.bases.join(" + ")) + "</span>" + d.ings.map(function (k) {
-      return '<span class="plus">+</span><button class="chip ing" data-addmust="' + esc(k) + '" aria-pressed="false" title="Only show drinks with ' + esc(label(k)) + '">' + esc(label(k)) + "</button>";
+      var lab = label(k) + (d.pur.indexOf(k) >= 0 ? " Puree" : "");
+      return '<span class="plus">+</span><button class="chip ing' + (d.pur.indexOf(k) >= 0 ? " pur" : "") + '" data-addmust="' + esc(k) + '" aria-pressed="false" title="Only show drinks with ' + esc(label(k)) + '">' + esc(lab) + "</button>";
     }).join("");
     var badges = [];
     if (d.sf) badges.push('<span class="badge">Sugar free option</span>');
@@ -656,7 +673,8 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button"); if (!t) return;
     var d = t.dataset;
-    if (d.vibe) { F.vibe = norm(F.vibe) === d.vibe ? "" : d.vibe; pick = null; shown = 30; refresh(); }
+    if (d.pureeof) { toggleIn(F.pureeOf, d.pureeof); pick = null; shown = 30; refresh(); }
+    else if (d.vibe) { F.vibe = norm(F.vibe) === d.vibe ? "" : d.vibe; pick = null; shown = 30; refresh(); }
     else if (d.shop) { toggleIn(F.shops, d.shop); pick = null; shown = 30; refresh(); }
     else if (d.mood) { toggleIn(F.moods, d.mood); if (F.moods.length && F.sort === "az") F.sort = "match"; pick = null; shown = 30; refresh(); }
     else if (d.base) { toggleIn(F.bases, d.base); pick = null; shown = 30; refresh(); }
@@ -691,11 +709,12 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   }
   addTyped("#f-must-in", function () { return F.must; });
   addTyped("#f-avoid-in", function () { return F.avoid; });
+  $("#o-pur").addEventListener("click", function () { F.puree = !F.puree; if (!F.puree) F.pureeOf = []; pick = null; shown = 30; refresh(); });
   $("#f-vibe").addEventListener("input", function (e) { F.vibe = e.target.value; pick = null; shown = 30; persist(); renderControls(); renderResults(); });
   $("#f-q").addEventListener("input", function (e) { F.q = e.target.value; pick = null; shown = 30; persist(); renderResults(); });
   $("#f-sort").addEventListener("change", function (e) { F.sort = e.target.value; refresh(); });
   $("#b-more").addEventListener("click", function () { shown += 30; renderResults(); });
-  $("#b-reset").addEventListener("click", function () { F = { shops: F.shops, moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, q: "", vibe: "", sort: "match" }; pick = null; shown = 30; refresh(); });
+  $("#b-reset").addEventListener("click", function () { F = { shops: F.shops, moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, puree: false, pureeOf: [], q: "", vibe: "", sort: "match" }; pick = null; shown = 30; refresh(); });
   $("#b-surprise").addEventListener("click", function () {
     var pool = renderList.length ? renderList : []; if (!pool.length) return;
     // weight toward better matches when moods are chosen
