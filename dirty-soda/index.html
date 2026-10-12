@@ -83,6 +83,10 @@
   .badge { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--soft); color: var(--ink); }
   details { margin-top: 8px; font-size: 14px; }
   details summary { cursor: pointer; color: var(--muted); }
+  .ideas { display: grid; gap: 8px; margin-top: 8px; }
+  .idea { border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 12px; background: var(--soft); }
+  .idea b.t { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
+  .chip.off { opacity: .5; cursor: default; text-decoration: line-through; }
   details.more > summary { font-weight: 600; color: var(--ink); padding: 4px 0; }
   details.more[open] > summary { margin-bottom: 10px; }
   details ul { margin: 6px 0 0; padding-left: 18px; }
@@ -113,6 +117,11 @@
   <!-- FIND -->
   <section id="view-find">
     <div class="panel">
+      <div class="section">
+        <h2>Describe a flavor or vibe</h2>
+        <input type="search" id="f-vibe" placeholder="peach cobbler, pina colada, summer pool party, key lime pie..." autocomplete="off">
+        <div class="row" id="f-vibe-ex" style="margin-top:8px"></div>
+      </div>
       <div class="section">
         <h2>Where are you?</h2>
         <div class="row" id="f-shops"></div>
@@ -162,6 +171,7 @@
         </div>
       </div>
     </div>
+    <div id="f-vibe-out"></div>
     <div class="count"><span id="f-count"></span></div>
     <div class="cards" id="f-results"></div>
     <div style="text-align:center;margin-top:12px"><button class="btn hidden" id="b-more">Show more</button></div>
@@ -287,6 +297,85 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     { id: "light", label: "Light and refreshing", e: "💧", fam: { "Water": 2.5, "Tea": 1.5, "Lemonade": 1.5, "Lemon-Lime": .5 }, sf: 1, neg: { creamy: 1.5 } },
     { id: "classic", label: "Classic comfort", e: "🥤", fam: { "Dr Pepper": 1, "Root Beer": 1.5, "Coke": 1 }, tags: { creamy: .5, dessert: .5 } }
   ];
+  var PROFILES = [
+    { k: ["peach cobbler", "cobbler"], l: "Peach cobbler", w: { peach: 3, vanilla: 2, cinnamon: 2, caramel: 1, butterscotch: 1, "half & half": 1 } },
+    { k: ["pina colada", "colada"], l: "Pina colada", w: { pineapple: 3, coconut: 3, "coconut cream": 2, "pina colada": 3, vanilla: 1 } },
+    { k: ["birthday", "cake batter", "confetti"], l: "Birthday cake", w: { "birthday cake": 3, cupcake: 3, vanilla: 2, "vanilla cream": 2, strawberry: 1, "sweet cream": 1 } },
+    { k: ["key lime", "lime pie"], l: "Key lime pie", w: { lime: 3, cheesecake: 2, vanilla: 2, coconut: 1, "sweet cream": 1 } },
+    { k: ["strawberry shortcake", "shortcake"], l: "Strawberry shortcake", w: { strawberry: 3, vanilla: 2, cupcake: 2, "sweet cream": 2, "vanilla cream": 2 } },
+    { k: ["cherry cola", "cherry coke", "cherry vanilla"], l: "Cherry cola", w: { cherry: 3, vanilla: 1.5, grenadine: 1 }, f: { Coke: 2, "Dr Pepper": 1.5, Pepsi: 1 } },
+    { k: ["shirley temple", "roy rogers"], l: "Shirley Temple", w: { grenadine: 3, cherry: 3 }, f: { "Lemon-Lime": 2 } },
+    { k: ["creamsicle", "dreamsicle", "orange cream"], l: "Creamsicle", w: { orange: 3, vanilla: 3, "half & half": 2, "sweet cream": 2, "whipped cream": 1 }, f: { "Orange Soda": 2 } },
+    { k: ["smore", "s'more", "campfire"], l: "S'mores", w: { "s'mores": 3, "toasted marshmallow": 3, chocolate: 2, caramel: 1 }, f: { "Root Beer": 1 } },
+    { k: ["tiki", "luau", "island", "hawaii", "aloha", "tropical"], l: "Tiki and island", w: { pineapple: 3, coconut: 3, passionfruit: 2.5, guava: 2.5, mango: 2.5, "blue curacao": 2, grenadine: 1, "coconut cream": 1.5 } },
+    { k: ["mojito"], l: "Mojito", w: { lime: 3, mint: 3, lemon: 1, coconut: 1 } },
+    { k: ["margarita", "paloma"], l: "Margarita (no alcohol)", w: { lime: 3, grapefruit: 2, orange: 1.5, tangerine: 1.5, pomegranate: 1 } },
+    { k: ["sangria"], l: "Sangria", w: { pomegranate: 2.5, cranberry: 2.5, orange: 2, strawberry: 2, peach: 1.5, lime: 1 } },
+    { k: ["lemon drop"], l: "Lemon drop", w: { lemon: 3, vanilla: 2, "sweet cream": 1 } },
+    { k: ["berry pie", "mixed berry", "berry"], l: "Mixed berry", w: { strawberry: 2, raspberry: 2, blackberry: 2, blueberry: 2, huckleberry: 2, "mixed berries": 2, vanilla: 1 } },
+    { k: ["blueberry muffin", "muffin"], l: "Blueberry muffin", w: { blueberry: 3, vanilla: 2, almond: 1.5, cinnamon: 1.5, "sweet cream": 1 } },
+    { k: ["banana split", "sundae"], l: "Banana split", w: { banana: 3, strawberry: 2, pineapple: 2, chocolate: 2, "whipped cream": 2, "ice cream": 2, cherry: 1 } },
+    { k: ["caramel apple", "apple pie", "apple"], l: "Caramel apple", w: { "green apple": 3, apple: 3, caramel: 3, "caramel drizzle": 2, cinnamon: 1.5, vanilla: 1 } },
+    { k: ["pumpkin"], l: "Pumpkin spice", w: { "pumpkin spice": 3, "pumpkin cold foam": 2.5, "pumpkin pie sauce": 2.5, cinnamon: 2, maple: 1.5, vanilla: 1 } },
+    { k: ["chai"], l: "Chai latte", w: { "chai spice": 3, cinnamon: 1.5, vanilla: 1, "half & half": 1 } },
+    { k: ["coffee", "mocha", "latte", "java"], l: "Coffee shop", w: { coffee: 3, chocolate: 2, caramel: 2, "classic caramel": 2, vanilla: 1.5, "coconut cream": 1 } },
+    { k: ["chocolate covered strawberr"], l: "Chocolate covered strawberry", w: { chocolate: 3, strawberry: 3, vanilla: 1, "sweet cream": 1 } },
+    { k: ["cookies and cream", "cookie", "oreo"], l: "Cookies and cream", w: { chocolate: 2.5, vanilla: 2.5, cupcake: 1.5, "sweet cream": 2, "vanilla cream": 2 } },
+    { k: ["vanilla coke", "vanilla"], l: "Vanilla", w: { vanilla: 3, "vanilla cream": 2, "sweet cream": 1.5, "half & half": 1.5 } },
+    { k: ["cheesecake"], l: "Cheesecake", w: { cheesecake: 3, strawberry: 1.5, vanilla: 1.5, "sweet cream": 1 } },
+    { k: ["cotton candy", "carnival", "fair"], l: "Carnival", w: { "blue cotton candy": 3, "blue raspberry": 2.5, grape: 1.5, cherry: 1.5, "popping pearls": 1, "whipped cream": 1 } },
+    { k: ["sour patch", "sour candy", "sour"], l: "Sour candy", w: { sour: 3, watermelon: 2, "blue raspberry": 2, lime: 1.5, "green apple": 2 } },
+    { k: ["candy", "gummy", "gummies"], l: "Candy shop", w: { "blue raspberry": 2.5, grape: 2, watermelon: 2, "tiger's blood": 2, "gummy shark": 2, "gummy frog": 2, cherry: 1.5, "blue cotton candy": 2 } },
+    { k: ["sunset", "sunrise"], l: "Tropical sunset", w: { guava: 3, passionfruit: 3, mango: 2, orange: 2, grenadine: 2, pineapple: 1 } },
+    { k: ["spa", "cucumber", "zen", "relax"], l: "Spa day", w: { cucumber: 3, mint: 2.5, lemon: 2, lime: 1.5, pear: 2, "mixed berries": 1 } },
+    { k: ["lavender", "floral", "garden"], l: "Floral", w: { lavender: 3, pear: 2, blueberry: 1.5, lemon: 1.5, peach: 1.5, pomegranate: 1 } },
+    { k: ["fruit punch", "hawaiian punch", "punch"], l: "Fruit punch", w: { strawberry: 2, pineapple: 2, orange: 2, cherry: 2, passionfruit: 2, guava: 2, grenadine: 1.5 } },
+    { k: ["tiger's blood", "tigers blood", "tiger blood"], l: "Tiger's blood", w: { "tiger's blood": 3, coconut: 1.5, strawberry: 1.5, "coconut cream": 1 } },
+    { k: ["root beer float", "float", "ice cream soda"], l: "Soda float", w: { "ice cream": 3, "vanilla ice cream": 3, vanilla: 2, "vanilla cream": 2, "whipped cream": 1.5 }, f: { "Root Beer": 3, "Cream Soda": 2 } },
+    { k: ["butterbeer", "harry potter"], l: "Butterbeer", w: { butterscotch: 3, caramel: 2, vanilla: 2, "whipped cream": 1.5, "vanilla cream": 1.5 }, f: { "Root Beer": 2, "Cream Soda": 1 } },
+    { k: ["holiday", "christmas", "winter", "festive"], l: "Holiday", w: { cranberry: 3, pomegranate: 2.5, cinnamon: 1.5, maple: 1.5, "toasted marshmallow": 1.5, "pumpkin spice": 1, "coconut cream": 1 } },
+    { k: ["summer", "poolside", "bbq", "barbecue"], l: "Summer", w: { pineapple: 2, watermelon: 2.5, lime: 2, strawberry: 1.5, peach: 1.5, coconut: 1.5, mango: 1.5, lemon: 1.5 }, f: { Lemonade: 1.5, Water: 1, "Lemon-Lime": 1 } },
+    { k: ["spring", "easter", "garden party"], l: "Spring", w: { lavender: 2, peach: 2.5, pear: 2, strawberry: 2.5, raspberry: 1.5, lemon: 1.5, vanilla: 1 } },
+    { k: ["beach", "vacation", "getaway"], l: "Beach day", w: { coconut: 3, pineapple: 2.5, mango: 2.5, "blue curacao": 2, peach: 1.5, watermelon: 1.5, "coconut cream": 1.5 } },
+    { k: ["pool party", "pool", "splash"], l: "Pool party", w: { "blue curacao": 3, "blue raspberry": 2.5, pineapple: 2, coconut: 2, lime: 1.5 }, f: { "Lemon-Lime": 1.5 } },
+    { k: ["spicy", "cinnamon"], l: "Cinnamon kick", w: { cinnamon: 3, "brown sugar cinnamon": 2.5, cherry: 1.5, "sweet cream": 1 } },
+    { k: ["date night", "romantic", "valentine"], l: "Date night", w: { raspberry: 2.5, strawberry: 2.5, chocolate: 2, vanilla: 2, cherry: 1.5, "vanilla cream": 1.5, pomegranate: 1.5 } },
+    { k: ["pick me up", "energize", "energy", "workout", "gym", "study"], l: "Pick me up", w: { "blue raspberry": 1.5, passionfruit: 1.5, grapefruit: 1.5, "fresh lime": 1, lime: 1.5, strawberry: 1.5, pomegranate: 1.5 }, f: { Energy: 3, Tea: 1 } },
+    { k: ["comfort", "cozy", "rainy", "snow day"], l: "Cozy comfort", w: { vanilla: 2, caramel: 2, butterscotch: 2, cinnamon: 2, "toasted marshmallow": 2, "half & half": 1.5, "whipped cream": 1.5, chocolate: 1.5 }, f: { "Root Beer": 1.5, "Dr Pepper": 1 } },
+    { k: ["refresh", "light", "crisp", "hydrat", "clean"], l: "Light and crisp", w: { lime: 2.5, lemon: 2.5, cucumber: 2, mint: 2, grapefruit: 2, "mixed berries": 1.5, watermelon: 1.5 }, f: { Water: 2.5, Lemonade: 2, Tea: 1 } }
+  ];
+  var VIBE_EXAMPLES = ["peach cobbler", "pina colada", "birthday cake", "key lime pie", "summer pool party", "caramel apple", "creamsicle", "tiki", "date night"];
+  var PROF = null;
+  function norm(s) { return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9&' ]/g, " ").replace(/\s+/g, " ").trim(); }
+  function reEsc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+  function buildProfile(text) {
+    var t = norm(text); if (!t) return null;
+    var w = {}, f = {}, labels = [];
+    PROFILES.forEach(function (p) {
+      if (p.k.some(function (k) { return t.indexOf(k) >= 0; })) {
+        labels.push(p.l);
+        Object.keys(p.w).forEach(function (k) { w[k] = Math.max(w[k] || 0, p.w[k]); });
+        if (p.f) Object.keys(p.f).forEach(function (b) { f[b] = Math.max(f[b] || 0, p.f[b]); });
+      }
+    });
+    Object.keys(ING_FREQ).forEach(function (k) {
+      if (k.length >= 3 && new RegExp("\\b" + reEsc(k) + "s?\\b").test(t)) { w[k] = Math.max(w[k] || 0, 2.5); if (labels.indexOf(label(k)) < 0 && !labels.length) labels.push(label(k)); }
+    });
+    return { t: t, w: w, f: f, labels: labels, empty: !Object.keys(w).length };
+  }
+  function vibeScore(d) {
+    if (!PROF) return { s: 0, m: [] };
+    if (PROF.empty) {
+      var words = PROF.t.split(" ").filter(function (x) { return x.length >= 3; });
+      var hit = words.length && words.every(function (x) { return d.hay.indexOf(x) >= 0; });
+      return { s: hit ? 2 : 0, m: [] };
+    }
+    var s = 0, m = [], un = 0;
+    d.ings.forEach(function (k) { if (PROF.w[k]) { s += PROF.w[k]; m.push(k); } else un++; });
+    d.fams.forEach(function (b) { if (PROF.f[b]) s += PROF.f[b]; });
+    if (m.length) s -= 0.3 * un;
+    return { s: s, m: m };
+  }
   var BASE_ORDER = ["Dr Pepper", "Coke", "Pepsi", "Mtn Dew", "Lemon-Lime", "Root Beer", "Fresca", "Ginger Ale", "Lemonade", "Orange Soda", "Cream Soda", "Tea", "Water", "Energy", "Protein", "Sports Drink", "Frozen"];
 
   /* ---------- parsing ---------- */
@@ -364,7 +453,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   function shopStyle(s) { return "background:hsl(" + hue(s) + " 55% 38%)"; }
 
   /* ---------- filter state ---------- */
-  var F = Object.assign({ shops: [], moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, q: "", sort: "match" }, saved);
+  var F = Object.assign({ shops: [], moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, q: "", vibe: "", sort: "match" }, saved);
   function persist() { store.set("ds_filters", F); }
   var shown = 30, pick = null;
 
@@ -386,6 +475,8 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     $("#f-must").innerHTML = F.must.map(function (k) { return '<button class="chip x" data-unmust="' + esc(k) + '" aria-pressed="true">' + esc(label(k)) + "</button>"; }).join("");
     $("#f-avoid").innerHTML = F.avoid.map(function (k) { return '<button class="chip x" data-unavoid="' + esc(k) + '" aria-pressed="true">' + esc(label(k)) + "</button>"; }).join("");
     [["o-sf", "sf"], ["o-caf", "caf"], ["o-nocaf", "nocaf"], ["o-fav", "fav"], ["o-new", "fresh"]].forEach(function (p) { $("#" + p[0]).setAttribute("aria-pressed", String(!!F[p[1]])); });
+    if (document.activeElement !== $("#f-vibe")) $("#f-vibe").value = F.vibe;
+    $("#f-vibe-ex").innerHTML = '<span class="muted">Try:</span> ' + VIBE_EXAMPLES.map(function (v) { return '<button class="chip" data-vibe="' + esc(v) + '" aria-pressed="' + (norm(F.vibe) === v) + '">' + esc(v) + "</button>"; }).join("");
     $("#f-q").value = F.q; $("#f-sort").value = F.sort;
     // pairings: what usually goes with the chosen base(s)
     var pairs = {}, pool = ALL.filter(function (d) { return !F.bases.length || d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; }); });
@@ -396,7 +487,8 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   }
 
   function score(d) {
-    if (!F.moods.length) return { s: 0, why: [] };
+    var v = vibeScore(d), vwhy = v.m.length ? ["Matches: " + v.m.slice(0, 5).map(label).join(", ")] : [];
+    if (!F.moods.length) return { s: v.s, ms: 0, vs: v.s, why: vwhy };
     var total = 0, why = [];
     F.moods.forEach(function (id) {
       var m = MOODS.filter(function (x) { return x.id === id; })[0], s = 0;
@@ -410,7 +502,63 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
       if (s > 0.9) why.push(m.e + " " + m.label);
       total += s;
     });
-    return { s: total / F.moods.length, why: why };
+    var ms = total / F.moods.length;
+    return { s: ms + v.s, ms: ms, vs: v.s, why: why.concat(vwhy) };
+  }
+
+  var CREAMS = ["vanilla cream", "coconut cream", "sweet cream", "half & half"], BRIGHTS = ["lime", "lemon"];
+  var FAM_LABEL = { "Lemon-Lime": "Sprite / 7Up", "Orange Soda": "Orange soda", "Cream Soda": "Cream soda" };
+  function renderVibe() {
+    var out = $("#f-vibe-out");
+    if (!PROF) { out.innerHTML = ""; return; }
+    if (PROF.empty) { out.innerHTML = '<div class="panel muted">No flavor profile for "' + esc(F.vibe) + '" yet, so I tried a plain name and ingredient search. Try a dessert, a drink, a place or a season.</div>'; return; }
+    var scope = ALL.filter(function (d) { return !disabled[d.shop] && (!F.shops.length || F.shops.indexOf(d.shop) >= 0); });
+    var avail = {}, shopIngs = {}, scopeFams = {};
+    scope.forEach(function (d) { (shopIngs[d.shop] = shopIngs[d.shop] || {}); d.ings.forEach(function (k) { avail[k] = 1; shopIngs[d.shop][k] = 1; }); d.fams.forEach(function (b) { scopeFams[b] = 1; }); });
+    var keys = Object.keys(PROF.w).sort(function (a, b) { return PROF.w[b] - PROF.w[a]; });
+    var ranked = keys.filter(function (k) { return avail[k]; });
+    var famScore = {};
+    Object.keys(PROF.f).forEach(function (b) { famScore[b] = PROF.f[b] + 1; });
+    scope.map(function (d) { return { d: d, v: vibeScore(d).s }; }).sort(function (a, b) { return b.v - a.v; }).slice(0, 12).forEach(function (x) { if (x.v > 0) x.d.fams.forEach(function (b) { famScore[b] = (famScore[b] || 0) + 0.5; }); });
+    var bases = Object.keys(famScore).filter(function (b) {
+      if (!scopeFams[b] || famScore[b] < 1 || ["Protein", "Frozen", "Sports Drink"].indexOf(b) >= 0) return false;
+      return b !== "Energy" || PROF.f.Energy;
+    }).sort(function (a, b) { return famScore[b] - famScore[a]; }).slice(0, 2);
+    // ingredients that most often ride along with the top flavor on real menus
+    var pairs = {}, anchor = ranked[0];
+    if (anchor) scope.forEach(function (d) { if (d.ings.indexOf(anchor) >= 0) d.ings.forEach(function (k) { if (k !== anchor) pairs[k] = (pairs[k] || 0) + 1; }); });
+    var pairList = Object.keys(pairs).sort(function (a, b) { return pairs[b] - pairs[a] || (a < b ? -1 : 1); }).slice(0, 6);
+    var chips = keys.slice(0, 10).map(function (k) {
+      return avail[k] ? '<button class="chip" data-addmust="' + esc(k) + '" aria-pressed="false" title="Only show drinks with ' + esc(label(k)) + '">' + esc(label(k)) + "</button>" : '<span class="chip static off" title="Not on the selected menus">' + esc(label(k)) + "</span>";
+    }).join("");
+    var ideas = [];
+    function shopsWith(list) { return Object.keys(shopIngs).filter(function (s) { return list.every(function (k) { return shopIngs[s][k]; }); }); }
+    function add(title, base, list) {
+      if (!base || list.length < 2) return;
+      var sig = base + "|" + list.slice().sort().join();
+      if (ideas.some(function (i) { return i.sig === sig; })) return;
+      ideas.push({ sig: sig, title: title, base: base, list: list, shops: shopsWith(list) });
+    }
+    var core = ranked.slice(0, 3);
+    if (ranked.length === 1) { core = ranked.concat(pairList.filter(function (k) { return k !== ranked[0]; }).slice(0, 2)); ranked = core.slice(); }
+    if (bases[0]) {
+      add("Closest to the vibe", bases[0], core);
+      if (bases[1]) add("Same flavors on " + (FAM_LABEL[bases[1]] || bases[1]), bases[1], core);
+      var cr = CREAMS.filter(function (k) { return avail[k] && core.indexOf(k) < 0; })[0];
+      if (cr && ranked.length >= 2) add("Creamier twist", bases[0], ranked.slice(0, 2).concat(cr));
+      var br = BRIGHTS.filter(function (k) { return avail[k] && core.indexOf(k) < 0; })[0];
+      if (br && ranked.length >= 2) add("Brighter twist", bases[0], ranked.slice(0, 2).concat(br));
+    }
+    var missing = keys.filter(function (k) { return !avail[k]; }).slice(0, 4);
+    out.innerHTML = '<div class="panel"><h2>Flavor profile: ' + esc(PROF.labels.join(" + ") || F.vibe) + "</h2>" +
+      '<div class="row">' + chips + "</div>" +
+      (pairList.length ? '<p class="muted" style="margin:8px 0 0">Often paired with ' + esc(label(anchor)) + ": " + pairList.map(function (k) { return '<button class="chip" data-addmust="' + esc(k) + '" aria-pressed="false">' + esc(label(k)) + "</button>"; }).join(" ") + "</p>" : "") +
+      (missing.length ? '<p class="muted" style="margin:8px 0 0">Not on ' + (F.shops.length ? "the selected menus" : "any menu here") + ": " + esc(missing.map(label).join(", ")) + ".</p>" : "") +
+      (ideas.length ? '<h2 style="margin-top:14px">Ideas to try</h2><div class="ideas">' + ideas.map(function (i) {
+        return '<div class="idea"><b class="t">' + esc(i.title) + '</b><div class="recipe"><span class="base">' + esc(FAM_LABEL[i.base] || i.base) + "</span>" +
+          i.list.map(function (k) { return '<span class="plus">+</span><span class="chip static">' + esc(label(k)) + "</span>"; }).join("") + "</div>" +
+          '<div class="muted" style="margin-top:6px;font-size:13px">' + (i.shops.length ? "All of these add-ins appear on the menu at " + esc(i.shops.join(", ")) + "." : "Mixes add-ins from different menus.") + " You may need to order it custom.</div></div>";
+      }).join("") + "</div>" : "") + "</div>";
   }
 
   function filtered() {
@@ -468,9 +616,12 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   }
 
   function renderResults() {
-    var list = filtered().map(function (d) { var sc = score(d); return { d: d, s: sc.s, why: sc.why }; });
-    if (F.moods.length) list = list.filter(function (x) { return x.s > 0.5; });
-    if (F.sort === "match" && F.moods.length) list.sort(function (a, b) { return b.s - a.s || (a.d.name < b.d.name ? -1 : 1); });
+    PROF = F.vibe && F.vibe.trim() ? buildProfile(F.vibe) : null;
+    var ranking = !!(F.moods.length || PROF);
+    var list = filtered().map(function (d) { var sc = score(d); return { d: d, s: sc.s, ms: sc.ms, vs: sc.vs, why: sc.why }; });
+    list = list.filter(function (x) { return (!F.moods.length || x.ms > 0.5) && (!PROF || x.vs > 0.5); });
+    renderVibe();
+    if (F.sort === "match" && ranking) list.sort(function (a, b) { return b.s - a.s || (a.d.name < b.d.name ? -1 : 1); });
     else if (F.sort === "shop") list.sort(function (a, b) { return a.d.shop < b.d.shop ? -1 : a.d.shop > b.d.shop ? 1 : (a.d.name < b.d.name ? -1 : 1); });
     else list.sort(function (a, b) { return a.d.name.toLowerCase() < b.d.name.toLowerCase() ? -1 : 1; });
 
@@ -481,12 +632,13 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     }
     html += list.slice(0, shown).filter(function (x) { return x.d.id !== pick; }).map(function (x) { return cardHTML(x.d, x.why, false); }).join("");
     $("#f-results").innerHTML = html || '<div class="panel muted">Nothing matches. Try removing a filter or a must-have ingredient.</div>';
-    $("#f-count").textContent = list.length + (list.length === 1 ? " drink" : " drinks") + (F.moods.length ? ", best matches first" : "");
+    $("#f-count").textContent = list.length + (list.length === 1 ? " drink" : " drinks") + (ranking ? ", best matches first" : "");
     $("#b-more").classList.toggle("hidden", list.length <= shown);
     $("#b-more").textContent = "Show more (" + (list.length - shown) + " left)";
     renderList = list;
   }
   var renderList = [];
+  function ranking_now() { return !!(F.moods.length || PROF); }
 
   function refresh() { if (F.bases.length || F.must.length || F.avoid.length || F.sf || F.caf || F.nocaf || F.fav || F.fresh) $("#f-more").open = true; persist(); renderControls(); renderResults(); }
 
@@ -504,7 +656,8 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button"); if (!t) return;
     var d = t.dataset;
-    if (d.shop) { toggleIn(F.shops, d.shop); pick = null; shown = 30; refresh(); }
+    if (d.vibe) { F.vibe = norm(F.vibe) === d.vibe ? "" : d.vibe; pick = null; shown = 30; refresh(); }
+    else if (d.shop) { toggleIn(F.shops, d.shop); pick = null; shown = 30; refresh(); }
     else if (d.mood) { toggleIn(F.moods, d.mood); if (F.moods.length && F.sort === "az") F.sort = "match"; pick = null; shown = 30; refresh(); }
     else if (d.base) { toggleIn(F.bases, d.base); pick = null; shown = 30; refresh(); }
     else if (d.unmust) { toggleIn(F.must, d.unmust); pick = null; refresh(); }
@@ -538,14 +691,15 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   }
   addTyped("#f-must-in", function () { return F.must; });
   addTyped("#f-avoid-in", function () { return F.avoid; });
+  $("#f-vibe").addEventListener("input", function (e) { F.vibe = e.target.value; pick = null; shown = 30; persist(); renderControls(); renderResults(); });
   $("#f-q").addEventListener("input", function (e) { F.q = e.target.value; pick = null; shown = 30; persist(); renderResults(); });
   $("#f-sort").addEventListener("change", function (e) { F.sort = e.target.value; refresh(); });
   $("#b-more").addEventListener("click", function () { shown += 30; renderResults(); });
-  $("#b-reset").addEventListener("click", function () { F = { shops: F.shops, moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, q: "", sort: "match" }; pick = null; shown = 30; refresh(); });
+  $("#b-reset").addEventListener("click", function () { F = { shops: F.shops, moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, q: "", vibe: "", sort: "match" }; pick = null; shown = 30; refresh(); });
   $("#b-surprise").addEventListener("click", function () {
     var pool = renderList.length ? renderList : []; if (!pool.length) return;
     // weight toward better matches when moods are chosen
-    var w = pool.map(function (x) { return F.moods.length ? Math.max(x.s, 0.1) : 1; }), sum = w.reduce(function (a, b) { return a + b; }, 0), r = Math.random() * sum, i = 0;
+    var w = pool.map(function (x) { return ranking_now() ? Math.max(x.s, 0.1) : 1; }), sum = w.reduce(function (a, b) { return a + b; }, 0), r = Math.random() * sum, i = 0;
     while (i < pool.length - 1 && r > w[i]) { r -= w[i]; i++; }
     pick = pool[i].d.id; renderResults(); window.scrollTo({ top: $("#f-results").offsetTop - 60, behavior: "smooth" });
   });
