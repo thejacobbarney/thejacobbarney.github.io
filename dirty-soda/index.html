@@ -87,6 +87,8 @@
   .idea { border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 12px; background: var(--soft); }
   .idea b.t { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
   .chip.pur { border-color: var(--accent); }
+  .chip.new { border-color: var(--good); color: var(--good); font-weight: 700; }
+  .chip.gone { text-decoration: line-through; opacity: .6; }
   .chip.off { opacity: .5; cursor: default; text-decoration: line-through; }
   details.more > summary { font-weight: 600; color: var(--ink); padding: 4px 0; }
   details.more[open] > summary { margin-bottom: 10px; }
@@ -112,6 +114,7 @@
 
   <nav class="tabs" role="tablist">
     <button role="tab" id="tab-find" aria-selected="true">Find a drink</button>
+    <button role="tab" id="tab-remix" aria-selected="false">🎲 Remix</button>
     <button role="tab" id="tab-menus" aria-selected="false">Menus</button>
   </nav>
 
@@ -182,6 +185,25 @@
     <div class="count"><span id="f-count"></span></div>
     <div class="cards" id="f-results"></div>
     <div style="text-align:center;margin-top:12px"><button class="btn hidden" id="b-more">Show more</button></div>
+  </section>
+
+  <!-- REMIX -->
+  <section id="view-remix" class="hidden">
+    <div class="panel">
+      <h2>Remix generator</h2>
+      <p class="muted" style="margin-top:0">Invents new drinks by taking a popular one and changing it: add a flavor, remove one, swap one, or swap the soda. Flavors are only used where they really pair on these menus. It follows the shop, base and skip filters from the Find tab, and your vibe or mood if you set one.</p>
+      <div class="row" id="r-modes"></div>
+      <div class="muted" id="r-scope" style="margin-top:8px"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="r-go">🎲 Remix</button>
+        <button class="btn hidden" id="r-clear">Use popular drinks again</button>
+      </div>
+    </div>
+    <div class="cards" id="r-results"></div>
+    <div class="panel" style="margin-top:14px">
+      <h2>Saved remixes</h2>
+      <div id="r-saved"></div>
+    </div>
   </section>
 
   <!-- MENUS -->
@@ -458,6 +480,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     ALL.forEach(function (d) { d.ings.forEach(function (k) { ING_FREQ[k] = (ING_FREQ[k] || 0) + 1; }); });
     var dl = $("#ing-list");
     dl.innerHTML = Object.keys(ING_FREQ).sort().map(function (k) { return '<option value="' + esc(label(k)) + '">'; }).join("");
+    buildRemixIndex();
     $("#stats").textContent = ALL.length + " drinks from " + SHOPS.length + " shops, " + Object.keys(ING_FREQ).length + " ingredients";
   }
 
@@ -627,6 +650,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     var sim = similarTo(d);
     return '<article class="card' + (isPick ? " pick" : "") + '" data-id="' + esc(d.id) + '">' +
       '<div class="top"><h3>' + esc(d.name) + '</h3><div class="icons">' +
+      '<button class="icon" data-remix="' + esc(d.id) + '" title="Remix this drink" aria-label="Remix this drink">🎲</button>' +
       '<button class="icon' + (tried[d.id] ? " on" : "") + '" data-tried="' + esc(d.id) + '" title="Mark as tried" aria-label="Mark as tried">✓</button>' +
       '<button class="icon' + (favs[d.id] ? " on" : "") + '" data-fav="' + esc(d.id) + '" title="Favorite" aria-label="Favorite">' + (favs[d.id] ? "♥" : "♡") + "</button></div></div>" +
       '<div class="meta"><span class="shop" style="' + shopStyle(d.shop) + '">' + esc(d.shop) + "</span><span>" + esc(d.cat) + "</span>" + badges.join("") + "</div>" +
@@ -675,11 +699,172 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     }).join("");
   }
 
+  /* ---------- remix generator ---------- */
+  var PAIR = {}, FAMPAIR = {}, REP_BASE = {}, EXIST = {}, POP = {};
+  function pk(a, b) { return a < b ? a + "|" + b : b + "|" + a; }
+  function sig(fam, ings) { return fam + "|" + ings.slice().sort().join(","); }
+  function buildRemixIndex() {
+    PAIR = {}; FAMPAIR = {}; REP_BASE = {}; EXIST = {}; POP = {};
+    var baseCount = {};
+    ALL.forEach(function (d) {
+      for (var i = 0; i < d.ings.length; i++) for (var j = i + 1; j < d.ings.length; j++) { var key = pk(d.ings[i], d.ings[j]); PAIR[key] = (PAIR[key] || 0) + 1; }
+      d.fams.forEach(function (f) { d.ings.forEach(function (k) { FAMPAIR[f + "|" + k] = (FAMPAIR[f + "|" + k] || 0) + 1; }); });
+      if (d.fams.length === 1 && d.bases.length === 1) { var c = (baseCount[d.fams[0]] = baseCount[d.fams[0]] || {}); c[d.bases[0]] = (c[d.bases[0]] || 0) + 1; }
+      d.fams.forEach(function (f) { EXIST[sig(f, d.ings)] = 1; });
+    });
+    Object.keys(baseCount).forEach(function (f) { var c = baseCount[f]; REP_BASE[f] = Object.keys(c).sort(function (a, b) { return c[b] - c[a]; })[0]; });
+  }
+  function popularity(d) {
+    if (POP[d.id] == null) POP[d.id] = 1 + similarTo(d).length * 0.7 + (d.board ? 0.5 : 0);
+    return POP[d.id] + (favs[d.id] ? 2 : 0);
+  }
+  function tagsOf(k) { return Object.keys(TAG_RULES).filter(function (t) { return TAG_RULES[t].test(k); }); }
+  function rand(n) { return Math.floor(Math.random() * n); }
+  function pickW(items, wf) {
+    var w = items.map(wf), sum = w.reduce(function (a, b) { return a + b; }, 0); if (!items.length || sum <= 0) return null;
+    var r = Math.random() * sum, i = 0; while (i < items.length - 1 && r > w[i]) { r -= w[i]; i++; } return items[i];
+  }
+  var ADJ = ["Electric", "Sunset", "Velvet", "Wild", "Lucky", "Midnight", "Sweet", "Cosmic", "Neon", "Cozy", "Golden", "Secret", "Lazy", "Sparkling", "Rebel"];
+  var NOUN = ["Fizz", "Rush", "Dream", "Breeze", "Crush", "Twist", "Splash", "Float", "Fling", "Spritz", "Surprise", "Sip"];
+  function nameFor(ings) {
+    var lead = ings.length ? label(ings[rand(Math.min(ings.length, 2))]) : "House";
+    return ADJ[rand(ADJ.length)] + " " + lead + " " + NOUN[rand(NOUN.length)];
+  }
+  var TOPPING = /stick|drizzle|gummy|popping|protein|sauce|foam|whipped|ice cream|^sour$/;
+  var RMODES = [["any", "Surprise me"], ["add", "Add a flavor"], ["swap", "Swap a flavor"], ["remove", "Remove a flavor"], ["base", "Swap the soda"]];
+  var R = { mode: "any", seed: null, results: [] };
+  var remixes = store.get("ds_remixes", []);
+
+  function remixScope() {
+    return ALL.filter(function (d) { return !disabled[d.shop] && (!F.shops.length || F.shops.indexOf(d.shop) >= 0); });
+  }
+  function remixOnce(src, mode, scope, avail, scopeFams) {
+    var out = { src: src, fam: src.fams[0], base: src.bases.join(" + "), ings: src.ings.slice(), added: [], removed: [], swapped: [], baseChange: null };
+    function weight(k, others) {
+      var w = 0; others.forEach(function (i) { w += PAIR[pk(i, k)] || 0; });
+      if (w <= 0) return 0;
+      w = Math.sqrt(w) + 0.3;
+      if (PROF && !PROF.empty && PROF.w[k]) w += PROF.w[k] * 0.6;
+      F.moods.forEach(function (id) { var m = MOODS.filter(function (x) { return x.id === id; })[0]; if (m.tags) Object.keys(m.tags).forEach(function (t) { if (TAG_RULES[t] && TAG_RULES[t].test(k)) w += m.tags[t] * 0.4; }); });
+      return w;
+    }
+    var hasCream = function (list) { return list.some(function (i) { return TAG_RULES.creamy.test(i); }); };
+    function cands(exclude, others, tagFilter) {
+      return avail.filter(function (k) {
+        if (exclude.indexOf(k) >= 0 || F.avoid.indexOf(k) >= 0 || TOPPING.test(k)) return false;
+        if (TAG_RULES.creamy.test(k) && hasCream(others)) return false;
+        if (tagFilter && !tagFilter.some(function (t) { return TAG_RULES[t].test(k); })) return false;
+        return weight(k, others) > 0;
+      });
+    }
+    var op = mode === "any" ? ["add", "swap", "remove", "base", "swap", "add"][rand(6)] : mode;
+    if (op === "add") {
+      if (src.ings.length >= 5) return null;
+      var k = pickW(cands(src.ings, src.ings), function (x) { return weight(x, src.ings); }); if (!k) return null;
+      out.ings.push(k); out.added.push(k);
+    } else if (op === "remove") {
+      if (src.ings.length < 3) return null;
+      var r = src.ings[rand(src.ings.length)];
+      out.ings = src.ings.filter(function (x) { return x !== r; }); out.removed.push(r);
+    } else if (op === "swap") {
+      if (!src.ings.length) return null;
+      var rm = src.ings[rand(src.ings.length)], rest = src.ings.filter(function (x) { return x !== rm; }), tg = tagsOf(rm);
+      var pool = cands(src.ings, rest, tg.length ? tg : null);
+      if (!pool.length) pool = cands(src.ings, rest, null);
+      var nk = pickW(pool, function (x) { return weight(x, rest); }); if (!nk) return null;
+      out.ings = rest.concat(nk); out.swapped.push([rm, nk]);
+    } else {
+      var skip = ["Protein", "Frozen", "Sports Drink", "Hot Chocolate", "Energy"];
+      if (skip.indexOf(src.fams[0]) >= 0) return null;
+      var fams = Object.keys(scopeFams).filter(function (f) { return skip.indexOf(f) < 0 && src.fams.indexOf(f) < 0; });
+      var nf = pickW(fams, function (f) { var w = 0.2; src.ings.forEach(function (i) { w += FAMPAIR[f + "|" + i] || 0; }); return w; }); if (!nf) return null;
+      out.baseChange = [src.bases.join(" + "), REP_BASE[nf] || nf]; out.base = REP_BASE[nf] || nf; out.fam = nf;
+    }
+    if (out.ings.some(function (k) { return F.avoid.indexOf(k) >= 0; })) return null;
+    if (!out.ings.length) return null;
+    out.sig = sig(out.fam, out.ings);
+    if (EXIST[out.sig] || out.sig === sig(src.fams[0], src.ings)) return null;
+    return out;
+  }
+  function describeChange(r) {
+    var p = [];
+    r.added.forEach(function (k) { p.push("Added " + label(k)); });
+    r.removed.forEach(function (k) { p.push("Removed " + label(k)); });
+    r.swapped.forEach(function (s) { p.push("Swapped " + label(s[0]) + " for " + label(s[1])); });
+    if (r.baseChange) p.push("Swapped " + r.baseChange[0] + " for " + r.baseChange[1]);
+    return p.join(", ");
+  }
+  function generateRemixes() {
+    PROF = F.vibe && F.vibe.trim() ? buildProfile(F.vibe) : null;
+    var scope = remixScope(), avail = {}, scopeFams = {};
+    scope.forEach(function (d) { d.ings.forEach(function (k) { avail[k] = 1; }); d.fams.forEach(function (f) { scopeFams[f] = 1; }); });
+    avail = Object.keys(avail);
+    var sources = R.seed ? [R.seed] : scope.filter(function (d) { return d.ings.length >= 2 && d.fams.length && ["Protein", "Hot Chocolate", "Frozen"].indexOf(d.fams[0]) < 0 && (!F.bases.length || d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; })); });
+    var res = [], seen = {}, tries = 0;
+    while (res.length < 4 && tries < 400 && sources.length) {
+      tries++;
+      var src = R.seed ? R.seed : pickW(sources, popularity);
+      var r = remixOnce(src, R.mode, scope, avail, scopeFams);
+      if (!r || seen[r.sig]) continue;
+      if (tries < 250 && F.must.some(function (k) { return r.ings.indexOf(k) < 0; })) continue;
+      seen[r.sig] = 1; r.name = nameFor(r.ings); res.push(r);
+    }
+    R.results = res;
+  }
+  function shopsWithAll(list) {
+    var by = {}; ALL.forEach(function (d) { if (disabled[d.shop]) return; var s = (by[d.shop] = by[d.shop] || {}); d.ings.forEach(function (k) { s[k] = 1; }); });
+    return Object.keys(by).filter(function (s) { return list.every(function (k) { return by[s][k]; }); });
+  }
+  function orderText(base, ings) { return base + " with " + ings.map(label).join(", "); }
+  function renderRemix() {
+    $("#r-modes").innerHTML = RMODES.map(function (m) { return '<button class="chip" data-rmode="' + m[0] + '" aria-pressed="' + (R.mode === m[0]) + '">' + m[1] + "</button>"; }).join("");
+    var bits = [];
+    bits.push(F.shops.length ? "Shops: " + F.shops.join(", ") : "All shops");
+    if (F.bases.length) bits.push("Sodas: " + F.bases.join(", "));
+    if (F.avoid.length) bits.push("Skipping: " + F.avoid.map(label).join(", "));
+    if (F.must.length) bits.push("Wanting: " + F.must.map(label).join(", "));
+    if (F.vibe && F.vibe.trim()) bits.push("Vibe: " + F.vibe.trim());
+    if (F.moods.length) bits.push("Mood: " + F.moods.map(function (id) { return MOODS.filter(function (m) { return m.id === id; })[0].label; }).join(", "));
+    $("#r-scope").textContent = bits.join(" · ") + (R.seed ? "" : ". Starting from popular drinks.");
+    if (R.seed) $("#r-scope").innerHTML = esc(bits.join(" · ")) + ". Remixing <b>" + esc(R.seed.name) + "</b>" + (R.seed.shop ? " (" + esc(R.seed.shop) + ")" : "") + ".";
+    $("#r-clear").classList.toggle("hidden", !R.seed);
+    $("#r-results").innerHTML = R.results.length ? R.results.map(function (r, i) {
+      var shops = shopsWithAll(r.ings);
+      var chips = r.ings.map(function (k) {
+        var isNew = r.added.indexOf(k) >= 0 || r.swapped.some(function (s) { return s[1] === k; });
+        var pu = r.src.pur && r.src.pur.indexOf(k) >= 0 ? " Puree" : "";
+        return '<span class="plus">+</span><span class="chip static' + (isNew ? " new" : "") + '">' + esc(label(k) + pu) + (isNew ? " (new)" : "") + "</span>";
+      }).join("");
+      var gone = r.removed.concat(r.swapped.map(function (s) { return s[0]; })).map(function (k) { return '<span class="chip static gone">' + esc(label(k)) + "</span>"; }).join(" ");
+      return '<article class="card pick"><div class="top"><h3>' + esc(r.name) + "</h3></div>" +
+        '<div class="meta"><span>Remix of <b>' + esc(r.src.name) + "</b>" + (r.src.shop ? " (" + esc(r.src.shop) + ")" : "") + "</span></div>" +
+        '<div class="recipe"><span class="base' + (r.baseChange ? " " : "") + '">' + esc(r.base) + "</span>" + chips + "</div>" +
+        '<div class="why">' + esc(describeChange(r)) + "</div>" + (gone ? '<div style="margin-top:6px">' + gone + "</div>" : "") +
+        '<div class="muted" style="margin-top:6px;font-size:13px">' + (shops.length ? "Every ingredient is on the menu at " + esc(shops.join(", ")) + "." : "Mixes ingredients from different menus.") + " You may need to order it custom.</div>" +
+        '<div class="row" style="margin-top:8px"><button class="btn small" data-rsave="' + i + '">♡ Save</button><button class="btn small" data-rcopy="' + i + '">Copy order</button><button class="btn small" data-ragain="' + i + '">Remix this one</button></div></article>';
+    }).join("") : '<div class="panel muted">Tap Remix to generate new drinks.</div>';
+    $("#r-saved").innerHTML = remixes.length ? remixes.map(function (s, i) {
+      return '<div class="menu-row"><div><b>' + esc(s.name) + '</b><div class="note">' + esc(orderText(s.base, s.ings)) + "</div><div class=\"note\">From " + esc(s.from) + ": " + esc(s.change) + '</div></div><div class="row"><button class="btn small" data-rscopy="' + i + '">Copy</button><button class="btn small danger" data-rsdel="' + i + '">Delete</button></div></div>';
+    }).join("") : '<p class="muted" style="margin:0">Nothing saved yet.</p>';
+  }
+  function copyText(t, btn) {
+    var done = function () { if (btn) { var o = btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = o; }, 1200); } };
+    if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, function () { window.prompt("Copy this order:", t); }); else window.prompt("Copy this order:", t);
+  }
+  function runRemix() { generateRemixes(); renderRemix(); }
+
   /* ---------- events ---------- */
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button"); if (!t) return;
     var d = t.dataset;
-    if (d.pureeof) { toggleIn(F.pureeOf, d.pureeof); pick = null; shown = 30; refresh(); }
+    if (d.rmode) { R.mode = d.rmode; runRemix(); }
+    else if (d.remix) { var sd = ALL.filter(function (x) { return x.id === d.remix; })[0]; if (sd) { R.seed = sd; showTab("remix"); runRemix(); window.scrollTo(0, 0); } }
+    else if (d.ragain) { var rr = R.results[+d.ragain]; if (rr) { R.seed = { name: rr.name, shop: "", bases: [rr.base], fams: [rr.fam], ings: rr.ings.slice(), pur: rr.src.pur || [] }; runRemix(); window.scrollTo(0, 0); } }
+    else if (d.rsave) { var sv = R.results[+d.rsave]; if (sv) { remixes.unshift({ name: sv.name, base: sv.base, ings: sv.ings, from: sv.src.name + (sv.src.shop ? " (" + sv.src.shop + ")" : ""), change: describeChange(sv) }); remixes = remixes.slice(0, 50); store.set("ds_remixes", remixes); t.textContent = "♥ Saved"; renderRemix(); } }
+    else if (d.rcopy) { var cv = R.results[+d.rcopy]; if (cv) copyText(orderText(cv.base, cv.ings), t); }
+    else if (d.rscopy) { var cs = remixes[+d.rscopy]; if (cs) copyText(orderText(cs.base, cs.ings), t); }
+    else if (d.rsdel) { remixes.splice(+d.rsdel, 1); store.set("ds_remixes", remixes); renderRemix(); }
+    else if (d.pureeof) { toggleIn(F.pureeOf, d.pureeof); pick = null; shown = 30; refresh(); }
     else if (d.vibe) { F.vibe = norm(F.vibe) === d.vibe ? "" : d.vibe; pick = null; shown = 30; refresh(); }
     else if (d.shop) { toggleIn(F.shops, d.shop); pick = null; shown = 30; refresh(); }
     else if (d.mood) { toggleIn(F.moods, d.mood); if (F.moods.length && F.sort === "az") F.sort = "match"; pick = null; shown = 30; refresh(); }
@@ -738,12 +923,18 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   function showTab(which) {
     $("#view-find").classList.toggle("hidden", which !== "find");
     $("#view-menus").classList.toggle("hidden", which !== "menus");
+    $("#view-remix").classList.toggle("hidden", which !== "remix");
+    $("#tab-remix").setAttribute("aria-selected", String(which === "remix"));
     $("#tab-find").setAttribute("aria-selected", String(which === "find"));
     $("#tab-menus").setAttribute("aria-selected", String(which === "menus"));
     if (which === "menus") renderMenus();
+    if (which === "remix") { if (!R.results.length) runRemix(); else renderRemix(); }
   }
   $("#tab-find").addEventListener("click", function () { showTab("find"); });
   $("#tab-menus").addEventListener("click", function () { showTab("menus"); });
+  $("#tab-remix").addEventListener("click", function () { showTab("remix"); });
+  $("#r-go").addEventListener("click", runRemix);
+  $("#r-clear").addEventListener("click", function () { R.seed = null; runRemix(); });
 
   $("#m-add").addEventListener("click", function () {
     var shop = $("#m-shop").value.trim(), cat = $("#m-cat").value.trim() || "Dirty Soda", text = $("#m-text").value;
