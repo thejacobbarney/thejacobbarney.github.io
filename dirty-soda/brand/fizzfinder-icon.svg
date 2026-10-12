@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 270" role="img" aria-label="FizzFinder soda cup icon">
+<title>FizzFinder soda cup icon</title>
+<defs><linearGradient id="fliq" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12D6D0"/><stop offset="1" stop-color="#1E58FF"/></linearGradient>
+    <linearGradient id="fword" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1E58FF"/><stop offset="1" stop-color="#12D6D0"/></linearGradient></defs>
+
+  <defs>
+    <clipPath id="fclip"><path d="M34 82 L166 70 Q175 69 174 78 L148 236 Q146 246 136 246 L66 246 Q56 246 54 236 L25 92 Q24 83 34 82 Z"/></clipPath>
+  </defs>
+  <path d="M72 80 L98 24" stroke="#12D6D0" stroke-width="20" stroke-linecap="round" fill="none"/>
+  <path d="M34 82 L166 70 Q175 69 174 78 L148 236 Q146 246 136 246 L66 246 Q56 246 54 236 L25 92 Q24 83 34 82 Z" fill="#FFFFFF"/>
+  <g clip-path="url(#fclip)">
+    <rect x="10" y="100" width="190" height="160" fill="url(#fliq)"/>
+    <path d="M10 112 Q52 92 96 112 T200 100 L200 260 L10 260 Z" fill="url(#fliq)"/>
+    <path d="M10 178 Q60 140 118 176 T200 160 L200 260 L10 260 Z" fill="#1E58FF" opacity=".35"/>
+    <circle cx="66" cy="136" r="11" fill="#FFFFFF"/><circle cx="94" cy="118" r="6" fill="#FFFFFF"/>
+    <circle cx="58" cy="176" r="9" fill="#FFFFFF"/><circle cx="88" cy="206" r="15" fill="#FFFFFF"/>
+    <circle cx="116" cy="164" r="6" fill="#FFFFFF"/><circle cx="122" cy="226" r="7" fill="#FFFFFF"/>
+  </g>
+  <path d="M34 82 L166 70 Q175 69 174 78 L148 236 Q146 246 136 246 L66 246 Q56 246 54 236 L25 92 Q24 83 34 82 Z" fill="none" stroke="#0A1A2F" stroke-width="17" stroke-linejoin="round"/>
+  <path d="M160 34 m-30 0 a30 30 0 1 0 60 0 a30 30 0 1 0 -60 0 M160 34 m-12 0 a12 12 0 1 0 24 0 a12 12 0 1 0 -24 0" fill="#12D6D0" fill-rule="evenodd"/>
+  <circle cx="222" cy="46" r="13" fill="#1E58FF"/>
+  <path d="M200 104 m-19 0 a19 19 0 1 0 38 0 a19 19 0 1 0 -38 0 M200 104 m-7 0 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0" fill="#1E58FF" fill-rule="evenodd"/>
+  <circle cx="118" cy="58" r="8" fill="#12D6D0"/>
+</svg>

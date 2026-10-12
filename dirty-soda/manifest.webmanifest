@@ -1,0 +1,15 @@
+{
+  "name": "FizzFinder | Dirty Soda Library",
+  "short_name": "FizzFinder",
+  "description": "Find your next favorite dirty soda.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0A1A2F",
+  "theme_color": "#0A1A2F",
+  "icons": [
+    { "src": "brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "brand/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "brand/fizzfinder-app-icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
