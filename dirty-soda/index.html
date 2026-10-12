@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dirty Soda Library</title>
+<meta name="description" content="A personal library of dirty soda menus with recommendations by mood or base.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#fff6ea">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%A4%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #fff6ea; --card: #ffffff; --ink: #2a1a14; --muted: #7b6a60; --line: #ecdccb;
+    --accent: #e4572e; --accent-ink: #ffffff; --soft: #ffe7d6; --good: #1b7f5c;
+    --chip: #f6ece1; --shadow: 0 1px 2px rgba(60,30,10,.08), 0 6px 18px rgba(60,30,10,.06);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1210; --card: #251a17; --ink: #f5e8de; --muted: #b19e92; --line: #3a2a24;
+      --accent: #ff7a4d; --accent-ink: #1a1210; --soft: #3a2519; --good: #4fd1a1;
+      --chip: #31231e; --shadow: none; color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 16px; }
+  header h1 { margin: 4px 0 2px; font-size: 28px; letter-spacing: -.5px; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+  nav.tabs { display: flex; gap: 8px; margin: 16px 0 12px; }
+  nav.tabs button {
+    flex: 1; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
+  }
+  nav.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; box-shadow: var(--shadow); margin-bottom: 14px; }
+  .panel h2 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--chip); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .chip.static { cursor: default; padding: 3px 9px; font-size: 13px; }
+  .chip.ing { cursor: pointer; }
+  .chip.x::after { content: "\00d7"; margin-left: 2px; opacity: .7; }
+  .section + .section { margin-top: 14px; }
+  input[type=text], input[type=search], textarea, select {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); font: inherit;
+  }
+  textarea { min-height: 150px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+  .btn {
+    padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
+    color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.small { padding: 6px 10px; font-size: 13px; }
+  .btn.danger { color: #c0392b; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .count { margin: 4px 2px 10px; color: var(--muted); font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .cards { display: grid; gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); }
+  .card.pick { border: 2px solid var(--accent); background: var(--soft); }
+  .card .top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+  .card h3 { margin: 0; font-size: 18px; letter-spacing: -.2px; }
+  .card .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; font-size: 13px; color: var(--muted); }
+  .shop { color: #fff; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .recipe { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .recipe .base { font-weight: 700; }
+  .plus { color: var(--muted); }
+  .why { margin-top: 8px; font-size: 13px; color: var(--good); font-weight: 600; }
+  .icons { display: flex; gap: 4px; }
+  .icon { border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; padding: 4px; color: var(--muted); }
+  .icon.on { color: var(--accent); }
+  .badge { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--soft); color: var(--ink); }
+  details { margin-top: 8px; font-size: 14px; }
+  details summary { cursor: pointer; color: var(--muted); }
+  details.more > summary { font-weight: 600; color: var(--ink); padding: 4px 0; }
+  details.more[open] > summary { margin-bottom: 10px; }
+  details ul { margin: 6px 0 0; padding-left: 18px; }
+  .hidden { display: none !important; }
+  .menu-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .menu-row:first-of-type { border-top: 0; }
+  .menu-row .note { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
+  label.lbl { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+  .errs { font-size: 13px; color: #c0392b; margin-top: 6px; white-space: pre-wrap; }
+  .okmsg { font-size: 13px; color: var(--good); margin-top: 6px; }
+  .suggest { margin-top: 8px; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 18px 0 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🥤 Dirty Soda Library</h1>
+    <p id="stats">Loading menus...</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tab-find" aria-selected="true">Find a drink</button>
+    <button role="tab" id="tab-menus" aria-selected="false">Menus</button>
+  </nav>
+
+  <!-- FIND -->
+  <section id="view-find">
+    <div class="panel">
+      <div class="section">
+        <h2>Where are you?</h2>
+        <div class="row" id="f-shops"></div>
+      </div>
+      <div class="section">
+        <h2>What's the mood?</h2>
+        <div class="row" id="f-moods"></div>
+      </div>
+      <details class="more section" id="f-more">
+        <summary>More filters (base, must have, skip, caffeine)</summary>
+      <div class="section">
+        <h2>Base</h2>
+        <div class="row" id="f-bases"></div>
+      </div>
+      <div class="section">
+        <h2>Must have</h2>
+        <div class="row" id="f-must"></div>
+        <input type="text" id="f-must-in" list="ing-list" placeholder="Type an ingredient, like coconut" autocomplete="off" style="margin-top:8px">
+        <div class="suggest row" id="f-pairs"></div>
+      </div>
+      <div class="section">
+        <h2>Skip</h2>
+        <div class="row" id="f-avoid"></div>
+        <input type="text" id="f-avoid-in" list="ing-list" placeholder="Ingredient to avoid" autocomplete="off" style="margin-top:8px">
+      </div>
+      <div class="section">
+        <h2>Also</h2>
+        <div class="row">
+          <button class="chip" id="o-sf" aria-pressed="false">Sugar free option</button>
+          <button class="chip" id="o-caf" aria-pressed="false">Caffeinated</button>
+          <button class="chip" id="o-nocaf" aria-pressed="false">No caffeine</button>
+          <button class="chip" id="o-fav" aria-pressed="false">♥ Favorites</button>
+          <button class="chip" id="o-new" aria-pressed="false">Haven't tried</button>
+        </div>
+      </div>
+      </details>
+      <div class="section">
+        <input type="search" id="f-q" placeholder="Search names or ingredients">
+        <div class="row" style="margin-top:10px">
+          <select id="f-sort" style="width:auto">
+            <option value="match">Best match</option>
+            <option value="az">A to Z</option>
+            <option value="shop">By shop</option>
+          </select>
+          <button class="btn primary" id="b-surprise">🎲 Surprise me</button>
+          <button class="btn" id="b-reset">Reset</button>
+        </div>
+      </div>
+    </div>
+    <div class="count"><span id="f-count"></span></div>
+    <div class="cards" id="f-results"></div>
+    <div style="text-align:center;margin-top:12px"><button class="btn hidden" id="b-more">Show more</button></div>
+  </section>
+
+  <!-- MENUS -->
+  <section id="view-menus" class="hidden">
+    <div class="panel">
+      <h2>Your menus</h2>
+      <div id="m-list"></div>
+    </div>
+    <div class="panel">
+      <h2>Add a menu</h2>
+      <p class="muted" style="margin-top:0">Paste one drink per line. Use a dash or colon after the name, then the soda and add-ins separated by plus signs or commas.</p>
+      <pre class="muted" style="margin:0 0 10px;white-space:pre-wrap;font-size:12px">Princess Peach - Dr Pepper + Peach + Coconut Cream
+Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
+      <div class="grid2">
+        <div><label class="lbl" for="m-shop">Shop name</label><input type="text" id="m-shop" placeholder="Swig"></div>
+        <div><label class="lbl" for="m-cat">Section (optional)</label><input type="text" id="m-cat" placeholder="Dirty Soda"></div>
+      </div>
+      <label class="lbl" for="m-text">Drinks</label>
+      <textarea id="m-text" placeholder="Name - Base + ingredient + ingredient"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="m-add">Add to library</button>
+      </div>
+      <div class="errs" id="m-errs"></div>
+      <div class="okmsg" id="m-ok"></div>
+    </div>
+    <div class="panel">
+      <h2>Backup</h2>
+      <p class="muted" style="margin-top:0">Menus you add, favorites and tried drinks live in this browser. Export them to move to another phone.</p>
+      <div class="row">
+        <button class="btn" id="b-export">Copy backup</button>
+        <button class="btn" id="b-import">Restore from pasted backup</button>
+      </div>
+      <textarea id="m-backup" style="min-height:80px;margin-top:10px" placeholder="Backup text appears here, or paste one to restore"></textarea>
+      <div class="errs" id="b-msg"></div>
+    </div>
+  </section>
+
+  <footer>Built for the soda run. Recipes come from each shop's published menu and may change.</footer>
+</div>
+<datalist id="ing-list"></datalist>
+
+<script src="menus.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); };
+
+  /* ---------- storage ---------- */
+  var store = {
+    get: function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+  var favs = store.get("ds_favs", {});
+  var tried = store.get("ds_tried", {});
+  var custom = store.get("ds_custom", []);      // [{shop, note, groups:[{cat, items:[...]}]}]
+  var disabled = store.get("ds_disabled", {});  // shop -> true
+  var saved = store.get("ds_filters", {});
+
+  /* ---------- normalization ---------- */
+  var BASE_RULES = [
+    [/dr\.? ?pepper/, "Dr Pepper"], [/mtn dew|mountain dew|\bdew\b/, "Mtn Dew"],
+    [/pepsi/, "Pepsi"], [/\bcoke\b|coca-?cola|\bcola\b/, "Coke"],
+    [/sprite|7 ?up|starry|sierra mist|lemon-lime/, "Lemon-Lime"],
+    [/root ?beer|barq|\bmug\b/, "Root Beer"], [/fresca/, "Fresca"], [/ginger ?ale/, "Ginger Ale"],
+    [/orange soda|orange crush|fanta/, "Orange Soda"], [/cream soda|big red/, "Cream Soda"],
+    [/gatorade|powerade/, "Sports Drink"], [/smoothie|freeze|frappe/, "Frozen"], [/lemonade/, "Lemonade"], [/\btea\b/, "Tea"],
+    [/sparkling|seltzer|club soda|\bwater\b/, "Water"],
+    [/red ?bull|red alert|rockstar|monster|vibe|reviver|swig energy|energy|celsius|\bbang\b/, "Energy"], [/protein/, "Protein"]
+  ];
+  function baseFamily(name) {
+    var s = name.toLowerCase();
+    for (var i = 0; i < BASE_RULES.length; i++) if (BASE_RULES[i][0].test(s)) return BASE_RULES[i][1];
+    return null;
+  }
+  var SYN = {
+    "maraschino cherry": "cherry", "maraschino cherries": "cherry", "cherries": "cherry", "red raspberry": "raspberry",
+    "half-and-half": "half & half", "half and half": "half & half", "1/2 & 1/2": "half & half", "tigers blood": "tiger's blood",
+    "whip": "whipped cream", "whip cream": "whipped cream", "cheese cake": "cheesecake", "apples": "apple",
+    "mixed berries": "mixed berries", "cream": "sweet cream", "sweet cream": "sweet cream", "lime wedge": "lime", "lemon wedge": "lemon"
+  };
+  function canon(raw) {
+    var s = raw.toLowerCase().replace(/[’`]/g, "'").trim(), sf = false;
+    if (/^(sugar[- ]?free|sf)\s+/.test(s)) { sf = true; s = s.replace(/^(sugar[- ]?free|sf)\s+/, ""); }
+    s = s.replace(/\(.*?\)/g, "").replace(/\b(fresh|frozen|real|swig|diced|double|extra|lite|light|your choice of)\b\s*/g, "").trim();
+    s = s.replace(/passion fruit/g, "passionfruit").replace(/blue cura[cç]ao/g, "blue curacao");
+    s = s.replace(/\s+(puree|fruit|syrup|shot)s?$/, "").replace(/\s+/g, " ").trim();
+    if (SYN[s]) s = SYN[s];
+    return { k: s, sf: sf };
+  }
+  var LABEL_FIX = { "tiger's blood": "Tiger's Blood", "half & half": "Half & Half", "s'mores": "S'mores", "pina colada": "Pina Colada" };
+  function label(k) { return LABEL_FIX[k] || k.replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
+
+  var TAG_RULES = {
+    tropical: /coconut|banana|pineapple|mango|passion|guava|curacao|pina colada|tangerine|kiwi|papaya|tiger/,
+    creamy: /cream|half & half|cold foam|coconut milk|cheesecake|horchata|irish/,
+    dessert: /vanilla|caramel|butterscotch|marshmallow|s'mores|chocolate|cupcake|birthday cake|toffee|almond|pecan|cinnamon|maple|cheesecake|gummy|brown sugar|chai|coffee|popping/,
+    tart: /^lime$|lemon|grapefruit|cranberry|pomegranate|green apple|blood orange|^sour$|tangerine|^apple$/,
+    berry: /strawberry|^raspberry$|blackberry|blueberry|huckleberry|berries|tiger/,
+    orchard: /peach|pear|apple|pumpkin|maple|cinnamon/,
+    cozy: /pumpkin|maple|cinnamon|chai|caramel|toffee|marshmallow|butterscotch|brown sugar|almond|pecan|coffee|chocolate|irish|s'mores|horchata|birthday cake|apple/,
+    mellow: /peach|vanilla|pear|lavender|almond|coconut/,
+    candy: /blue raspberry|cotton candy|grape$|^cherry$|grenadine|watermelon|gummy|tiger|bubble|curacao|popping|kiwi/,
+    floral: /lavender|cucumber|mint|pear|rose/,
+    chocolate: /chocolate|s'mores|mocha/
+  };
+  var CAFFEINATED = { "Dr Pepper": 1, "Coke": 1, "Pepsi": 1, "Mtn Dew": 1, "Energy": 1, "Tea": 1 };
+
+  var MOODS = [
+    { id: "tropical", label: "Tropical getaway", e: "🌴", tags: { tropical: 2 }, fam: { "Lemonade": .5, "Lemon-Lime": .3, "Water": .2 } },
+    { id: "creamy", label: "Creamy dessert", e: "🍦", tags: { creamy: 2, dessert: 1.5 } },
+    { id: "cozy", label: "Cozy fall", e: "🍂", tags: { cozy: 2.5, creamy: .5, orchard: 1 }, seasonal: 2 },
+    { id: "tart", label: "Tart and zingy", e: "🍋", tags: { tart: 2 }, neg: { creamy: 1 } },
+    { id: "berry", label: "Berry bomb", e: "🍓", tags: { berry: 2.5 } },
+    { id: "mellow", label: "Soft and mellow", e: "🍑", tags: { mellow: 2, creamy: .5 } },
+    { id: "candy", label: "Candy shop", e: "🍬", tags: { candy: 2.5 } },
+    { id: "floral", label: "Fresh and floral", e: "🌸", tags: { floral: 3 } },
+    { id: "chocolate", label: "Chocolate fix", e: "🍫", tags: { chocolate: 4 } },
+    { id: "boost", label: "Need a boost", e: "⚡", fam: { "Energy": 4, "Protein": 2, "Tea": .5 }, caf: 1 },
+    { id: "light", label: "Light and refreshing", e: "💧", fam: { "Water": 2.5, "Tea": 1.5, "Lemonade": 1.5, "Lemon-Lime": .5 }, sf: 1, neg: { creamy: 1.5 } },
+    { id: "classic", label: "Classic comfort", e: "🥤", fam: { "Dr Pepper": 1, "Root Beer": 1.5, "Coke": 1 }, tags: { creamy: .5, dessert: .5 } }
+  ];
+  var BASE_ORDER = ["Dr Pepper", "Coke", "Pepsi", "Mtn Dew", "Lemon-Lime", "Root Beer", "Fresca", "Ginger Ale", "Lemonade", "Orange Soda", "Cream Soda", "Tea", "Water", "Energy", "Protein", "Sports Drink", "Frozen"];
+
+  /* ---------- parsing ---------- */
+  function makeItem(shop, cat, line, isCustom) {
+    var p = line.split("|");
+    var name = (p[0] || "").trim(), rawBase = (p[1] || "").trim(), rawIngs = (p[2] || "").trim();
+    var flags = ((p[3] || "").toLowerCase().split(",")).map(function (x) { return x.trim(); });
+    var bases = rawBase ? rawBase.split("/").map(function (x) { return x.trim(); }).filter(Boolean) : [];
+    var fams = [];
+    bases.forEach(function (b) { var f = baseFamily(b); if (f && fams.indexOf(f) < 0) fams.push(f); });
+    var ings = [], keys = [], sfAny = flags.indexOf("sf") >= 0;
+    rawIngs.split(",").forEach(function (r) {
+      r = r.trim(); if (!r) return;
+      var c = canon(r);
+      if (!c.k) return;
+      if (c.sf) sfAny = true;
+      if (keys.indexOf(c.k) < 0) { keys.push(c.k); ings.push(c.k); }
+    });
+    if (bases.some(function (b) { return /diet|zero|sugar[- ]?free|\bsf\b/i.test(b); })) sfAny = true;
+    var caf = fams.some(function (f) { return CAFFEINATED[f]; }) && !bases.some(function (b) { return /caffeine[- ]?free/i.test(b); });
+    var tagCount = {};
+    ings.forEach(function (k) {
+      Object.keys(TAG_RULES).forEach(function (t) { if (TAG_RULES[t].test(k)) tagCount[t] = (tagCount[t] || 0) + 1; });
+    });
+    var id = (shop + "|" + name + "|" + bases.join("/")).toLowerCase();
+    return {
+      id: id, shop: shop, cat: cat, name: name, bases: bases, fams: fams, ings: ings,
+      sf: sfAny, caf: caf, seasonal: flags.indexOf("seasonal") >= 0 || flags.indexOf("limited") >= 0,
+      blended: flags.indexOf("blended") >= 0, tags: tagCount, custom: !!isCustom,
+      hay: (name + " " + bases.join(" ") + " " + ings.join(" ") + " " + shop).toLowerCase()
+    };
+  }
+
+  function parsePasted(text, shop, cat) {
+    var lines = text.split(/\r?\n/), out = [], errs = [];
+    lines.forEach(function (ln, i) {
+      var raw = ln.trim();
+      if (!raw) return;
+      raw = raw.replace(/^[•*\-\d.)\s]+(?=\S)/, function (m) { return /^\s*[-*•]\s/.test(m) || /^\d+[.)]/.test(m) ? "" : m; });
+      var m = raw.match(/^(.+?)\s*(?:\s[-–—]\s|:|\|)\s*(.+)$/);
+      if (!m) { errs.push("Line " + (i + 1) + ": could not find a name and recipe in \"" + raw + "\""); return; }
+      var name = m[1].trim(), rec = m[2].trim();
+      rec = rec.replace(/half\s*(?:&|and)\s*half/gi, "half-and-half").replace(/1\/2\s*&\s*1\/2/g, "half-and-half");
+      var toks = rec.split(/\s*[+,;]\s*|\s+&\s+|\s+and\s+/i).map(function (t) { return t.trim(); }).filter(Boolean);
+      var bases = [], ings = [];
+      toks.forEach(function (t) { if (baseFamily(t) && !/^(fresh|frozen)\b/i.test(t) && t.split(" ").length <= 4 && !/\b(cream|puree|syrup|foam)\b/i.test(t)) bases.push(t); else ings.push(t); });
+      if (!bases.length) { errs.push("Line " + (i + 1) + ": no soda base recognized in \"" + rec + "\" (try Dr Pepper, Coke, Mtn Dew, Sprite, Lemonade, Water...)"); return; }
+      out.push(name + "|" + bases.join("/") + "|" + ings.join(", ").replace(/half-and-half/g, "Half & Half") + "|");
+    });
+    return { items: out, errs: errs };
+  }
+
+  /* ---------- library ---------- */
+  var ALL = [], SHOPS = [], ING_FREQ = {};
+  function build() {
+    ALL = []; SHOPS = [];
+    var menus = (window.BUILTIN_MENUS || []).map(function (m) { return { m: m, custom: false }; })
+      .concat(custom.map(function (m) { return { m: m, custom: true }; }));
+    menus.forEach(function (e) {
+      var m = e.m, n = 0;
+      m.groups.forEach(function (g) {
+        g.items.forEach(function (line) { var it = makeItem(m.shop, g.cat || "Drinks", line, e.custom); if (it.name) { ALL.push(it); n++; } });
+      });
+      var ex = SHOPS.filter(function (s) { return s.name === m.shop; })[0];
+      if (ex) { ex.count += n; if (e.custom) ex.custom = true; } else SHOPS.push({ name: m.shop, count: n, note: m.note || "", custom: e.custom });
+    });
+    ING_FREQ = {};
+    ALL.forEach(function (d) { d.ings.forEach(function (k) { ING_FREQ[k] = (ING_FREQ[k] || 0) + 1; }); });
+    var dl = $("#ing-list");
+    dl.innerHTML = Object.keys(ING_FREQ).sort().map(function (k) { return '<option value="' + esc(label(k)) + '">'; }).join("");
+    $("#stats").textContent = ALL.length + " drinks from " + SHOPS.length + " shops, " + Object.keys(ING_FREQ).length + " ingredients";
+  }
+
+  function hue(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
+  function shopStyle(s) { return "background:hsl(" + hue(s) + " 55% 38%)"; }
+
+  /* ---------- filter state ---------- */
+  var F = Object.assign({ shops: [], moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, q: "", sort: "match" }, saved);
+  function persist() { store.set("ds_filters", F); }
+  var shown = 30, pick = null;
+
+  function toggleIn(arr, v) { var i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); }
+  function keyOf(v) { return canon(v).k; }
+
+  function renderControls() {
+    $("#f-shops").innerHTML = SHOPS.filter(function (s) { return !disabled[s.name]; }).map(function (s) {
+      return '<button class="chip" data-shop="' + esc(s.name) + '" aria-pressed="' + (F.shops.indexOf(s.name) >= 0) + '">' + esc(s.name) + '</button>';
+    }).join("") + '<span class="muted">' + (F.shops.length ? "" : "All shops") + "</span>";
+    $("#f-moods").innerHTML = MOODS.map(function (m) {
+      return '<button class="chip" data-mood="' + m.id + '" aria-pressed="' + (F.moods.indexOf(m.id) >= 0) + '">' + m.e + " " + m.label + "</button>";
+    }).join("");
+    var present = {};
+    ALL.forEach(function (d) { d.fams.forEach(function (f) { present[f] = 1; }); });
+    $("#f-bases").innerHTML = BASE_ORDER.filter(function (b) { return present[b]; }).map(function (b) {
+      return '<button class="chip" data-base="' + esc(b) + '" aria-pressed="' + (F.bases.indexOf(b) >= 0) + '">' + esc(b) + "</button>";
+    }).join("");
+    $("#f-must").innerHTML = F.must.map(function (k) { return '<button class="chip x" data-unmust="' + esc(k) + '" aria-pressed="true">' + esc(label(k)) + "</button>"; }).join("");
+    $("#f-avoid").innerHTML = F.avoid.map(function (k) { return '<button class="chip x" data-unavoid="' + esc(k) + '" aria-pressed="true">' + esc(label(k)) + "</button>"; }).join("");
+    [["o-sf", "sf"], ["o-caf", "caf"], ["o-nocaf", "nocaf"], ["o-fav", "fav"], ["o-new", "fresh"]].forEach(function (p) { $("#" + p[0]).setAttribute("aria-pressed", String(!!F[p[1]])); });
+    $("#f-q").value = F.q; $("#f-sort").value = F.sort;
+    // pairings: what usually goes with the chosen base(s)
+    var pairs = {}, pool = ALL.filter(function (d) { return !F.bases.length || d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; }); });
+    pool.forEach(function (d) { d.ings.forEach(function (k) { pairs[k] = (pairs[k] || 0) + 1; }); });
+    var top = Object.keys(pairs).filter(function (k) { return F.must.indexOf(k) < 0; }).sort(function (a, b) { return pairs[b] - pairs[a] || (a < b ? -1 : 1); }).slice(0, 8);
+    $("#f-pairs").innerHTML = '<span class="muted">' + (F.bases.length ? "Popular with " + F.bases.join(" / ") + ":" : "Popular add-ins:") + "</span> " +
+      top.map(function (k) { return '<button class="chip" data-addmust="' + esc(k) + '" aria-pressed="false">' + esc(label(k)) + " <span class=\"muted\">" + pairs[k] + "</span></button>"; }).join("");
+  }
+
+  function score(d) {
+    if (!F.moods.length) return { s: 0, why: [] };
+    var total = 0, why = [];
+    F.moods.forEach(function (id) {
+      var m = MOODS.filter(function (x) { return x.id === id; })[0], s = 0;
+      if (m.tags) Object.keys(m.tags).forEach(function (t) { s += m.tags[t] * Math.min(d.tags[t] || 0, 2); });
+      if (m.neg) Object.keys(m.neg).forEach(function (t) { s -= m.neg[t] * Math.min(d.tags[t] || 0, 2); });
+      if (m.fam) d.fams.forEach(function (f) { s += m.fam[f] || 0; });
+      if (m.seasonal && d.seasonal) s += m.seasonal;
+      if (m.caf && d.caf) s += m.caf;
+      if (m.sf && d.sf) s += m.sf;
+      s = s / (1 + 0.08 * Math.max(d.ings.length - 2, 0));
+      if (s > 0.9) why.push(m.e + " " + m.label);
+      total += s;
+    });
+    return { s: total / F.moods.length, why: why };
+  }
+
+  function filtered() {
+    var q = F.q.trim().toLowerCase();
+    return ALL.filter(function (d) {
+      if (disabled[d.shop]) return false;
+      if (F.shops.length && F.shops.indexOf(d.shop) < 0) return false;
+      if (F.bases.length && !d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; })) return false;
+      if (F.must.some(function (k) { return d.ings.indexOf(k) < 0; })) return false;
+      if (F.avoid.some(function (k) { return d.ings.indexOf(k) >= 0; })) return false;
+      if (F.sf && !d.sf) return false;
+      if (F.caf && !d.caf) return false;
+      if (F.nocaf && d.caf) return false;
+      if (F.fav && !favs[d.id]) return false;
+      if (F.fresh && tried[d.id]) return false;
+      if (q && q.split(/\s+/).some(function (w) { return d.hay.indexOf(w) < 0; })) return false;
+      return true;
+    });
+  }
+
+  function similarTo(d) {
+    var a = d.ings.concat(d.fams), out = [];
+    ALL.forEach(function (o) {
+      if (o.shop === d.shop || disabled[o.shop]) return;
+      if (!o.fams.some(function (f) { return d.fams.indexOf(f) >= 0; })) return;
+      var b = o.ings.concat(o.fams), inter = 0;
+      a.forEach(function (x) { if (b.indexOf(x) >= 0) inter++; });
+      var j = inter / (a.length + b.length - inter);
+      if (j >= 0.5) out.push({ d: o, j: j });
+    });
+    return out.sort(function (x, y) { return y.j - x.j; }).slice(0, 4);
+  }
+
+  function cardHTML(d, why, isPick) {
+    var rec = '<span class="base">' + esc(d.bases.join(" + ")) + "</span>" + d.ings.map(function (k) {
+      return '<span class="plus">+</span><button class="chip ing" data-addmust="' + esc(k) + '" aria-pressed="false" title="Only show drinks with ' + esc(label(k)) + '">' + esc(label(k)) + "</button>";
+    }).join("");
+    var badges = [];
+    if (d.sf) badges.push('<span class="badge">Sugar free option</span>');
+    if (d.caf) badges.push('<span class="badge">⚡ caffeine</span>');
+    if (d.seasonal) badges.push('<span class="badge">Seasonal</span>');
+    if (d.blended) badges.push('<span class="badge">Blended</span>');
+    var sim = similarTo(d);
+    return '<article class="card' + (isPick ? " pick" : "") + '" data-id="' + esc(d.id) + '">' +
+      '<div class="top"><h3>' + esc(d.name) + '</h3><div class="icons">' +
+      '<button class="icon' + (tried[d.id] ? " on" : "") + '" data-tried="' + esc(d.id) + '" title="Mark as tried" aria-label="Mark as tried">✓</button>' +
+      '<button class="icon' + (favs[d.id] ? " on" : "") + '" data-fav="' + esc(d.id) + '" title="Favorite" aria-label="Favorite">' + (favs[d.id] ? "♥" : "♡") + "</button></div></div>" +
+      '<div class="meta"><span class="shop" style="' + shopStyle(d.shop) + '">' + esc(d.shop) + "</span><span>" + esc(d.cat) + "</span>" + badges.join("") + "</div>" +
+      '<div class="recipe">' + rec + "</div>" +
+      (why && why.length ? '<div class="why">' + esc(why.join(" · ")) + "</div>" : "") +
+      (sim.length ? "<details><summary>Similar at other shops (" + sim.length + ")</summary><ul>" + sim.map(function (s) {
+        return "<li><b>" + esc(s.d.name) + "</b> at " + esc(s.d.shop) + ": " + esc(s.d.bases.join(" + ") + " + " + s.d.ings.map(label).join(" + ")) + "</li>";
+      }).join("") + "</ul></details>" : "") +
+      "</article>";
+  }
+
+  function renderResults() {
+    var list = filtered().map(function (d) { var sc = score(d); return { d: d, s: sc.s, why: sc.why }; });
+    if (F.moods.length) list = list.filter(function (x) { return x.s > 0.5; });
+    if (F.sort === "match" && F.moods.length) list.sort(function (a, b) { return b.s - a.s || (a.d.name < b.d.name ? -1 : 1); });
+    else if (F.sort === "shop") list.sort(function (a, b) { return a.d.shop < b.d.shop ? -1 : a.d.shop > b.d.shop ? 1 : (a.d.name < b.d.name ? -1 : 1); });
+    else list.sort(function (a, b) { return a.d.name.toLowerCase() < b.d.name.toLowerCase() ? -1 : 1; });
+
+    var html = "";
+    if (pick) {
+      var px = list.filter(function (x) { return x.d.id === pick; })[0];
+      if (px) { html += cardHTML(px.d, ["🎲 Your pick"].concat(px.why), true); }
+    }
+    html += list.slice(0, shown).filter(function (x) { return x.d.id !== pick; }).map(function (x) { return cardHTML(x.d, x.why, false); }).join("");
+    $("#f-results").innerHTML = html || '<div class="panel muted">Nothing matches. Try removing a filter or a must-have ingredient.</div>';
+    $("#f-count").textContent = list.length + (list.length === 1 ? " drink" : " drinks") + (F.moods.length ? ", best matches first" : "");
+    $("#b-more").classList.toggle("hidden", list.length <= shown);
+    $("#b-more").textContent = "Show more (" + (list.length - shown) + " left)";
+    renderList = list;
+  }
+  var renderList = [];
+
+  function refresh() { if (F.bases.length || F.must.length || F.avoid.length || F.sf || F.caf || F.nocaf || F.fav || F.fresh) $("#f-more").open = true; persist(); renderControls(); renderResults(); }
+
+  /* ---------- menus view ---------- */
+  function renderMenus() {
+    $("#m-list").innerHTML = SHOPS.map(function (s) {
+      return '<div class="menu-row"><div><b>' + esc(s.name) + "</b> · " + s.count + " drinks" + (s.custom ? ' <span class="badge">yours</span>' : "") +
+        (s.note ? '<div class="note">' + esc(s.note) + "</div>" : "") + "</div><div class=\"row\">" +
+        '<label class="toggle"><input type="checkbox" data-incl="' + esc(s.name) + '"' + (disabled[s.name] ? "" : " checked") + "> Include</label>" +
+        (s.custom ? '<button class="btn small danger" data-delmenu="' + esc(s.name) + '">Delete</button>' : "") + "</div></div>";
+    }).join("");
+  }
+
+  /* ---------- events ---------- */
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button"); if (!t) return;
+    var d = t.dataset;
+    if (d.shop) { toggleIn(F.shops, d.shop); pick = null; shown = 30; refresh(); }
+    else if (d.mood) { toggleIn(F.moods, d.mood); if (F.moods.length && F.sort === "az") F.sort = "match"; pick = null; shown = 30; refresh(); }
+    else if (d.base) { toggleIn(F.bases, d.base); pick = null; shown = 30; refresh(); }
+    else if (d.unmust) { toggleIn(F.must, d.unmust); pick = null; refresh(); }
+    else if (d.unavoid) { toggleIn(F.avoid, d.unavoid); pick = null; refresh(); }
+    else if (d.addmust) { if (F.must.indexOf(d.addmust) < 0) F.must.push(d.addmust); pick = null; shown = 30; refresh(); window.scrollTo({ top: $("#view-find").offsetTop, behavior: "smooth" }); }
+    else if (d.fav) { if (favs[d.fav]) delete favs[d.fav]; else favs[d.fav] = 1; store.set("ds_favs", favs); renderResults(); }
+    else if (d.tried) { if (tried[d.tried]) delete tried[d.tried]; else tried[d.tried] = 1; store.set("ds_tried", tried); renderResults(); }
+    else if (d.delmenu) {
+      if (!confirm("Delete the menu \"" + d.delmenu + "\" that you added?")) return;
+      custom = custom.filter(function (m) { return m.shop !== d.delmenu; }); store.set("ds_custom", custom);
+      F.shops = F.shops.filter(function (s) { return s !== d.delmenu; }); build(); renderMenus(); refresh();
+    }
+  });
+  [["o-sf", "sf"], ["o-caf", "caf"], ["o-nocaf", "nocaf"], ["o-fav", "fav"], ["o-new", "fresh"]].forEach(function (p) {
+    $("#" + p[0]).addEventListener("click", function () {
+      F[p[1]] = !F[p[1]];
+      if (p[1] === "caf" && F.caf) F.nocaf = false;
+      if (p[1] === "nocaf" && F.nocaf) F.caf = false;
+      pick = null; shown = 30; refresh();
+    });
+  });
+  function addTyped(inputId, arr) {
+    var el = $(inputId);
+    function commit() {
+      var k = keyOf(el.value); if (!k) return;
+      if (arr().indexOf(k) < 0) arr().push(k);
+      el.value = ""; pick = null; shown = 30; refresh();
+    }
+    el.addEventListener("change", commit);
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); commit(); } });
+  }
+  addTyped("#f-must-in", function () { return F.must; });
+  addTyped("#f-avoid-in", function () { return F.avoid; });
+  $("#f-q").addEventListener("input", function (e) { F.q = e.target.value; pick = null; shown = 30; persist(); renderResults(); });
+  $("#f-sort").addEventListener("change", function (e) { F.sort = e.target.value; refresh(); });
+  $("#b-more").addEventListener("click", function () { shown += 30; renderResults(); });
+  $("#b-reset").addEventListener("click", function () { F = { shops: F.shops, moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, q: "", sort: "match" }; pick = null; shown = 30; refresh(); });
+  $("#b-surprise").addEventListener("click", function () {
+    var pool = renderList.length ? renderList : []; if (!pool.length) return;
+    // weight toward better matches when moods are chosen
+    var w = pool.map(function (x) { return F.moods.length ? Math.max(x.s, 0.1) : 1; }), sum = w.reduce(function (a, b) { return a + b; }, 0), r = Math.random() * sum, i = 0;
+    while (i < pool.length - 1 && r > w[i]) { r -= w[i]; i++; }
+    pick = pool[i].d.id; renderResults(); window.scrollTo({ top: $("#f-results").offsetTop - 60, behavior: "smooth" });
+  });
+  document.addEventListener("change", function (e) {
+    var n = e.target.dataset && e.target.dataset.incl; if (!n) return;
+    if (e.target.checked) delete disabled[n]; else disabled[n] = true;
+    store.set("ds_disabled", disabled); F.shops = F.shops.filter(function (s) { return !disabled[s]; }); refresh();
+  });
+
+  function showTab(which) {
+    $("#view-find").classList.toggle("hidden", which !== "find");
+    $("#view-menus").classList.toggle("hidden", which !== "menus");
+    $("#tab-find").setAttribute("aria-selected", String(which === "find"));
+    $("#tab-menus").setAttribute("aria-selected", String(which === "menus"));
+    if (which === "menus") renderMenus();
+  }
+  $("#tab-find").addEventListener("click", function () { showTab("find"); });
+  $("#tab-menus").addEventListener("click", function () { showTab("menus"); });
+
+  $("#m-add").addEventListener("click", function () {
+    var shop = $("#m-shop").value.trim(), cat = $("#m-cat").value.trim() || "Dirty Soda", text = $("#m-text").value;
+    $("#m-errs").textContent = ""; $("#m-ok").textContent = "";
+    if (!shop) { $("#m-errs").textContent = "Give the shop a name first."; return; }
+    var r = parsePasted(text, shop, cat);
+    if (!r.items.length) { $("#m-errs").textContent = r.errs.join("\n") || "Paste at least one drink."; return; }
+    var ex = custom.filter(function (m) { return m.shop === shop; })[0];
+    if (ex) { ex.groups.push({ cat: cat, items: r.items }); }
+    else if ((window.BUILTIN_MENUS || []).some(function (m) { return m.shop.toLowerCase() === shop.toLowerCase(); })) {
+      custom.push({ shop: shop + " (mine)", note: "Added by you", groups: [{ cat: cat, items: r.items }] });
+    } else custom.push({ shop: shop, note: "Added by you", groups: [{ cat: cat, items: r.items }] });
+    store.set("ds_custom", custom); build(); renderMenus(); refresh();
+    $("#m-ok").textContent = "Added " + r.items.length + " drinks." + (r.errs.length ? " " + r.errs.length + " lines were skipped." : "");
+    $("#m-errs").textContent = r.errs.join("\n"); $("#m-text").value = "";
+  });
+  $("#b-export").addEventListener("click", function () {
+    var txt = JSON.stringify({ v: 1, custom: custom, favs: favs, tried: tried, disabled: disabled });
+    $("#m-backup").value = txt;
+    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { $("#b-msg").textContent = "Copied."; }, function () { $("#b-msg").textContent = "Select the text and copy it."; });
+    else $("#b-msg").textContent = "Select the text and copy it.";
+  });
+  $("#b-import").addEventListener("click", function () {
+    try {
+      var o = JSON.parse($("#m-backup").value);
+      if (!o || o.v !== 1) throw new Error("Not a backup");
+      custom = o.custom || []; favs = o.favs || {}; tried = o.tried || {}; disabled = o.disabled || {};
+      store.set("ds_custom", custom); store.set("ds_favs", favs); store.set("ds_tried", tried); store.set("ds_disabled", disabled);
+      build(); renderMenus(); refresh(); $("#b-msg").textContent = "Restored.";
+    } catch (err) { $("#b-msg").textContent = "That does not look like a backup."; }
+  });
+
+  /* ---------- init ---------- */
+  build();
+  F.shops = F.shops.filter(function (s) { return SHOPS.some(function (x) { return x.name === s; }); });
+  refresh();
+  window.__ds = { ALL: function () { return ALL; }, parsePasted: parsePasted, canon: canon, baseFamily: baseFamily, makeItem: makeItem };
+})();
+</script>
+</body>
+</html>
