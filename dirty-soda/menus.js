@@ -448,6 +448,101 @@ window.BUILTIN_MENUS = [
         "Manic Monkey|Smoothie|Raspberry, Mango, Banana|blended"
       ]}
     ]
+  },
+  {
+    shop: "Twisted",
+    note: "Photo of a paper menu. The shop name is not printed on it, so rename this if it is wrong. Base 16 oz $1.99, 24 oz $2.25, 32 oz $2.55, 44 oz $2.75. Cream $0.50, flavor $0.40, puree $0.60. Add to any soda: Classic (vanilla and cream), Colada (pineapple, coconut, cream), Twisted (coconut and fresh lime), Boba (popping boba). Twisters ice cream smoothies are $4.50 and Twisted Energy is $4.75.",
+    groups: [
+      { cat: "Cola Dirty Soda", items: [
+        "Blackout|Coke/Pepsi|Raspberry Puree, Blackberry",
+        "Jitterbug|Coke/Pepsi|Mango Puree, Coconut, Fresh Lime",
+        "Lindy Hop|Coke/Pepsi|Cherry, Maraschino Cherry",
+        "My Foolish Heart|Coke/Pepsi|Raspberry Puree, Coconut Cream",
+        "Pixie|Coke/Pepsi|Peach Puree, Orange, Sweet Cream",
+        "Pure Poppy|Coke/Pepsi|Blue Raspberry, Vanilla, Sweet Cream",
+        "Jules|Coke/Pepsi|Black Cherry, Coconut, Coconut Cream",
+        "Summer Lovin|Coke/Pepsi|Strawberry, Coconut, Pineapple",
+        "T-Bird|Coke/Pepsi|Pineapple, Cherry, Maraschino Cherry",
+        "The Bop|Coke/Pepsi|Coconut, Cherry"
+      ]},
+      { cat: "Dr Pepper Dirty Soda", items: [
+        "Dr Knievel|Dr Pepper|Strawberry Puree, Vanilla, Coconut, Sweet Cream",
+        "Grease Monkey|Dr Pepper|Peach Puree, Strawberry, Watermelon",
+        "Huck Finn|Dr Pepper|Vanilla, Huckleberry",
+        "Jukebox|Dr Pepper|Raspberry, Coconut, Sweet Cream",
+        "Madster|Dr Pepper|Vanilla, Coconut, Sweet Cream",
+        "Nerd Alert|Dr Pepper|Pineapple, Coconut, Coconut Cream",
+        "Reggie|Dr Pepper|Raspberry, Fresh Lime",
+        "Kimbo|Dr Pepper|Peach, Vanilla, Sweet Cream",
+        "Zuko|Dr Pepper|Raspberry, Fresh Lime, Sweet Cream"
+      ]},
+      { cat: "Root Beer Dirty Soda", items: [
+        "Mandie Bee|Root Beer|Raspberry Puree, Blackberry, Sweet Cream",
+        "Retro Rock|Root Beer|Orange, Vanilla",
+        "Rizzo|Root Beer|Strawberry Puree, Coconut, Vanilla, Sweet Cream",
+        "Root Beer Barrel|Root Beer|Caramel, Vanilla"
+      ]},
+      { cat: "Orange Dirty Soda", items: [
+        "Popsicle|Orange Soda|Mango Puree, Peach Puree",
+        "Tigerlily|Orange Soda|Pineapple, Strawberry, Fresh Lime",
+        "Trixie|Orange Soda|Huckleberry, Raspberry"
+      ]},
+      { cat: "Mtn Dew Dirty Soda", items: [
+        "Appletini|Mtn Dew|Green Apple",
+        "Berry Mai Tai|Mtn Dew|Huckleberry, Blackberry, Pomegranate",
+        "Big Chill|Mtn Dew|Mango Puree, Sweet Cream",
+        "Bombshell|Mtn Dew|Grapefruit, Pomegranate, Fresh Lime",
+        "Kiwi Rush|Mtn Dew|Strawberry Puree, Kiwi",
+        "Love Shack|Mtn Dew|Blue Curacao, Pineapple, Coconut, Fresh Lime",
+        "Mad Love|Mtn Dew|Orange, Sweet Cream",
+        "Marigold Swing|Mtn Dew|Mango Puree, Vanilla, Sweet Cream",
+        "Just Peachy|Mtn Dew|Peach Puree, Sweet Cream",
+        "Red Dragon|Mtn Dew|Watermelon, Sweet Cream",
+        "Rock & Roll|Mtn Dew|Strawberry, Cherry, Sweet Cream"
+      ]},
+      { cat: "Sprite Dirty Soda", items: [
+        "Bengal's Blood|Sprite|Mango, Pomegranate, Raspberry",
+        "Da Bom|Sprite|Tiger's Blood, Coconut, Coconut Cream",
+        "Fashionista|Sprite/Lemonade|Cherry, Maraschino Cherry",
+        "Lime Rickey|Sprite|Grape, Fresh Lime",
+        "Lulu|Sprite|Strawberry, Watermelon, Peach",
+        "Peaches & Cream|Sprite|Peach Puree, Sweet Cream",
+        "Pink Cupcake|Sprite|Strawberry, Vanilla, Cupcake, Sweet Cream",
+        "Saturday Night Swing|Sprite|Banana, Pineapple, Strawberry, Coconut",
+        "Stop Staring|Sprite|Peach, Mango Puree, Coconut, Fresh Lime",
+        "Voodoo|Sprite|Grapefruit, Cherry, Fresh Lime",
+        "Swizzle Stix|Sprite|Raspberry Puree, Coconut, Coconut Cream"
+      ]},
+      { cat: "Lemonade and Tea", items: [
+        "Arnold Palmer|Iced Tea/Lemonade||",
+        "Blush|Lemonade/Iced Tea|Raspberry, Strawberry Puree, Coconut",
+        "High Society|Lemonade/Iced Tea|Strawberry, Cherry",
+        "Knighthawk|Lemonade/Iced Tea|Mango Puree, Coconut, Kiwi",
+        "Shimmy|Lemonade/Iced Tea|Peach Puree, Mango, Coconut Cream"
+      ]},
+      { cat: "Flavored Water", items: [
+        "Colada Twist|Water|Coconut, Pineapple, Fresh Lime",
+        "Berrylada|Water|Coconut, Raspberry, Fresh Lime, Coconut Cream",
+        "Fruit Lover|Water|Strawberry, Peach, Watermelon, Fresh Lime",
+        "Kimi|Water|Pineapple, Mango, Fresh Lime",
+        "Paradise Island|Water|Strawberry, Coconut, Peach, Fresh Lime"
+      ]},
+      { cat: "Twisted Energy", items: [
+        "#23|Red Alert/Mtn Dew|Cherry",
+        "Whitster|Red Alert/Mtn Dew|Pomegranate, Grapefruit, Fresh Lime",
+        "Haydo|Rockstar/Mtn Dew|Pineapple, Raspberry, Peach",
+        "Brain Blast|Rockstar/Sprite|Strawberry, Lime",
+        "The Alexa|Sugar-Free Rockstar/Mtn Dew|Mango, Pineapple, Coconut, Fresh Lime|sf",
+        "Huckle Star|Lemonade Rockstar/Lemonade|Huckleberry, Coconut Cream",
+        "All Twisted|Sugar-Free Rockstar|Coconut, Fresh Lime|sf"
+      ]},
+      { cat: "Kids (Little Crewzers)", items: [
+        "Boogey Monster|Sprite|Green Apple",
+        "Snackle|Lemonade|Blackberry, Sweet Cream",
+        "Shirley Temple|Sprite|Cherry, Maraschino Cherry",
+        "Truair|Root Beer|Chocolate, Vanilla"
+      ]}
+    ]
   }
 ];
 
