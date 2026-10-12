@@ -3,258 +3,423 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Dirty Soda Library</title>
-<meta name="description" content="A personal library of dirty soda menus with recommendations by mood or base.">
+<title>FizzFinder | Dirty Soda Library</title>
+<meta name="description" content="FizzFinder is a dirty soda library. Find your next favorite drink by flavor, mood or soda, and remix your own.">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#fff6ea">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%A4%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0A1A2F">
+<link rel="icon" type="image/svg+xml" href="brand/fizzfinder-icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
+<link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="fonts/space-grotesk-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  @font-face { font-family: "Space Grotesk"; font-weight: 500; font-style: normal; font-display: swap; src: url(fonts/space-grotesk-500.woff2) format("woff2"); }
+  @font-face { font-family: "Space Grotesk"; font-weight: 700; font-style: normal; font-display: swap; src: url(fonts/space-grotesk-700.woff2) format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 400; font-style: normal; font-display: swap; src: url(fonts/inter-400.woff2) format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 500; font-style: normal; font-display: swap; src: url(fonts/inter-500.woff2) format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 600; font-style: normal; font-display: swap; src: url(fonts/inter-600.woff2) format("woff2"); }
+
   :root {
-    --bg: #fff6ea; --card: #ffffff; --ink: #2a1a14; --muted: #7b6a60; --line: #ecdccb;
-    --accent: #e4572e; --accent-ink: #ffffff; --soft: #ffe7d6; --good: #1b7f5c;
-    --chip: #f6ece1; --shadow: 0 1px 2px rgba(60,30,10,.08), 0 6px 18px rgba(60,30,10,.06);
+    /* brand */
+    --navy: #0A1A2F; --blue: #1E58FF; --aqua: #12D6D0; --grape: #A855F7;
+    --ice: #F1F5F9; --slate: #CBD5E1; --charcoal: #111827; --white: #FFFFFF;
+    /* derived */
+    --navy-2: #12294A; --blue-tint: #E8EEFF; --aqua-tint: #DDF9F8; --grape-tint: #F3E8FF;
+    --grape-ink: #6B21A8; --muted: #526075; --line: #D5DEE9;
+    --danger: #B42318; --good: #0B7A75;
+    /* type */
+    --font-display: "Space Grotesk", ui-rounded, "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    /* shape and space */
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --pill: 999px;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+    --shadow: 0 1px 2px rgba(10, 26, 47, .06), 0 4px 14px rgba(10, 26, 47, .06);
+    --bar-h: 56px; --nav-h: 64px;
     color-scheme: light;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1a1210; --card: #251a17; --ink: #f5e8de; --muted: #b19e92; --line: #3a2a24;
-      --accent: #ff7a4d; --accent-ink: #1a1210; --soft: #3a2519; --good: #4fd1a1;
-      --chip: #31231e; --shadow: none; color-scheme: dark;
-    }
-  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--bar-h) + 12px); }
   body {
-    background: var(--bg); color: var(--ink);
-    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    margin: 0; background: var(--ice); color: var(--charcoal);
+    font: 400 16px/1.5 var(--font-ui);
+    padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 12px);
   }
-  .wrap { max-width: 880px; margin: 0 auto; padding: 16px; }
-  header h1 { margin: 4px 0 2px; font-size: 28px; letter-spacing: -.5px; }
-  header p { margin: 0; color: var(--muted); font-size: 14px; }
-  nav.tabs { display: flex; gap: 8px; margin: 16px 0 12px; }
-  nav.tabs button {
-    flex: 1; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line);
-    background: var(--card); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
-  }
-  nav.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; box-shadow: var(--shadow); margin-bottom: 14px; }
-  .panel h2 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .chip {
-    display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
-    border: 1px solid var(--line); background: var(--chip); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer;
-  }
-  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-  .chip.static { cursor: default; padding: 3px 9px; font-size: 13px; }
-  .chip.ing { cursor: pointer; }
-  .chip.x::after { content: "\00d7"; margin-left: 2px; opacity: .7; }
-  .section + .section { margin-top: 14px; }
-  input[type=text], input[type=search], textarea, select {
-    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
-    background: var(--bg); color: var(--ink); font: inherit;
-  }
-  textarea { min-height: 150px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
-  .btn {
-    padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
-    color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
-  }
-  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  .btn.small { padding: 6px 10px; font-size: 13px; }
-  .btn.danger { color: #c0392b; }
-  .muted { color: var(--muted); font-size: 14px; }
-  .count { margin: 4px 2px 10px; color: var(--muted); font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .cards { display: grid; gap: 10px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); }
-  .card.pick { border: 2px solid var(--accent); background: var(--soft); }
-  .card .top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
-  .card h3 { margin: 0; font-size: 18px; letter-spacing: -.2px; }
-  .card .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; font-size: 13px; color: var(--muted); }
-  .shop { color: #fff; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-  .recipe { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .recipe .base { font-weight: 700; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 700; margin: 0; line-height: 1.15; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 var(--s4); }
+  .num, #f-count, .match, .view-title { font-variant-numeric: tabular-nums; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .hidden, [hidden] { display: none !important; }
+  .skip { position: absolute; left: var(--s3); top: -60px; background: var(--white); color: var(--navy); padding: var(--s2) var(--s3); border-radius: var(--r-sm); z-index: 100; font-weight: 600; }
+  .skip:focus { top: var(--s2); }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; box-shadow: 0 0 0 6px rgba(18, 214, 208, .45); border-radius: var(--r-sm); }
+  .on-dark :focus-visible, .topbar :focus-visible, .hero :focus-visible, .bottomnav :focus-visible, .footer :focus-visible { outline-color: var(--aqua); box-shadow: 0 0 0 5px rgba(18, 214, 208, .35); }
+  .ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .ico.fill { fill: currentColor; }
+
+  /* header */
+  .topbar { position: sticky; top: 0; z-index: 40; background: var(--navy); color: var(--white); padding-top: env(safe-area-inset-top); }
+  .bar { display: flex; align-items: center; gap: var(--s4); height: var(--bar-h); }
+  .brand { display: inline-flex; align-items: center; border-radius: var(--r-sm); }
+  .brand img { height: 30px; width: auto; display: block; }
+  .topnav { display: none; margin-left: var(--s4); gap: var(--s1); }
+  .topnav button { background: none; border: 0; color: #C7D2E3; font-weight: 600; font-size: 15px; padding: 0 var(--s3); height: var(--bar-h); position: relative; }
+  .topnav button:hover { color: var(--white); }
+  .topnav button[aria-current="page"] { color: var(--white); }
+  .topnav button[aria-current="page"]::after { content: ""; position: absolute; left: var(--s3); right: var(--s3); bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--aqua); }
+  .spacer { flex: 1; }
+  .iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--r-md); border: 0; background: transparent; color: inherit; }
+  .topbar .iconbtn:hover { background: rgba(255, 255, 255, .1); }
+  .iconbtn.sm { width: 36px; height: 36px; color: var(--muted); border-radius: var(--r-sm); }
+  .iconbtn.sm:hover { background: var(--ice); color: var(--navy); }
+  .iconbtn.sm[aria-pressed="true"] { color: var(--blue); }
+  .iconbtn.sm[data-fav][aria-pressed="true"] { color: #D6336C; }
+  .iconbtn.sm[aria-pressed="true"] .ico { fill: currentColor; }
+  .iconbtn.sm[data-tried][aria-pressed="true"] .ico { fill: none; color: var(--good); }
+
+  /* hero */
+  .hero { position: relative; overflow: hidden; background: var(--navy); color: var(--white); padding: var(--s4) 0 56px; }
+  .hero::before, .hero::after { content: ""; position: absolute; border-radius: 50%; pointer-events: none; }
+  .hero::before { width: 260px; height: 260px; right: -70px; top: -90px; background: radial-gradient(circle at 35% 35%, rgba(168, 85, 247, .55), rgba(168, 85, 247, 0) 68%); }
+  .hero::after { width: 220px; height: 220px; left: -80px; bottom: -110px; background: radial-gradient(circle at 60% 40%, rgba(18, 214, 208, .38), rgba(18, 214, 208, 0) 70%); }
+  .hero .wrap { position: relative; z-index: 1; }
+  body:not(.tab-find) .hero { display: none; }
+  .hero h1 { font-size: clamp(28px, 7.4vw, 46px); letter-spacing: -.02em; }
+  .hero h1 span { color: var(--aqua); }
+  .hero p { margin: var(--s2) 0 var(--s4); color: #C7D2E3; font-size: 15px; }
+  .shop-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+  /* chips and buttons */
+  .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 var(--s3); border-radius: var(--pill); border: 1px solid var(--slate); background: var(--white); color: var(--charcoal); font-size: 14px; font-weight: 500; line-height: 1.2; }
+  .chip:hover { border-color: var(--blue); }
+  .chip[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: var(--white); font-weight: 600; }
+  .chip.flav[aria-pressed="true"] { background: var(--grape); border-color: var(--grape); color: var(--navy); }
+  .chip .num { font-size: 12px; opacity: .75; font-weight: 600; }
+  .chip.on-dark { background: transparent; border-color: rgba(255, 255, 255, .35); color: var(--white); }
+  .chip.on-dark:hover { border-color: var(--aqua); }
+  .chip.on-dark[aria-pressed="true"] { background: var(--white); border-color: var(--white); color: var(--navy); }
+  .chip.removable .ico { width: 14px; height: 14px; opacity: .7; }
+  .chip.static { min-height: 28px; padding: 0 10px; font-size: 13px; cursor: default; background: var(--ice); }
+  .chip.static:hover { border-color: var(--slate); }
+  .chip.ing { min-height: 28px; padding: 0 10px; font-size: 13px; background: var(--ice); border-color: transparent; }
+  .chip.ing:hover { border-color: var(--blue); background: var(--white); }
+  .chip.f-puree, .chip.f-frozen, .chip.f-fruit, .chip.f-fresh, .chip.f-pearls, .chip.f-sf { border-color: var(--aqua); background: var(--aqua-tint); }
+  .chip.new { background: var(--grape-tint); border-color: var(--grape); color: var(--grape-ink); font-weight: 600; }
+  .chip.gone { text-decoration: line-through; opacity: .65; }
+  .chip.off { opacity: .55; text-decoration: line-through; }
+  .link { background: none; border: 0; padding: 4px 6px; color: var(--blue); font-size: 14px; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; border-radius: var(--r-sm); }
+  .link[aria-pressed="true"] { font-weight: 700; color: var(--navy); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); min-height: 44px; padding: 0 var(--s4); border-radius: var(--r-md); border: 1px solid var(--slate); background: var(--white); color: var(--navy); font-weight: 600; font-size: 15px; }
+  .btn:hover { border-color: var(--blue); }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: var(--white); }
+  .btn.primary:hover { background: #1749D6; }
+  .btn.grape { background: var(--grape); border-color: var(--grape); color: var(--navy); }
+  .btn.grape:hover { background: #9740EC; }
+  .btn.small { min-height: 36px; padding: 0 var(--s3); font-size: 14px; }
+  .btn.danger { color: var(--danger); }
+  .row { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+  .muted { color: var(--muted); }
+  .hint { color: var(--muted); font-size: 13px; margin: var(--s2) 0 0; }
+
+  /* search card */
+  .searchcard { position: relative; z-index: 2; margin-top: -36px; background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: var(--s4); }
+  .searchbox { display: flex; align-items: center; gap: var(--s3); padding: 0 var(--s3); border: 2px solid var(--slate); border-radius: var(--r-md); background: var(--white); }
+  .searchbox:focus-within { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(18, 214, 208, .35); }
+  .searchbox .ico { color: var(--blue); width: 22px; height: 22px; }
+  .searchbox input { flex: 1; min-width: 0; height: 50px; border: 0; outline: none; background: transparent; font-size: 16px; }
+  .searchbox input::-webkit-search-cancel-button { appearance: none; }
+  .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--s1); margin-top: var(--s2); font-size: 14px; }
+  @media (max-width: 520px) { .examples .link:nth-child(n+6) { display: none; } .fchip .chev { display: none; } .fchip { padding: 0 11px; } }
+  .filterbar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--s3); }
+  .fchip { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 0 10px; border-radius: var(--pill); border: 1px solid var(--slate); background: var(--white); color: var(--charcoal); font-size: 13.5px; font-weight: 600; }
+  .fchip:hover { border-color: var(--blue); }
+  .fchip .ico { color: var(--muted); }
+  .fchip .chev { width: 14px; height: 14px; margin-left: -2px; transition: transform .15s; }
+  .fchip.has { border-color: var(--blue); background: var(--blue-tint); color: var(--navy); }
+  .fchip.has .ico { color: var(--blue); }
+  .fchip.open { background: var(--navy); border-color: var(--navy); color: var(--white); }
+  .fchip.open .ico { color: var(--aqua); }
+  .fchip.open .chev { transform: rotate(180deg); }
+  .fchip.toggle[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: var(--white); }
+  .fchip.toggle[aria-pressed="true"] .ico { color: var(--white); }
+  .fchip .num { min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--pill); background: var(--blue); color: var(--white); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+  .fchip.open .num { background: var(--aqua); color: var(--navy); }
+  .filterpanel { margin-top: var(--s3); padding: var(--s4); background: var(--ice); border: 1px solid var(--line); border-radius: var(--r-md); }
+  .psec + .psec { margin-top: var(--s4); }
+  .psec h3 { font-size: 14px; margin-bottom: var(--s2); color: var(--navy); }
+  .psec input[type=text] { width: 100%; height: 44px; margin-top: var(--s2); padding: 0 var(--s3); border: 1px solid var(--slate); border-radius: var(--r-md); background: var(--white); font-size: 16px; }
+  .psec details { margin-top: var(--s3); font-size: 14px; }
+  .psec details summary { cursor: pointer; color: var(--blue); font-weight: 500; }
+  .psec details ul { margin: var(--s2) 0 0; padding-left: 18px; }
+  .actives { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+  .achip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border-radius: var(--pill); border: 1px solid var(--blue); background: var(--blue-tint); color: var(--navy); font-size: 13px; font-weight: 600; }
+  .achip .ico { width: 14px; height: 14px; }
+
+  /* results */
+  .resultbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); margin: var(--s5) 0 var(--s3); }
+  .resultbar .grow { flex: 1 1 200px; }
+  .resultbar h2 { font-size: 22px; }
+  .resultbar .sub { color: var(--muted); font-size: 14px; }
+  .resultbar select { height: 44px; padding: 0 var(--s3); border: 1px solid var(--slate); border-radius: var(--r-md); background: var(--white); font-size: 15px; }
+  .cards { display: grid; gap: var(--s3); grid-template-columns: 1fr; }
+  @media (min-width: 720px) { .cards { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1020px) { .cards { grid-template-columns: repeat(3, 1fr); } }
+  .dcard { position: relative; display: flex; flex-direction: column; gap: var(--s2); background: var(--white); border: 1px solid var(--line); border-top: 3px solid var(--shop, var(--blue)); border-radius: var(--r-md); padding: var(--s3) var(--s4) var(--s4); box-shadow: var(--shadow); }
+  .dcard.is-pick { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(30, 88, 255, .18); }
+  .dcard.custom { border-top-color: var(--grape); }
+  .dc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s2); }
+  .dc-name { font-size: 18px; letter-spacing: -.01em; }
+  .dc-actions { display: flex; flex: none; margin: -4px -6px 0 0; }
+  .dc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s2); margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+  .shoptag { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--navy); }
+  .shoptag .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .kind { padding: 1px 8px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600; }
+  .kind-menu { background: var(--aqua-tint); color: #075E5A; }
+  .kind-custom { background: var(--grape-tint); color: var(--grape-ink); }
+  .kind-tried { background: var(--blue-tint); color: var(--navy); }
+  .recipe { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 14px; }
+  .recipe .base { font-weight: 700; color: var(--navy); }
   .plus { color: var(--muted); }
-  .why { margin-top: 8px; font-size: 13px; color: var(--good); font-weight: 600; }
-  .icons { display: flex; gap: 4px; }
-  .icon { border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; padding: 4px; color: var(--muted); }
-  .icon.on { color: var(--accent); }
-  .badge { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--soft); color: var(--ink); }
-  details { margin-top: 8px; font-size: 14px; }
-  details summary { cursor: pointer; color: var(--muted); }
-  .ideas { display: grid; gap: 8px; margin-top: 8px; }
-  .idea { border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 12px; background: var(--soft); }
-  .idea b.t { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
-  .chip.f-puree, .chip.f-frozen, .chip.f-fruit, .chip.f-fresh, .chip.f-pearls, .chip.f-sf { border-color: var(--accent); }
-  .chip.new { border-color: var(--good); color: var(--good); font-weight: 700; }
-  .chip.gone { text-decoration: line-through; opacity: .6; }
-  .chip.off { opacity: .5; cursor: default; text-decoration: line-through; }
-  details.more > summary { font-weight: 600; color: var(--ink); padding: 4px 0; }
-  details.more[open] > summary { margin-bottom: 10px; }
-  details ul { margin: 6px 0 0; padding-left: 18px; }
-  .hidden { display: none !important; }
-  .menu-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
-  .menu-row:first-of-type { border-top: 0; }
-  .menu-row .note { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; }
-  label.lbl { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
-  .errs { font-size: 13px; color: #c0392b; margin-top: 6px; white-space: pre-wrap; }
-  .okmsg { font-size: 13px; color: var(--good); margin-top: 6px; }
-  .suggest { margin-top: 8px; }
-  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 18px 0 30px; }
+  .plus-chip::before { content: "+"; color: var(--muted); font-weight: 700; margin-right: 1px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-sm); background: var(--ice); color: #334155; font-size: 12px; font-weight: 500; }
+  .tag .ico { width: 12px; height: 12px; }
+  .tag.warn { background: #FFF4D6; color: #7A4B00; }
+  .matchrow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); font-size: 13px; }
+  .match { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--navy); }
+  .bars { display: inline-flex; gap: 2px; align-items: flex-end; }
+  .bars i { display: block; width: 4px; border-radius: 2px; background: var(--slate); }
+  .bars i:nth-child(1) { height: 7px; } .bars i:nth-child(2) { height: 11px; } .bars i:nth-child(3) { height: 15px; }
+  .match.m3 .bars i { background: var(--blue); }
+  .match.m2 .bars i:nth-child(-n+2) { background: var(--blue); }
+  .match.m1 .bars i:nth-child(1) { background: var(--blue); }
+  details.more { font-size: 13px; }
+  details.more summary { cursor: pointer; color: var(--blue); font-weight: 500; }
+  details.more ul { margin: 6px 0 0; padding-left: 18px; color: #334155; }
+  .why-list li + li { margin-top: 2px; }
+
+  /* panels, vibe and states */
+  .panel { background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: var(--s4); margin-bottom: var(--s3); }
+  .panel h2 { font-size: 18px; margin-bottom: var(--s2); }
+  .panel h3 { font-size: 15px; margin: var(--s4) 0 var(--s2); }
+  .panel.vibe { border-top: 3px solid var(--grape); margin-top: var(--s4); }
+  .panel.vibe .eyebrow, .eyebrow { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--grape-ink); margin-bottom: 4px; }
+  .ideas { display: grid; gap: var(--s3); grid-template-columns: 1fr; margin-top: var(--s2); }
+  @media (min-width: 720px) { .ideas { grid-template-columns: repeat(2, 1fr); } }
+  .idea { border: 1px dashed var(--grape); border-radius: var(--r-md); padding: var(--s3) var(--s4); background: #FBF7FF; }
+  .idea .t { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); font-family: var(--font-display); font-weight: 700; font-size: 15px; margin-bottom: var(--s2); }
+  .state { text-align: center; padding: var(--s6) var(--s4); background: var(--white); border: 1px dashed var(--slate); border-radius: var(--r-lg); color: var(--muted); }
+  .state .ico { width: 32px; height: 32px; color: var(--blue); margin-bottom: var(--s2); }
+  .state h3 { font-size: 18px; color: var(--navy); margin-bottom: 4px; }
+  .state p { margin: 0 0 var(--s3); }
+  .state.error .ico { color: var(--danger); }
+  .remix-head { border-top: 3px solid var(--grape); }
+  .remix-head .eyebrow { margin: 0 0 4px; }
+  .remix-head p { margin: var(--s2) 0 var(--s3); color: var(--muted); font-size: 14px; }
+  .scope { margin: var(--s3) 0; font-size: 14px; color: var(--muted); }
+  .tabs { display: flex; gap: var(--s2); flex-wrap: wrap; margin: var(--s4) 0 var(--s3); }
+  .view-title { font-size: 26px; margin: var(--s5) 0 var(--s1); }
+  .view-sub { margin: 0 0 var(--s3); color: var(--muted); font-size: 15px; }
+  .menu-row { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s3); padding: var(--s3) 0; border-top: 1px solid var(--line); }
+  .menu-row:first-of-type { border-top: 0; padding-top: 0; }
+  .menu-row .note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .toggle-lbl { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; min-height: 36px; }
+  .toggle-lbl input { width: 20px; height: 20px; accent-color: var(--blue); }
+  label.lbl { display: block; font-size: 13px; font-weight: 600; color: var(--navy); margin: var(--s3) 0 4px; }
+  .panel input[type=text], .panel textarea { width: 100%; padding: var(--s3); border: 1px solid var(--slate); border-radius: var(--r-md); background: var(--white); font-size: 16px; }
+  .panel textarea { min-height: 150px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+  @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+  pre.sample { margin: 0 0 var(--s3); padding: var(--s3); background: var(--ice); border-radius: var(--r-md); white-space: pre-wrap; font-size: 12.5px; color: #334155; }
+  .errs { font-size: 13px; color: var(--danger); margin-top: var(--s2); white-space: pre-wrap; }
+  .okmsg { font-size: 13px; color: var(--good); margin-top: var(--s2); font-weight: 600; }
+  .center { text-align: center; margin-top: var(--s4); }
+
+  /* footer and bottom nav */
+  .footer { margin-top: var(--s6); background: var(--navy); color: #AEBBD0; padding: var(--s5) 0; font-size: 13px; }
+  .footer img { height: 26px; width: auto; display: block; margin-bottom: var(--s2); }
+  .footer p { margin: 0; max-width: 60ch; }
+  .bottomnav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--navy); border-top: 1px solid rgba(255, 255, 255, .12); padding-bottom: env(safe-area-inset-bottom); }
+  .bottomnav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: var(--nav-h); background: none; border: 0; color: #AEBBD0; font-size: 11.5px; font-weight: 600; position: relative; }
+  .bottomnav button .ico { width: 22px; height: 22px; }
+  .bottomnav button[aria-current="page"] { color: var(--aqua); }
+  .bottomnav button[aria-current="page"]::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 3px 3px; background: var(--aqua); }
+  @media (min-width: 760px) {
+    .topnav { display: flex; }
+    .bottomnav { display: none; }
+    body { padding-bottom: 0; }
+    .hero { padding: var(--s6) 0 64px; }
+    .hero p { font-size: 17px; }
+    .brand img { height: 34px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 </style>
 </head>
-<body>
-<div class="wrap">
-  <header>
-    <h1>🥤 Dirty Soda Library</h1>
-    <p id="stats">Loading menus...</p>
-  </header>
+<body class="tab-find">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+    <symbol id="i-shop" viewBox="0 0 24 24"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9h16v11H4z"/><path d="M9.5 20v-6h5v6"/></symbol>
+    <symbol id="i-mood" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9.5h.01M15 9.5h.01"/></symbol>
+    <symbol id="i-cup" viewBox="0 0 24 24"><path d="M6 8h12l-1.4 12a1 1 0 0 1-1 .9H8.4a1 1 0 0 1-1-.9L6 8z"/><path d="M5 8h14"/><path d="M13 8l1.6-5h2.4"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19c8 0 14-5 14-14-9 0-14 6-14 14z"/><path d="M5 19l8-8"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-checkc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9-9.2C1.8 7.2 4 4 7 4c2 0 3.5 1 5 3 1.5-2 3-3 5-3 3 0 5.2 3.2 4 6.8C19 15.6 12 20 12 20z"/></symbol>
+    <symbol id="i-remix" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16v4M17 18h4"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><path d="M9 9h11v11H9z"/><path d="M5 15V4h11"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18h.01"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  </defs>
+</svg>
 
-  <nav class="tabs" role="tablist">
-    <button role="tab" id="tab-find" aria-selected="true">Find a drink</button>
-    <button role="tab" id="tab-remix" aria-selected="false">🎲 Remix</button>
-    <button role="tab" id="tab-menus" aria-selected="false">Menus</button>
-  </nav>
+<a class="skip" href="#main">Skip to content</a>
 
-  <!-- FIND -->
-  <section id="view-find">
-    <div class="panel">
-      <div class="section">
-        <h2>Describe a flavor or vibe</h2>
-        <input type="search" id="f-vibe" placeholder="peach cobbler, pina colada, summer pool party, key lime pie..." autocomplete="off">
-        <div class="row" id="f-vibe-ex" style="margin-top:8px"></div>
+<header class="topbar">
+  <div class="wrap bar">
+    <a class="brand" href="./" aria-label="FizzFinder home"><img src="brand/fizzfinder-compact-dark.svg" alt="FizzFinder" width="150" height="34"></a>
+    <nav class="topnav" aria-label="Primary">
+      <button type="button" data-tab="find" aria-current="page">Find</button>
+      <button type="button" data-tab="remix">Remix</button>
+      <button type="button" data-tab="favs">Favorites</button>
+      <button type="button" data-tab="menus">Menus</button>
+    </nav>
+    <span class="spacer"></span>
+    <button type="button" class="iconbtn" id="b-settings" aria-label="Settings, backup and restore" title="Settings, backup and restore"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-gear"/></svg></button>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <h1 id="hero-title">Find Your <span>Next Favorite.</span></h1>
+      <p id="stats">Loading the menus...</p>
+      <div class="shop-row" id="hero-shops" role="group" aria-label="Where are you?"></div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <!-- FIND -->
+    <section id="view-find" aria-label="Find a drink">
+      <div class="searchcard">
+        <label class="sr-only" for="f-vibe">Describe a flavor or vibe</label>
+        <div class="searchbox">
+          <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-search"/></svg>
+          <input type="search" id="f-vibe" placeholder="Describe a flavor or vibe..." autocomplete="off" enterkeyhint="search">
+        </div>
+        <div class="examples" id="f-vibe-ex"></div>
+        <div class="filterbar" id="f-bar" role="toolbar" aria-label="Filters"></div>
+        <div class="filterpanel" id="f-panel" hidden></div>
+        <div class="actives" id="f-actives"></div>
       </div>
-      <div class="section">
-        <h2>Where are you?</h2>
-        <div class="row" id="f-shops"></div>
-        <div class="row" style="margin-top:8px"><button class="chip" id="o-board" aria-pressed="false" title="For shops where I have a photo of the current board, hide drinks that are no longer on it">On the menu board now</button></div>
+
+      <div id="f-vibe-out"></div>
+
+      <div class="resultbar">
+        <div class="grow">
+          <h2 id="f-count" aria-live="polite">Drinks</h2>
+          <div class="sub" id="f-sub"></div>
+        </div>
+        <label class="sr-only" for="f-sort">Sort results</label>
+        <select id="f-sort">
+          <option value="match">Best match</option>
+          <option value="az">A to Z</option>
+          <option value="shop">By shop</option>
+        </select>
+        <button type="button" class="btn primary" id="b-surprise"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-spark"/></svg>Try something new</button>
+        <button type="button" class="btn" id="b-reset">Reset</button>
       </div>
-      <div class="section">
-        <h2>What's the mood?</h2>
-        <div class="row" id="f-moods"></div>
-      </div>
-      <div class="section">
-        <h2>Form of the fruit or flavor</h2>
-        <div class="row" id="f-forms"></div>
-        <div class="row hidden" id="f-form-of" style="margin-top:8px"></div>
-        <details>
-          <summary>What do these mean?</summary>
-          <ul>
-            <li><b>Flavor shot</b>: a syrup pumped into the drink, like peach flavor.</li>
-            <li><b>Puree</b>: blended fruit, thicker and more natural, like peach puree.</li>
-            <li><b>Frozen or real fruit</b>: actual fruit pieces in the cup, like frozen peach.</li>
-            <li><b>Fresh fruit</b>: cut or squeezed fresh, mostly lime, lemon and orange.</li>
-            <li><b>Sugar-free flavor</b>: a sugar-free syrup shot.</li>
-            <li><b>Popping pearls</b>: juice balls that pop when you bite them.</li>
-          </ul>
-          <p class="muted" style="margin:6px 0 0">When a menu just says "Peach," it is treated as a flavor shot.</p>
-        </details>
-      </div>
-      <details class="more section" id="f-more">
-        <summary>More filters (base, must have, skip, caffeine)</summary>
-      <div class="section">
-        <h2>Base</h2>
-        <div class="row" id="f-bases"></div>
-      </div>
-      <div class="section">
-        <h2>Must have</h2>
-        <div class="row" id="f-must"></div>
-        <input type="text" id="f-must-in" list="ing-list" placeholder="Type an ingredient, like coconut" autocomplete="off" style="margin-top:8px">
-        <div class="suggest row" id="f-pairs"></div>
-      </div>
-      <div class="section">
-        <h2>Skip</h2>
-        <div class="row" id="f-avoid"></div>
-        <input type="text" id="f-avoid-in" list="ing-list" placeholder="Ingredient to avoid" autocomplete="off" style="margin-top:8px">
-      </div>
-      <div class="section">
-        <h2>Also</h2>
+      <div class="cards" id="f-results" aria-live="polite"><div class="state"><h3>Loading drinks</h3><p>One moment while the menus load.</p></div></div>
+      <div class="center"><button type="button" class="btn hidden" id="b-more">Show more</button></div>
+    </section>
+
+    <!-- REMIX -->
+    <section id="view-remix" hidden aria-label="Remix">
+      <h2 class="view-title">Remix a favorite</h2>
+      <p class="view-sub">Start from a popular drink and change one thing. Only pairings that appear on real menus are used.</p>
+      <div class="panel remix-head">
+        <div class="eyebrow">Custom builds</div>
+        <div class="row" id="r-modes" role="group" aria-label="Type of change"></div>
+        <div class="scope" id="r-scope"></div>
         <div class="row">
-          <button class="chip" id="o-sf" aria-pressed="false">Sugar free option</button>
-          <button class="chip" id="o-caf" aria-pressed="false">Caffeinated</button>
-          <button class="chip" id="o-nocaf" aria-pressed="false">No caffeine</button>
-          <button class="chip" id="o-fav" aria-pressed="false">♥ Favorites</button>
-          <button class="chip" id="o-new" aria-pressed="false">Haven't tried</button>
+          <button type="button" class="btn grape" id="r-go"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-remix"/></svg>Remix</button>
+          <button type="button" class="btn hidden" id="r-clear">Use popular drinks again</button>
         </div>
       </div>
-      </details>
-      <div class="section">
-        <input type="search" id="f-q" placeholder="Search names or ingredients">
-        <div class="row" style="margin-top:10px">
-          <select id="f-sort" style="width:auto">
-            <option value="match">Best match</option>
-            <option value="az">A to Z</option>
-            <option value="shop">By shop</option>
-          </select>
-          <button class="btn primary" id="b-surprise">🎲 Surprise me</button>
-          <button class="btn" id="b-reset">Reset</button>
-        </div>
-      </div>
-    </div>
-    <div id="f-vibe-out"></div>
-    <div class="count"><span id="f-count"></span></div>
-    <div class="cards" id="f-results"></div>
-    <div style="text-align:center;margin-top:12px"><button class="btn hidden" id="b-more">Show more</button></div>
-  </section>
+      <div class="cards" id="r-results" aria-live="polite"></div>
+    </section>
 
-  <!-- REMIX -->
-  <section id="view-remix" class="hidden">
-    <div class="panel">
-      <h2>Remix generator</h2>
-      <p class="muted" style="margin-top:0">Invents new drinks by taking a popular one and changing it: add a flavor, remove one, swap one, or swap the soda. Flavors are only used where they really pair on these menus. It follows the shop, base and skip filters from the Find tab, and your vibe or mood if you set one.</p>
-      <div class="row" id="r-modes"></div>
-      <div class="muted" id="r-scope" style="margin-top:8px"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="btn primary" id="r-go">🎲 Remix</button>
-        <button class="btn hidden" id="r-clear">Use popular drinks again</button>
-      </div>
-    </div>
-    <div class="cards" id="r-results"></div>
-    <div class="panel" style="margin-top:14px">
-      <h2>Saved remixes</h2>
-      <div id="r-saved"></div>
-    </div>
-  </section>
+    <!-- FAVORITES -->
+    <section id="view-favs" hidden aria-label="Favorites">
+      <h2 class="view-title">Favorites</h2>
+      <p class="view-sub">Saved in this browser. Nothing is sent anywhere.</p>
+      <div class="tabs" id="fav-tabs" role="group" aria-label="Saved items"></div>
+      <div class="cards" id="fav-list"></div>
+    </section>
 
-  <!-- MENUS -->
-  <section id="view-menus" class="hidden">
-    <div class="panel">
-      <h2>Your menus</h2>
-      <div id="m-list"></div>
-    </div>
-    <div class="panel">
-      <h2>Add a menu</h2>
-      <p class="muted" style="margin-top:0">Paste one drink per line. Use a dash or colon after the name, then the soda and add-ins separated by plus signs or commas.</p>
-      <pre class="muted" style="margin:0 0 10px;white-space:pre-wrap;font-size:12px">Princess Peach - Dr Pepper + Peach + Coconut Cream
+    <!-- MENUS -->
+    <section id="view-menus" hidden aria-label="Menus">
+      <h2 class="view-title">Menus</h2>
+      <p class="view-sub">Choose which shops count, add a menu, or back up your data.</p>
+      <div class="panel">
+        <h2>Your menus</h2>
+        <div id="m-list"></div>
+      </div>
+      <div class="panel">
+        <h2>Add or update a menu</h2>
+        <p class="muted" style="margin-top:0">Paste one drink per line. Put a dash or colon after the name, then the soda and add-ins separated by plus signs or commas.</p>
+        <pre class="sample">Princess Peach - Dr Pepper + Peach + Coconut Cream
 Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
-      <div class="grid2">
-        <div><label class="lbl" for="m-shop">Shop name</label><input type="text" id="m-shop" placeholder="Swig"></div>
-        <div><label class="lbl" for="m-cat">Section (optional)</label><input type="text" id="m-cat" placeholder="Dirty Soda"></div>
+        <div class="grid2">
+          <div><label class="lbl" for="m-shop">Shop name</label><input type="text" id="m-shop" placeholder="Swig" autocomplete="off"></div>
+          <div><label class="lbl" for="m-cat">Section (optional)</label><input type="text" id="m-cat" placeholder="Dirty Soda" autocomplete="off"></div>
+        </div>
+        <label class="lbl" for="m-text">Drinks</label>
+        <textarea id="m-text" placeholder="Name - Base + ingredient + ingredient"></textarea>
+        <div class="row" style="margin-top:12px"><button type="button" class="btn primary" id="m-add">Add to library</button></div>
+        <div class="errs" id="m-errs" role="alert"></div>
+        <div class="okmsg" id="m-ok" role="status"></div>
       </div>
-      <label class="lbl" for="m-text">Drinks</label>
-      <textarea id="m-text" placeholder="Name - Base + ingredient + ingredient"></textarea>
-      <div class="row" style="margin-top:10px">
-        <button class="btn primary" id="m-add">Add to library</button>
+      <div class="panel" id="backup">
+        <h2>Backup and restore</h2>
+        <p class="muted" style="margin-top:0">Menus you add, favorites, tried drinks and saved remixes live in this browser. Copy a backup to move them to another phone.</p>
+        <div class="row">
+          <button type="button" class="btn" id="b-export"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg>Copy backup</button>
+          <button type="button" class="btn" id="b-import">Restore from pasted backup</button>
+        </div>
+        <label class="lbl" for="m-backup">Backup text</label>
+        <textarea id="m-backup" style="min-height:90px" placeholder="Your backup appears here, or paste one to restore"></textarea>
+        <div class="errs" id="b-msg" role="status"></div>
       </div>
-      <div class="errs" id="m-errs"></div>
-      <div class="okmsg" id="m-ok"></div>
-    </div>
-    <div class="panel">
-      <h2>Backup</h2>
-      <p class="muted" style="margin-top:0">Menus you add, favorites and tried drinks live in this browser. Export them to move to another phone.</p>
-      <div class="row">
-        <button class="btn" id="b-export">Copy backup</button>
-        <button class="btn" id="b-import">Restore from pasted backup</button>
-      </div>
-      <textarea id="m-backup" style="min-height:80px;margin-top:10px" placeholder="Backup text appears here, or paste one to restore"></textarea>
-      <div class="errs" id="b-msg"></div>
-    </div>
-  </section>
+    </section>
+  </div>
+</main>
 
-  <footer>Built for the soda run. Recipes come from each shop's published menu and may change.</footer>
-</div>
+<footer class="footer">
+  <div class="wrap">
+    <img src="brand/fizzfinder-compact-dark.svg" alt="FizzFinder" width="115" height="26">
+    <p>Recipes come from each shop's published menu and may change. Your favorites, tried drinks, saved remixes and added menus stay in this browser.</p>
+  </div>
+</footer>
+
+<nav class="bottomnav" aria-label="Primary">
+  <button type="button" data-tab="find" aria-current="page"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-search"/></svg>Find</button>
+  <button type="button" data-tab="remix"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-remix"/></svg>Remix</button>
+  <button type="button" data-tab="favs"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-heart"/></svg>Favorites</button>
+  <button type="button" data-tab="menus"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-list"/></svg>Menus</button>
+</nav>
+
+<noscript><div class="wrap"><div class="state error"><h3>JavaScript is needed</h3><p>FizzFinder runs in your browser, so please turn JavaScript on.</p></div></div></noscript>
 <datalist id="ing-list"></datalist>
 
 <script src="menus.js"></script>
@@ -349,18 +514,18 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   var CAFFEINATED = { "Dr Pepper": 1, "Coke": 1, "Pepsi": 1, "Mtn Dew": 1, "Energy": 1, "Tea": 1 };
 
   var MOODS = [
-    { id: "tropical", label: "Tropical getaway", e: "🌴", tags: { tropical: 2 }, fam: { "Lemonade": .5, "Lemon-Lime": .3, "Water": .2 } },
-    { id: "creamy", label: "Creamy dessert", e: "🍦", tags: { creamy: 2, dessert: 1.5 } },
-    { id: "cozy", label: "Cozy fall", e: "🍂", tags: { cozy: 2.5, creamy: .5, orchard: 1 }, seasonal: 2 },
-    { id: "tart", label: "Tart and zingy", e: "🍋", tags: { tart: 2 }, neg: { creamy: 1 } },
-    { id: "berry", label: "Berry bomb", e: "🍓", tags: { berry: 2.5 } },
-    { id: "mellow", label: "Soft and mellow", e: "🍑", tags: { mellow: 2, creamy: .5 } },
-    { id: "candy", label: "Candy shop", e: "🍬", tags: { candy: 2.5 } },
-    { id: "floral", label: "Fresh and floral", e: "🌸", tags: { floral: 3 } },
-    { id: "chocolate", label: "Chocolate fix", e: "🍫", tags: { chocolate: 4 } },
-    { id: "boost", label: "Need a boost", e: "⚡", fam: { "Energy": 4, "Protein": 2, "Tea": .5 }, caf: 1 },
-    { id: "light", label: "Light and refreshing", e: "💧", fam: { "Water": 2.5, "Tea": 1.5, "Lemonade": 1.5, "Lemon-Lime": .5 }, sf: 1, neg: { creamy: 1.5 } },
-    { id: "classic", label: "Classic comfort", e: "🥤", fam: { "Dr Pepper": 1, "Root Beer": 1.5, "Coke": 1 }, tags: { creamy: .5, dessert: .5 } }
+    { id: "tropical", label: "Tropical getaway", tags: { tropical: 2 }, fam: { "Lemonade": .5, "Lemon-Lime": .3, "Water": .2 } },
+    { id: "creamy", label: "Creamy dessert", tags: { creamy: 2, dessert: 1.5 } },
+    { id: "cozy", label: "Cozy fall", tags: { cozy: 2.5, creamy: .5, orchard: 1 }, seasonal: 2 },
+    { id: "tart", label: "Tart and zingy", tags: { tart: 2 }, neg: { creamy: 1 } },
+    { id: "berry", label: "Berry bomb", tags: { berry: 2.5 } },
+    { id: "mellow", label: "Soft and mellow", tags: { mellow: 2, creamy: .5 } },
+    { id: "candy", label: "Candy shop", tags: { candy: 2.5 } },
+    { id: "floral", label: "Fresh and floral", tags: { floral: 3 } },
+    { id: "chocolate", label: "Chocolate fix", tags: { chocolate: 4 } },
+    { id: "boost", label: "Need a boost", fam: { "Energy": 4, "Protein": 2, "Tea": .5 }, caf: 1 },
+    { id: "light", label: "Light and refreshing", fam: { "Water": 2.5, "Tea": 1.5, "Lemonade": 1.5, "Lemon-Lime": .5 }, sf: 1, neg: { creamy: 1.5 } },
+    { id: "classic", label: "Classic comfort", fam: { "Dr Pepper": 1, "Root Beer": 1.5, "Coke": 1 }, tags: { creamy: .5, dessert: .5 } }
   ];
   var PROFILES = [
     { k: ["peach cobbler", "cobbler"], l: "Peach cobbler", w: { peach: 3, vanilla: 2, cinnamon: 2, caramel: 1, butterscotch: 1, "half & half": 1 } },
@@ -429,17 +594,19 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     return { t: t, w: w, f: f, labels: labels, empty: !Object.keys(w).length };
   }
   function vibeScore(d) {
-    if (!PROF) return { s: 0, m: [] };
+    if (!PROF) return { s: 0, m: [], nm: false };
+    var nm = PROF.t.length >= 3 && norm(d.name).indexOf(PROF.t) >= 0;
     if (PROF.empty) {
       var words = PROF.t.split(" ").filter(function (x) { return x.length >= 3; });
-      var hit = words.length && words.every(function (x) { return d.hay.indexOf(x) >= 0; });
-      return { s: hit ? 2 : 0, m: [] };
+      var hit = nm || (words.length && words.every(function (x) { return d.hay.indexOf(x) >= 0; }));
+      return { s: hit ? 2 : 0, m: [], nm: nm };
     }
     var s = 0, m = [], un = 0;
     d.ings.forEach(function (k) { if (PROF.w[k]) { s += PROF.w[k]; m.push(k); } else un++; });
     d.fams.forEach(function (b) { if (PROF.f[b]) s += PROF.f[b]; });
     if (m.length) s -= 0.3 * un;
-    return { s: s, m: m };
+    if (nm) s += 6;
+    return { s: s, m: m, nm: nm };
   }
   var BASE_ORDER = ["Dr Pepper", "Coke", "Pepsi", "Mtn Dew", "Lemon-Lime", "Root Beer", "Fresca", "Ginger Ale", "Lemonade", "Orange Soda", "Cream Soda", "Tea", "Water", "Energy", "Protein", "Sports Drink", "Frozen", "Hot Chocolate"];
 
@@ -516,11 +683,9 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     var dl = $("#ing-list");
     dl.innerHTML = Object.keys(ING_FREQ).sort().map(function (k) { return '<option value="' + esc(label(k)) + '">'; }).join("");
     buildRemixIndex();
-    $("#stats").textContent = ALL.length + " drinks from " + SHOPS.length + " shops, " + Object.keys(ING_FREQ).length + " ingredients";
+    $("#stats").textContent = ALL.length + " drinks from " + SHOPS.length + " shops. Real ingredients. Endless combinations.";
   }
 
-  function hue(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
-  function shopStyle(s) { return "background:hsl(" + hue(s) + " 55% 38%)"; }
 
   /* ---------- filter state ---------- */
   var F = Object.assign({ shops: [], moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, forms: [], formOf: [], board: false, q: "", vibe: "", sort: "match" }, saved);
@@ -530,44 +695,143 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   function toggleIn(arr, v) { var i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); }
   function keyOf(v) { return canon(v).k; }
 
+
+  /* ---------- icons and small helpers ---------- */
+  function ico(id, cls) { return '<svg class="ico' + (cls ? " " + cls : "") + '" aria-hidden="true" focusable="false"><use href="#i-' + id + '"/></svg>'; }
+  function chipBtn(text, attrs, pressed, cls, extra) {
+    return '<button type="button" class="chip' + (cls ? " " + cls : "") + '" ' + attrs + ' aria-pressed="' + (!!pressed) + '">' + (pressed ? ico("check") : "") + esc(text) + (extra || "") + "</button>";
+  }
+  function removable(attr, k, text) {
+    return '<button type="button" class="chip removable" ' + attr + '="' + esc(k) + '" aria-label="Remove ' + esc(text) + '">' + esc(text) + ico("x") + "</button>";
+  }
+  var SHOP_COLORS = ["#1E58FF", "#12D6D0", "#A855F7", "#0A1A2F", "#4D8BFF", "#7C3AED"];
+  function shopColor(name) {
+    for (var i = 0; i < SHOPS.length; i++) if (SHOPS[i].name === name) return SHOP_COLORS[i % SHOP_COLORS.length];
+    return SHOP_COLORS[0];
+  }
+  var TAG_LABELS = [["tropical", "Tropical"], ["creamy", "Creamy"], ["berry", "Berry"], ["tart", "Tart"], ["dessert", "Dessert"], ["cozy", "Cozy"], ["candy", "Candy"], ["floral", "Floral"], ["chocolate", "Chocolate"], ["orchard", "Orchard"]];
+  function flavorTags(d) {
+    var arr = TAG_LABELS.filter(function (t) { return d.tags[t[0]]; });
+    arr.sort(function (a, b) { return d.tags[b[0]] - d.tags[a[0]]; });
+    return arr.slice(0, 3).map(function (t) { return t[1]; });
+  }
+  function moodLabel(id) { var m = MOODS.filter(function (x) { return x.id === id; })[0]; return m ? m.label : id; }
+  function reducedMotion() { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
+  function scrollToEl(el, offset) {
+    if (!el) return;
+    var top = el.getBoundingClientRect().top + window.pageYOffset - (offset == null ? 72 : offset);
+    window.scrollTo({ top: Math.max(top, 0), behavior: reducedMotion() ? "auto" : "smooth" });
+  }
+
+  /* ---------- filter bar, panels and active filters ---------- */
+  var PANELS = [["shop", "Shop", "shop"], ["mood", "Mood", "mood"], ["base", "Soda base", "cup"], ["ing", "Ingredients", "drop"], ["form", "Form", "layers"], ["caf", "Caffeine", "bolt"]];
+  var TOGGLES = [["sf", "Sugar free", "leaf"], ["fresh", "Not tried", "checkc"], ["fav", "Favorites", "heart"]];
+  var openPanel = null;
+  function panelCount(id) {
+    switch (id) {
+      case "shop": return F.shops.length + (F.board ? 1 : 0);
+      case "mood": return F.moods.length;
+      case "base": return F.bases.length;
+      case "ing": return F.must.length + F.avoid.length;
+      case "form": return F.forms.length + F.formOf.length;
+      case "caf": return (F.caf ? 1 : 0) + (F.nocaf ? 1 : 0);
+    }
+    return 0;
+  }
+  function sec(title, body) { return '<div class="psec"><h3>' + title + "</h3>" + body + "</div>"; }
+
   function renderControls() {
-    $("#f-shops").innerHTML = SHOPS.filter(function (s) { return !disabled[s.name]; }).map(function (s) {
-      return '<button class="chip" data-shop="' + esc(s.name) + '" aria-pressed="' + (F.shops.indexOf(s.name) >= 0) + '">' + esc(s.name) + '</button>';
-    }).join("") + '<span class="muted">' + (F.shops.length ? "" : "All shops") + "</span>";
-    $("#f-moods").innerHTML = MOODS.map(function (m) {
-      return '<button class="chip" data-mood="' + m.id + '" aria-pressed="' + (F.moods.indexOf(m.id) >= 0) + '">' + m.e + " " + m.label + "</button>";
-    }).join("");
-    var present = {};
-    ALL.forEach(function (d) { d.fams.forEach(function (f) { present[f] = 1; }); });
-    $("#f-bases").innerHTML = BASE_ORDER.filter(function (b) { return present[b]; }).map(function (b) {
-      return '<button class="chip" data-base="' + esc(b) + '" aria-pressed="' + (F.bases.indexOf(b) >= 0) + '">' + esc(b) + "</button>";
-    }).join("");
-    $("#f-must").innerHTML = F.must.map(function (k) { return '<button class="chip x" data-unmust="' + esc(k) + '" aria-pressed="true">' + esc(label(k)) + "</button>"; }).join("");
-    $("#f-avoid").innerHTML = F.avoid.map(function (k) { return '<button class="chip x" data-unavoid="' + esc(k) + '" aria-pressed="true">' + esc(label(k)) + "</button>"; }).join("");
-    [["o-sf", "sf"], ["o-caf", "caf"], ["o-nocaf", "nocaf"], ["o-fav", "fav"], ["o-new", "fresh"]].forEach(function (p) { $("#" + p[0]).setAttribute("aria-pressed", String(!!F[p[1]])); });
+    var vis = SHOPS.filter(function (s) { return !disabled[s.name]; });
+    $("#hero-shops").innerHTML = chipBtn("All shops", 'data-shop-all="1"', !F.shops.length, "on-dark") +
+      vis.map(function (s) { return chipBtn(s.name, 'data-shop="' + esc(s.name) + '"', F.shops.indexOf(s.name) >= 0, "on-dark"); }).join("");
     if (document.activeElement !== $("#f-vibe")) $("#f-vibe").value = F.vibe;
-    $("#f-vibe-ex").innerHTML = '<span class="muted">Try:</span> ' + VIBE_EXAMPLES.map(function (v) { return '<button class="chip" data-vibe="' + esc(v) + '" aria-pressed="' + (norm(F.vibe) === v) + '">' + esc(v) + "</button>"; }).join("");
-    $("#o-board").setAttribute("aria-pressed", String(!!F.board));
-    $("#f-forms").innerHTML = FORM_GROUPS.map(function (g) { return '<button class="chip" data-formg="' + g[0] + '" aria-pressed="' + (F.forms.indexOf(g[0]) >= 0) + '">' + g[1] + "</button>"; }).join("");
-    var okf = allowedForms(), fcount = {};
-    ALL.forEach(function (d) {
-      if (disabled[d.shop] || (F.shops.length && F.shops.indexOf(d.shop) < 0)) return;
-      d.ings.forEach(function (k) { if (isFlavorKey(k) && d.forms[k].some(function (f) { return okf.indexOf(f) >= 0; })) fcount[k] = (fcount[k] || 0) + 1; });
-    });
-    var fkeys = Object.keys(fcount).sort(function (a, b) { return fcount[b] - fcount[a] || (a < b ? -1 : 1); }).slice(0, 18);
-    $("#f-form-of").classList.toggle("hidden", !F.forms.length);
-    $("#f-form-of").innerHTML = '<span class="muted">Which fruit or flavor:</span> ' + fkeys.map(function (k) { return '<button class="chip" data-formof="' + esc(k) + '" aria-pressed="' + (F.formOf.indexOf(k) >= 0) + '">' + esc(label(k)) + ' <span class="muted">' + fcount[k] + "</span></button>"; }).join("");
-    $("#f-q").value = F.q; $("#f-sort").value = F.sort;
-    // pairings: what usually goes with the chosen base(s)
-    var pairs = {}, pool = ALL.filter(function (d) { return !F.bases.length || d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; }); });
-    pool.forEach(function (d) { d.ings.forEach(function (k) { pairs[k] = (pairs[k] || 0) + 1; }); });
-    var top = Object.keys(pairs).filter(function (k) { return F.must.indexOf(k) < 0; }).sort(function (a, b) { return pairs[b] - pairs[a] || (a < b ? -1 : 1); }).slice(0, 8);
-    $("#f-pairs").innerHTML = '<span class="muted">' + (F.bases.length ? "Popular with " + F.bases.join(" / ") + ":" : "Popular add-ins:") + "</span> " +
-      top.map(function (k) { return '<button class="chip" data-addmust="' + esc(k) + '" aria-pressed="false">' + esc(label(k)) + " <span class=\"muted\">" + pairs[k] + "</span></button>"; }).join("");
+    $("#f-vibe-ex").innerHTML = '<span class="muted">Try</span>' + VIBE_EXAMPLES.map(function (v) {
+      return '<button type="button" class="link" data-vibe="' + esc(v) + '" aria-pressed="' + (norm(F.vibe) === v) + '">' + esc(v) + "</button>";
+    }).join("");
+    $("#f-bar").innerHTML = PANELS.map(function (p) {
+      var c = panelCount(p[0]);
+      return '<button type="button" class="fchip' + (c ? " has" : "") + (openPanel === p[0] ? " open" : "") + '" data-panel="' + p[0] + '" aria-expanded="' + (openPanel === p[0]) + '" aria-controls="f-panel">' +
+        ico(p[2]) + p[1] + (c ? '<span class="num">' + c + "</span>" : "") + ico("chevron", "chev") + "</button>";
+    }).join("") + TOGGLES.map(function (t) {
+      return '<button type="button" class="fchip toggle' + (F[t[0]] ? " has" : "") + '" data-toggle="' + t[0] + '" aria-pressed="' + (!!F[t[0]]) + '">' + ico(F[t[0]] ? "check" : t[2]) + t[1] + "</button>";
+    }).join("");
+    $("#f-sort").value = F.sort;
+    renderPanel();
+    renderActives();
+  }
+
+  function renderPanel() {
+    var el = $("#f-panel");
+    if (!openPanel) { el.hidden = true; el.innerHTML = ""; return; }
+    el.hidden = false;
+    var h = "";
+    if (openPanel === "shop") {
+      h += sec("Where are you?", '<div class="row">' + chipBtn("All shops", 'data-shop-all="1"', !F.shops.length) +
+        SHOPS.filter(function (s) { return !disabled[s.name]; }).map(function (s) { return chipBtn(s.name, 'data-shop="' + esc(s.name) + '"', F.shops.indexOf(s.name) >= 0); }).join("") + "</div>");
+      h += sec("Menu board", '<div class="row">' + chipBtn("On the menu board now", 'data-board="1"', F.board) + '</div><p class="hint">For shops where there is a recent photo of the menu board, hide drinks that are no longer on it.</p>');
+    } else if (openPanel === "mood") {
+      h += sec("What is the mood?", '<div class="row">' + MOODS.map(function (m) { return chipBtn(m.label, 'data-mood="' + m.id + '"', F.moods.indexOf(m.id) >= 0, "flav"); }).join("") + "</div>");
+    } else if (openPanel === "base") {
+      var present = {};
+      ALL.forEach(function (d) { d.fams.forEach(function (f) { present[f] = 1; }); });
+      h += sec("Soda base", '<div class="row">' + BASE_ORDER.filter(function (b) { return present[b]; }).map(function (b) { return chipBtn(b, 'data-base="' + esc(b) + '"', F.bases.indexOf(b) >= 0); }).join("") + "</div>");
+    } else if (openPanel === "ing") {
+      var pairs = {}, pool = ALL.filter(function (d) { return !F.bases.length || d.fams.some(function (f) { return F.bases.indexOf(f) >= 0; }); });
+      pool.forEach(function (d) { d.ings.forEach(function (k) { pairs[k] = (pairs[k] || 0) + 1; }); });
+      var top = Object.keys(pairs).filter(function (k) { return F.must.indexOf(k) < 0; }).sort(function (a, b) { return pairs[b] - pairs[a] || (a < b ? -1 : 1); }).slice(0, 8);
+      h += sec("Must have", (F.must.length ? '<div class="row">' + F.must.map(function (k) { return removable("data-unmust", k, label(k)); }).join("") + "</div>" : "") +
+        '<input type="text" id="f-must-in" list="ing-list" placeholder="Type an ingredient, like coconut" autocomplete="off" aria-label="Add a must-have ingredient">' +
+        '<div class="row" style="margin-top:8px"><span class="muted" style="font-size:13px">' + (F.bases.length ? "Popular with " + esc(F.bases.join(" / ")) : "Popular add-ins") + "</span>" +
+        top.map(function (k) { return '<button type="button" class="chip" data-addmust="' + esc(k) + '" aria-pressed="false">' + esc(label(k)) + ' <span class="num">' + pairs[k] + "</span></button>"; }).join("") + "</div>");
+      h += sec("Skip", (F.avoid.length ? '<div class="row">' + F.avoid.map(function (k) { return removable("data-unavoid", k, label(k)); }).join("") + "</div>" : "") +
+        '<input type="text" id="f-avoid-in" list="ing-list" placeholder="Ingredient to avoid" autocomplete="off" aria-label="Add an ingredient to skip">');
+    } else if (openPanel === "form") {
+      var okf = allowedForms(), fcount = {};
+      ALL.forEach(function (d) {
+        if (disabled[d.shop] || (F.shops.length && F.shops.indexOf(d.shop) < 0)) return;
+        d.ings.forEach(function (k) { if (isFlavorKey(k) && d.forms[k].some(function (f) { return okf.indexOf(f) >= 0; })) fcount[k] = (fcount[k] || 0) + 1; });
+      });
+      var fkeys = Object.keys(fcount).sort(function (a, b) { return fcount[b] - fcount[a] || (a < b ? -1 : 1); }).slice(0, 18);
+      h += sec("Form of the fruit or flavor", '<div class="row">' + FORM_GROUPS.map(function (g) { return chipBtn(g[1], 'data-formg="' + g[0] + '"', F.forms.indexOf(g[0]) >= 0, "flav"); }).join("") + "</div>");
+      if (F.forms.length) h += sec("Which fruit or flavor", '<div class="row">' + fkeys.map(function (k) { return chipBtn(label(k), 'data-formof="' + esc(k) + '"', F.formOf.indexOf(k) >= 0, "", ' <span class="num">' + fcount[k] + "</span>"); }).join("") + "</div>");
+      h += '<details class="psec"><summary>What do these mean?</summary><ul>' +
+        "<li><b>Flavor shot</b>: a syrup pumped into the drink, like peach flavor.</li>" +
+        "<li><b>Puree</b>: blended fruit, thicker and more natural, like peach puree.</li>" +
+        "<li><b>Frozen or real fruit</b>: actual fruit pieces in the cup, like frozen peach.</li>" +
+        "<li><b>Fresh fruit</b>: cut or squeezed fresh, mostly lime, lemon and orange.</li>" +
+        "<li><b>Sugar-free flavor</b>: a sugar-free syrup shot.</li>" +
+        "<li><b>Popping pearls</b>: juice balls that pop when you bite them.</li></ul>" +
+        '<p class="hint">When a menu just says "Peach," it is treated as a flavor shot.</p></details>';
+    } else if (openPanel === "caf") {
+      h += sec("Caffeine", '<div class="row">' + chipBtn("Caffeinated", 'data-flag="caf"', F.caf) + chipBtn("No caffeine", 'data-flag="nocaf"', F.nocaf) + '</div><p class="hint">Based on the soda base, so treat it as a guide.</p>');
+    }
+    el.innerHTML = h;
+  }
+
+  function renderActives() {
+    var items = [];
+    F.shops.forEach(function (s) { items.push(["shops", s, s]); });
+    if (F.board) items.push(["flag", "board", "On the menu board now"]);
+    F.moods.forEach(function (id) { items.push(["moods", id, moodLabel(id)]); });
+    F.bases.forEach(function (b) { items.push(["bases", b, b]); });
+    F.must.forEach(function (k) { items.push(["must", k, "Has " + label(k)]); });
+    F.avoid.forEach(function (k) { items.push(["avoid", k, "No " + label(k)]); });
+    F.forms.forEach(function (g) { var fg = FORM_GROUPS.filter(function (x) { return x[0] === g; })[0]; items.push(["forms", g, "Form: " + (fg ? fg[1] : g)]); });
+    F.formOf.forEach(function (k) { items.push(["formOf", k, "Form of " + label(k)]); });
+    if (F.sf) items.push(["flag", "sf", "Sugar free"]);
+    if (F.caf) items.push(["flag", "caf", "Caffeinated"]);
+    if (F.nocaf) items.push(["flag", "nocaf", "No caffeine"]);
+    if (F.fresh) items.push(["flag", "fresh", "Not tried"]);
+    if (F.fav) items.push(["flag", "fav", "Favorites"]);
+    $("#f-actives").innerHTML = items.length ? items.map(function (i) {
+      return '<button type="button" class="achip" data-clear="' + i[0] + ":" + esc(i[1]) + '" aria-label="Remove filter ' + esc(i[2]) + '">' + esc(i[2]) + ico("x") + "</button>";
+    }).join("") + '<button type="button" class="link" data-reset="1">Clear all</button>' : "";
   }
 
   function score(d) {
-    var v = vibeScore(d), vwhy = v.m.length ? ["Matches: " + v.m.slice(0, 5).map(label).join(", ")] : [];
+    var v = vibeScore(d), vwhy = [];
+    if (v.nm) vwhy.push("The name matches your search");
+    if (v.m.length) vwhy.push("Matches your vibe through " + v.m.slice(0, 5).map(label).join(", "));
     if (!F.moods.length) return { s: v.s, ms: 0, vs: v.s, why: vwhy };
     var total = 0, why = [];
     F.moods.forEach(function (id) {
@@ -579,7 +843,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
       if (m.caf && d.caf) s += m.caf;
       if (m.sf && d.sf) s += m.sf;
       s = s / (1 + 0.08 * Math.max(d.ings.length - 2, 0));
-      if (s > 0.9) why.push(m.e + " " + m.label);
+      if (s > 0.9) why.push("Fits the " + m.label + " mood");
       total += s;
     });
     var ms = total / F.moods.length;
@@ -594,10 +858,14 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     return c;
   }
   function domForm(fc, k) { var o = fc[k]; if (!o) return "flavor"; return Object.keys(o).sort(function (a, b) { return o[b] - o[a]; })[0]; }
+
   function renderVibe() {
     var out = $("#f-vibe-out");
     if (!PROF) { out.innerHTML = ""; return; }
-    if (PROF.empty) { out.innerHTML = '<div class="panel muted">No flavor profile for "' + esc(F.vibe) + '" yet, so I tried a plain name and ingredient search. Try a dessert, a drink, a place or a season.</div>'; return; }
+    if (PROF.empty) {
+      out.innerHTML = '<div class="panel vibe"><div class="eyebrow">Flavor profile</div><h2>No profile for "' + esc(F.vibe.trim()) + '" yet</h2><p class="hint" style="margin:0">Showing plain name and ingredient matches instead. Try a dessert, a drink, a place or a season.</p></div>';
+      return;
+    }
     var scope = ALL.filter(function (d) { return !disabled[d.shop] && (!F.shops.length || F.shops.indexOf(d.shop) >= 0); });
     var avail = {}, shopIngs = {}, scopeFams = {}, fc = formCounts(scope);
     scope.forEach(function (d) { (shopIngs[d.shop] = shopIngs[d.shop] || {}); d.ings.forEach(function (k) { avail[k] = 1; shopIngs[d.shop][k] = 1; }); d.fams.forEach(function (b) { scopeFams[b] = 1; }); });
@@ -616,15 +884,17 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     var pairList = Object.keys(pairs).sort(function (a, b) { return pairs[b] - pairs[a] || (a < b ? -1 : 1); }).slice(0, 6);
     var chips = keys.slice(0, 10).map(function (k) {
       var df = domForm(fc, k);
-      return avail[k] ? '<button class="chip f-' + df + '" data-addmust="' + esc(k) + '" aria-pressed="false" title="Usually ' + esc(FORM_HELP[df]) + ' on these menus. Tap to only show drinks with ' + esc(label(k)) + '">' + esc(chipText(k, df)) + "</button>" : '<span class="chip static off" title="Not on the selected menus">' + esc(label(k)) + "</span>";
+      return avail[k]
+        ? '<button type="button" class="chip f-' + df + '" data-addmust="' + esc(k) + '" aria-pressed="false" title="Usually ' + esc(FORM_HELP[df]) + ' on these menus. Tap to only show drinks with ' + esc(label(k)) + '">' + esc(chipText(k, df)) + "</button>"
+        : '<span class="chip static off" title="Not on the selected menus">' + esc(label(k)) + "</span>";
     }).join("");
     var ideas = [];
     function shopsWith(list) { return Object.keys(shopIngs).filter(function (s) { return list.every(function (k) { return shopIngs[s][k]; }); }); }
     function add(title, base, list) {
       if (!base || list.length < 2) return;
-      var sig = base + "|" + list.slice().sort().join();
-      if (ideas.some(function (i) { return i.sig === sig; })) return;
-      ideas.push({ sig: sig, title: title, base: base, list: list, shops: shopsWith(list) });
+      var sg = base + "|" + list.slice().sort().join();
+      if (ideas.some(function (i) { return i.sig === sg; })) return;
+      ideas.push({ sig: sg, title: title, base: base, list: list, shops: shopsWith(list) });
     }
     var core = ranked.slice(0, 3);
     if (ranked.length === 1) { core = ranked.concat(pairList.filter(function (k) { return k !== ranked[0]; }).slice(0, 2)); ranked = core.slice(); }
@@ -637,15 +907,15 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
       if (br && ranked.length >= 2) add("Brighter twist", bases[0], ranked.slice(0, 2).concat(br));
     }
     var missing = keys.filter(function (k) { return !avail[k]; }).slice(0, 4);
-    out.innerHTML = '<div class="panel"><h2>Flavor profile: ' + esc(PROF.labels.join(" + ") || F.vibe) + "</h2>" +
+    out.innerHTML = '<section class="panel vibe" aria-label="Flavor profile"><div class="eyebrow">Flavor profile</div><h2>' + esc(PROF.labels.join(" + ") || F.vibe.trim()) + "</h2>" +
       '<div class="row">' + chips + "</div>" +
-      (pairList.length ? '<p class="muted" style="margin:8px 0 0">Often paired with ' + esc(label(anchor)) + ": " + pairList.map(function (k) { return '<button class="chip" data-addmust="' + esc(k) + '" aria-pressed="false">' + esc(label(k)) + "</button>"; }).join(" ") + "</p>" : "") +
-      (missing.length ? '<p class="muted" style="margin:8px 0 0">Not on ' + (F.shops.length ? "the selected menus" : "any menu here") + ": " + esc(missing.map(label).join(", ")) + ".</p>" : "") +
-      (ideas.length ? '<h2 style="margin-top:14px">Ideas to try</h2><div class="ideas">' + ideas.map(function (i) {
-        return '<div class="idea"><b class="t">' + esc(i.title) + '</b><div class="recipe"><span class="base">' + esc(FAM_LABEL[i.base] || i.base) + "</span>" +
-          i.list.map(function (k) { var df = domForm(fc, k); return '<span class="plus">+</span><span class="chip static f-' + df + '">' + esc(chipText(k, df)) + "</span>"; }).join("") + "</div>" +
-          '<div class="muted" style="margin-top:6px;font-size:13px">' + (i.shops.length ? "All of these add-ins appear on the menu at " + esc(i.shops.join(", ")) + "." : "Mixes add-ins from different menus.") + " You may need to order it custom.</div></div>";
-      }).join("") + "</div>" : "") + "</div>";
+      (pairList.length ? '<div class="row" style="margin-top:10px"><span class="muted" style="font-size:13px">Often paired with ' + esc(label(anchor)) + "</span>" + pairList.map(function (k) { return '<button type="button" class="chip" data-addmust="' + esc(k) + '" aria-pressed="false">' + esc(label(k)) + "</button>"; }).join("") + "</div>" : "") +
+      (missing.length ? '<p class="hint">Not on ' + (F.shops.length ? "the selected menus" : "any menu here") + ": " + esc(missing.map(label).join(", ")) + ".</p>" : "") +
+      (ideas.length ? '<h3>Custom builds to try</h3><div class="ideas">' + ideas.map(function (i) {
+        return '<div class="idea"><div class="t"><span>' + esc(i.title) + '</span><span class="kind kind-custom">Custom build</span></div><div class="recipe"><span class="base">' + esc(FAM_LABEL[i.base] || i.base) + "</span>" +
+          i.list.map(function (k) { var df = domForm(fc, k); return '<span class="chip static plus-chip f-' + df + '">' + esc(chipText(k, df)) + "</span>"; }).join("") + "</div>" +
+          '<p class="hint">' + (i.shops.length ? "All of these add-ins appear on the menu at " + esc(i.shops.join(", ")) + "." : "Mixes add-ins from different menus.") + " Not a menu item, so you may need to order it custom.</p></div>";
+      }).join("") + '</div><p class="hint">Drinks that are already on a menu and fit the vibe are listed below.</p>' : "") + "</section>";
   }
 
   function filtered() {
@@ -684,29 +954,42 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     return out.sort(function (x, y) { return y.j - x.j; }).slice(0, 4);
   }
 
-  function cardHTML(d, why, isPick) {
+
+  function cardHTML(d, o) {
+    o = o || {};
     var rec = '<span class="base">' + esc(d.bases.join(" + ")) + "</span>" + d.ings.map(function (k) {
       return d.forms[k].map(function (f) {
         var tip = isFlavorKey(k) ? " (" + FORM_HELP[f] + ")" : "";
-        return '<span class="plus">+</span><button class="chip ing f-' + f + '" data-addmust="' + esc(k) + '" aria-pressed="false" title="' + esc(label(k) + tip + ". Tap to only show drinks with " + label(k)) + '">' + esc(chipText(k, f)) + "</button>";
+        return '<button type="button" class="chip ing plus-chip f-' + f + '" data-addmust="' + esc(k) + '" aria-pressed="false" title="' + esc(label(k) + tip + ". Tap to only show drinks with " + label(k)) + '">' + esc(chipText(k, f)) + "</button>";
       }).join("");
     }).join("");
-    var badges = [];
-    if (BOARD_SHOPS[d.shop] && !d.board) badges.push('<span class="badge" title="Not on the most recent menu board photo for this shop">Not on current board</span>');
-    if (d.sf) badges.push('<span class="badge">Sugar free option</span>');
-    if (d.caf) badges.push('<span class="badge">⚡ caffeine</span>');
-    if (d.seasonal) badges.push('<span class="badge">Seasonal</span>');
-    if (d.blended) badges.push('<span class="badge">Blended</span>');
+    var tags = flavorTags(d).map(function (t) { return '<span class="tag">' + esc(t) + "</span>"; });
+    if (d.caf) tags.push('<span class="tag">' + ico("bolt") + "Caffeine</span>");
+    if (d.sf) tags.push('<span class="tag">' + ico("leaf") + "Sugar-free option</span>");
+    if (d.seasonal) tags.push('<span class="tag">Seasonal</span>');
+    if (d.blended) tags.push('<span class="tag">Blended</span>');
+    if (BOARD_SHOPS[d.shop] && !d.board) tags.push('<span class="tag warn" title="Not on the most recent menu board photo for this shop">Not on current board</span>');
+    var match = "";
+    if (o.ratio != null) {
+      var lvl = o.ratio >= 0.75 ? 3 : o.ratio >= 0.45 ? 2 : 1, txt = lvl === 3 ? "Strong match" : lvl === 2 ? "Good match" : "Partial match";
+      match = '<div class="matchrow"><span class="match m' + lvl + '"><span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>' + txt + "</span>" +
+        (o.why && o.why.length ? '<details class="more"><summary>See why it matches</summary><ul class="why-list">' + o.why.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul></details>" : "") + "</div>";
+    } else if (o.why && o.why.length) {
+      match = '<div class="matchrow"><details class="more"><summary>Why this pick</summary><ul class="why-list">' + o.why.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul></details></div>";
+    }
     var sim = similarTo(d);
-    return '<article class="card' + (isPick ? " pick" : "") + '" data-id="' + esc(d.id) + '">' +
-      '<div class="top"><h3>' + esc(d.name) + '</h3><div class="icons">' +
-      '<button class="icon" data-remix="' + esc(d.id) + '" title="Remix this drink" aria-label="Remix this drink">🎲</button>' +
-      '<button class="icon' + (tried[d.id] ? " on" : "") + '" data-tried="' + esc(d.id) + '" title="Mark as tried" aria-label="Mark as tried">✓</button>' +
-      '<button class="icon' + (favs[d.id] ? " on" : "") + '" data-fav="' + esc(d.id) + '" title="Favorite" aria-label="Favorite">' + (favs[d.id] ? "♥" : "♡") + "</button></div></div>" +
-      '<div class="meta"><span class="shop" style="' + shopStyle(d.shop) + '">' + esc(d.shop) + "</span><span>" + esc(d.cat) + "</span>" + badges.join("") + "</div>" +
+    var nm = esc(d.name);
+    return '<article class="dcard' + (o.pick ? " is-pick" : "") + '" data-id="' + esc(d.id) + '" style="--shop:' + shopColor(d.shop) + '">' +
+      '<div class="dc-head"><div><h3 class="dc-name">' + nm + "</h3>" +
+      '<div class="dc-meta"><span class="shoptag"><span class="dot" style="background:' + shopColor(d.shop) + '" aria-hidden="true"></span>' + esc(d.shop) + "</span><span>" + esc(d.cat) + "</span>" +
+      '<span class="kind kind-menu">On the menu</span>' + (o.pick ? '<span class="kind kind-tried">Your pick</span>' : "") + (tried[d.id] ? '<span class="kind kind-tried">Tried</span>' : "") + "</div></div>" +
+      '<div class="dc-actions">' +
+      '<button type="button" class="iconbtn sm" data-remix="' + esc(d.id) + '" aria-label="Remix ' + nm + '" title="Remix this drink">' + ico("remix") + "</button>" +
+      '<button type="button" class="iconbtn sm" data-tried="' + esc(d.id) + '" aria-pressed="' + (!!tried[d.id]) + '" aria-label="Mark ' + nm + ' as tried" title="Mark as tried">' + ico("checkc") + "</button>" +
+      '<button type="button" class="iconbtn sm" data-fav="' + esc(d.id) + '" aria-pressed="' + (!!favs[d.id]) + '" aria-label="Favorite ' + nm + '" title="Favorite">' + ico("heart") + "</button></div></div>" +
       '<div class="recipe">' + rec + "</div>" +
-      (why && why.length ? '<div class="why">' + esc(why.join(" · ")) + "</div>" : "") +
-      (sim.length ? "<details><summary>Similar at other shops (" + sim.length + ")</summary><ul>" + sim.map(function (s) {
+      (tags.length ? '<div class="tags">' + tags.join("") + "</div>" : "") + match +
+      (sim.length ? '<details class="more"><summary>Similar at other shops (' + sim.length + ")</summary><ul>" + sim.map(function (s) {
         return "<li><b>" + esc(s.d.name) + "</b> at " + esc(s.d.shop) + ": " + esc(s.d.bases.join(" + ") + " + " + s.d.ings.map(label).join(" + ")) + "</li>";
       }).join("") + "</ul></details>" : "") +
       "</article>";
@@ -718,34 +1001,70 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     var list = filtered().map(function (d) { var sc = score(d); return { d: d, s: sc.s, ms: sc.ms, vs: sc.vs, why: sc.why }; });
     list = list.filter(function (x) { return (!F.moods.length || x.ms > 0.5) && (!PROF || x.vs > 0.5); });
     renderVibe();
-    if (F.sort === "match" && ranking) list.sort(function (a, b) { return b.s - a.s || (a.d.name < b.d.name ? -1 : 1); });
-    else if (F.sort === "shop") list.sort(function (a, b) { return a.d.shop < b.d.shop ? -1 : a.d.shop > b.d.shop ? 1 : (a.d.name < b.d.name ? -1 : 1); });
-    else list.sort(function (a, b) { return a.d.name.toLowerCase() < b.d.name.toLowerCase() ? -1 : 1; });
+    var maxS = 0; list.forEach(function (x) { if (x.s > maxS) maxS = x.s; });
+    var byName = function (a, b) { return a.d.name.toLowerCase() < b.d.name.toLowerCase() ? -1 : a.d.name.toLowerCase() > b.d.name.toLowerCase() ? 1 : 0; };
+    if (F.sort === "match") {
+      if (ranking) list.sort(function (a, b) { return b.s - a.s || byName(a, b); });
+      else list.sort(function (a, b) { return popularity(b.d) - popularity(a.d) || byName(a, b); });
+    } else if (F.sort === "shop") list.sort(function (a, b) { return a.d.shop < b.d.shop ? -1 : a.d.shop > b.d.shop ? 1 : byName(a, b); });
+    else list.sort(byName);
 
     var html = "";
     if (pick) {
       var px = list.filter(function (x) { return x.d.id === pick; })[0];
-      if (px) { html += cardHTML(px.d, ["🎲 Your pick"].concat(px.why), true); }
+      if (px) html += cardHTML(px.d, { pick: true, why: ["Random pick from your current filters"].concat(px.why), ratio: ranking && maxS > 0 ? px.s / maxS : null });
     }
-    html += list.slice(0, shown).filter(function (x) { return x.d.id !== pick; }).map(function (x) { return cardHTML(x.d, x.why, false); }).join("");
-    $("#f-results").innerHTML = html || '<div class="panel muted">Nothing matches. Try removing a filter or a must-have ingredient.</div>';
-    $("#f-count").textContent = list.length + (list.length === 1 ? " drink" : " drinks") + (ranking ? ", best matches first" : "");
+    html += list.slice(0, shown).filter(function (x) { return x.d.id !== pick; }).map(function (x) { return cardHTML(x.d, { why: x.why, ratio: ranking && maxS > 0 ? x.s / maxS : null }); }).join("");
+    if (!ALL.length) html = '<div class="state error">' + ico("alert") + "<h3>Menu data did not load</h3><p>Check your connection, then reload the page. Menus you added yourself are still saved in this browser.</p></div>";
+    else if (!html) html = '<div class="state">' + ico("search") + "<h3>No drinks match</h3><p>Try removing a filter, a must-have ingredient or a word from the search.</p>" +
+      '<button type="button" class="btn primary" data-reset="1">Clear filters</button></div>';
+    $("#f-results").innerHTML = html;
+    $("#f-count").textContent = list.length + (list.length === 1 ? " drink" : " drinks");
+    $("#f-sub").textContent = F.sort === "match" ? (ranking ? "Best matches first" : "Popular picks first") : F.sort === "az" ? "A to Z" : "Grouped by shop";
     $("#b-more").classList.toggle("hidden", list.length <= shown);
     $("#b-more").textContent = "Show more (" + (list.length - shown) + " left)";
     renderList = list;
   }
   var renderList = [];
-  function ranking_now() { return !!(F.moods.length || PROF); }
 
-  function refresh() { if (F.bases.length || F.must.length || F.avoid.length || F.sf || F.caf || F.nocaf || F.fav || F.fresh) $("#f-more").open = true; persist(); renderControls(); renderResults(); }
+  function refresh() { persist(); renderControls(); renderResults(); }
+
+  /* ---------- favorites view ---------- */
+  var favTab = "fav";
+  function renderFavs() {
+    var favList = ALL.filter(function (d) { return favs[d.id]; }), triedList = ALL.filter(function (d) { return tried[d.id]; });
+    var byName = function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1; };
+    favList.sort(byName); triedList.sort(byName);
+    $("#fav-tabs").innerHTML = chipBtn("Favorites (" + favList.length + ")", 'data-favtab="fav"', favTab === "fav") +
+      chipBtn("Tried (" + triedList.length + ")", 'data-favtab="tried"', favTab === "tried") +
+      chipBtn("Saved remixes (" + remixes.length + ")", 'data-favtab="remix"', favTab === "remix", "flav");
+    var html = "";
+    if (favTab === "fav" || favTab === "tried") {
+      var list = favTab === "fav" ? favList : triedList;
+      html = list.map(function (d) { return cardHTML(d, {}); }).join("");
+      if (!html) html = '<div class="state" style="grid-column:1/-1">' + ico(favTab === "fav" ? "heart" : "checkc") + "<h3>" + (favTab === "fav" ? "No favorites yet" : "Nothing marked as tried yet") + "</h3><p>" +
+        (favTab === "fav" ? "Tap the heart on any drink to save it here." : "Tap the check on a drink after you try it.") + '</p><button type="button" class="btn primary" data-tab="find">Find a drink</button></div>';
+    } else {
+      html = remixes.map(function (s, i) {
+        var chips = ingPairs(s.ings, s.forms || {}).map(function (p) { return '<span class="chip static plus-chip f-' + p[1] + '">' + esc(chipText(p[0], p[1])) + "</span>"; }).join("");
+        return '<article class="dcard custom"><div class="dc-head"><div><h3 class="dc-name">' + esc(s.name) + '</h3><div class="dc-meta"><span class="kind kind-custom">Custom build</span><span>From ' + esc(s.from) + "</span></div></div>" +
+          '<div class="dc-actions"><button type="button" class="iconbtn sm" data-rscopy="' + i + '" aria-label="Copy order for ' + esc(s.name) + '" title="Copy order">' + ico("copy") + "</button>" +
+          '<button type="button" class="iconbtn sm" data-rsdel="' + i + '" aria-label="Delete ' + esc(s.name) + '" title="Delete">' + ico("trash") + "</button></div></div>" +
+          '<div class="recipe"><span class="base">' + esc(s.base) + "</span>" + chips + '</div><p class="hint" style="margin:0">' + esc(s.change) + "</p></article>";
+      }).join("");
+      if (!html) html = '<div class="state" style="grid-column:1/-1">' + ico("remix") + "<h3>No saved remixes yet</h3><p>Save a remix you like and it will show up here.</p>" +
+        '<button type="button" class="btn grape" data-tab="remix">Remix a favorite</button></div>';
+    }
+    $("#fav-list").innerHTML = html;
+  }
 
   /* ---------- menus view ---------- */
   function renderMenus() {
     $("#m-list").innerHTML = SHOPS.map(function (s) {
-      return '<div class="menu-row"><div><b>' + esc(s.name) + "</b> · " + s.count + " drinks" + (s.custom ? ' <span class="badge">yours</span>' : "") +
-        (s.note ? '<div class="note">' + esc(s.note) + "</div>" : "") + "</div><div class=\"row\">" +
-        '<label class="toggle"><input type="checkbox" data-incl="' + esc(s.name) + '"' + (disabled[s.name] ? "" : " checked") + "> Include</label>" +
-        (s.custom ? '<button class="btn small danger" data-delmenu="' + esc(s.name) + '">Delete</button>' : "") + "</div></div>";
+      return '<div class="menu-row"><div><b>' + esc(s.name) + "</b> &middot; " + s.count + " drinks" + (s.custom ? ' <span class="kind kind-tried">Yours</span>' : "") +
+        (s.note ? '<div class="note">' + esc(s.note) + "</div>" : "") + '</div><div class="row">' +
+        '<label class="toggle-lbl"><input type="checkbox" data-incl="' + esc(s.name) + '"' + (disabled[s.name] ? "" : " checked") + "> Include</label>" +
+        (s.custom ? '<button type="button" class="btn small danger" data-delmenu="' + esc(s.name) + '">Delete</button>' : "") + "</div></div>";
     }).join("");
   }
 
@@ -889,127 +1208,152 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
   }
   function ingPairs(ings, forms) { var out = []; ings.forEach(function (k) { (forms[k] || ["flavor"]).forEach(function (f) { out.push([k, f]); }); }); return out; }
   function orderText(base, ings, forms) { return base + " with " + ingPairs(ings, forms || {}).map(function (p) { return chipText(p[0], p[1]); }).join(", "); }
+
   function renderRemix() {
-    $("#r-modes").innerHTML = RMODES.map(function (m) { return '<button class="chip" data-rmode="' + m[0] + '" aria-pressed="' + (R.mode === m[0]) + '">' + m[1] + "</button>"; }).join("");
+    $("#r-modes").innerHTML = RMODES.map(function (m) { return chipBtn(m[1], 'data-rmode="' + m[0] + '"', R.mode === m[0], "flav"); }).join("");
     var bits = [];
     bits.push(F.shops.length ? "Shops: " + F.shops.join(", ") : "All shops");
     if (F.bases.length) bits.push("Sodas: " + F.bases.join(", "));
     if (F.avoid.length) bits.push("Skipping: " + F.avoid.map(label).join(", "));
     if (F.must.length) bits.push("Wanting: " + F.must.map(label).join(", "));
     if (F.vibe && F.vibe.trim()) bits.push("Vibe: " + F.vibe.trim());
-    if (F.moods.length) bits.push("Mood: " + F.moods.map(function (id) { return MOODS.filter(function (m) { return m.id === id; })[0].label; }).join(", "));
-    $("#r-scope").textContent = bits.join(" · ") + (R.seed ? "" : ". Starting from popular drinks.");
-    if (R.seed) $("#r-scope").innerHTML = esc(bits.join(" · ")) + ". Remixing <b>" + esc(R.seed.name) + "</b>" + (R.seed.shop ? " (" + esc(R.seed.shop) + ")" : "") + ".";
+    if (F.moods.length) bits.push("Mood: " + F.moods.map(moodLabel).join(", "));
+    $("#r-scope").innerHTML = esc(bits.join(" · ")) + ". " + (R.seed ? "Remixing <b>" + esc(R.seed.name) + "</b>" + (R.seed.shop ? " (" + esc(R.seed.shop) + ")" : "") + "." : "Starting from popular drinks. Change filters on the Find tab.");
     $("#r-clear").classList.toggle("hidden", !R.seed);
     $("#r-results").innerHTML = R.results.length ? R.results.map(function (r, i) {
       var newK = {};
       r.added.forEach(function (a) { newK[a[0]] = 1; }); r.swapped.forEach(function (s) { newK[s[2]] = 1; }); r.changed.forEach(function (c) { newK[c[0]] = 1; });
       var chips = ingPairs(r.ings, r.forms).map(function (p) {
         var isNew = !!newK[p[0]];
-        return '<span class="plus">+</span><span class="chip static f-' + p[1] + (isNew ? " new" : "") + '" title="' + esc(FORM_HELP[p[1]]) + '">' + esc(chipText(p[0], p[1])) + (isNew ? " (new)" : "") + "</span>";
+        return '<span class="chip static plus-chip f-' + p[1] + (isNew ? " new" : "") + '" title="' + esc(FORM_HELP[p[1]]) + '">' + esc(chipText(p[0], p[1])) + (isNew ? " (new)" : "") + "</span>";
       }).join("");
       var goneList = r.removed.map(function (a) { return [a[0], a[1]]; }).concat(r.swapped.map(function (s) { return [s[0], s[1]]; })).concat(r.changed.map(function (c) { return [c[0], c[1]]; }));
       var gone = goneList.map(function (p) { return '<span class="chip static gone">' + esc(chipText(p[0], p[1])) + "</span>"; }).join(" ");
       var shops = shopsWithAll(ingPairs(r.ings, r.forms).map(function (p) { return p[0] + ":" + p[1]; }));
-      return '<article class="card pick"><div class="top"><h3>' + esc(r.name) + "</h3></div>" +
-        '<div class="meta"><span>Remix of <b>' + esc(r.src.name) + "</b>" + (r.src.shop ? " (" + esc(r.src.shop) + ")" : "") + "</span></div>" +
+      return '<article class="dcard custom"><div class="dc-head"><div><h3 class="dc-name">' + esc(r.name) + '</h3><div class="dc-meta"><span class="kind kind-custom">Custom build</span><span>Remix of <b>' + esc(r.src.name) + "</b>" + (r.src.shop ? " (" + esc(r.src.shop) + ")" : "") + "</span></div></div></div>" +
         '<div class="recipe"><span class="base">' + esc(r.base) + "</span>" + chips + "</div>" +
-        '<div class="why">' + esc(describeChange(r)) + "</div>" + (gone ? '<div style="margin-top:6px">' + gone + "</div>" : "") +
-        '<div class="muted" style="margin-top:6px;font-size:13px">' + (shops.length ? "Each ingredient is used in this exact form at " + esc(shops.join(", ")) + "." : "Mixes forms and ingredients from different menus.") + " You may need to order it custom.</div>" +
-        '<div class="row" style="margin-top:8px"><button class="btn small" data-rsave="' + i + '">♡ Save</button><button class="btn small" data-rcopy="' + i + '">Copy order</button><button class="btn small" data-ragain="' + i + '">Remix this one</button></div></article>';
-    }).join("") : '<div class="panel muted">Tap Remix to generate new drinks.</div>';
-    $("#r-saved").innerHTML = remixes.length ? remixes.map(function (s, i) {
-      return '<div class="menu-row"><div><b>' + esc(s.name) + '</b><div class="note">' + esc(orderText(s.base, s.ings, s.forms)) + "</div><div class=\"note\">From " + esc(s.from) + ": " + esc(s.change) + '</div></div><div class="row"><button class="btn small" data-rscopy="' + i + '">Copy</button><button class="btn small danger" data-rsdel="' + i + '">Delete</button></div></div>';
-    }).join("") : '<p class="muted" style="margin:0">Nothing saved yet.</p>';
+        '<div class="matchrow"><span class="match"><b>What changed:</b>&nbsp;' + esc(describeChange(r)) + "</span></div>" + (gone ? '<div class="row">' + gone + "</div>" : "") +
+        '<p class="hint" style="margin:0">' + (shops.length ? "Each ingredient is used in this exact form at " + esc(shops.join(", ")) + "." : "Mixes forms and ingredients from different menus.") + " Not a menu item, so you may need to order it custom.</p>" +
+        '<div class="row" style="margin-top:4px"><button type="button" class="btn small" data-rsave="' + i + '">' + ico("heart") + 'Save this drink</button><button type="button" class="btn small" data-rcopy="' + i + '">' + ico("copy") + 'Copy your order</button><button type="button" class="btn small" data-ragain="' + i + '">' + ico("remix") + "Remix this one</button></div></article>";
+    }).join("") : '<div class="state" style="grid-column:1/-1">' + ico("remix") + "<h3>No remixes yet</h3><p>Tap Remix to try something new.</p></div>";
   }
+
   function copyText(t, btn) {
     var done = function () { if (btn) { var o = btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = o; }, 1200); } };
     if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, function () { window.prompt("Copy this order:", t); }); else window.prompt("Copy this order:", t);
   }
   function runRemix() { generateRemixes(); renderRemix(); }
 
+
+  /* ---------- navigation ---------- */
+  var curTab = "find";
+  function showTab(which) {
+    curTab = which;
+    document.body.classList.toggle("tab-find", which === "find");
+    ["find", "remix", "favs", "menus"].forEach(function (t) { $("#view-" + t).hidden = t !== which; });
+    document.querySelectorAll("[data-tab]").forEach(function (b) { if (b.dataset.tab === which) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    if (which === "menus") renderMenus();
+    if (which === "favs") renderFavs();
+    if (which === "remix") { if (!R.results.length) runRemix(); else renderRemix(); }
+    window.scrollTo(0, 0);
+  }
+  function rerenderCards() { if (curTab === "favs") renderFavs(); else renderResults(); }
+
+  function clearFilter(spec) {
+    var i = spec.indexOf(":"), type = spec.slice(0, i), val = spec.slice(i + 1);
+    var arr = { shops: F.shops, moods: F.moods, bases: F.bases, must: F.must, avoid: F.avoid, forms: F.forms, formOf: F.formOf }[type];
+    if (arr) { var at = arr.indexOf(val); if (at >= 0) arr.splice(at, 1); if (type === "forms" && !F.forms.length) F.formOf = []; }
+    else if (type === "flag") { F[val] = false; }
+  }
+
   /* ---------- events ---------- */
   document.addEventListener("click", function (e) {
     var t = e.target.closest("button"); if (!t) return;
     var d = t.dataset;
-    if (d.rmode) { R.mode = d.rmode; runRemix(); }
-    else if (d.remix) { var sd = ALL.filter(function (x) { return x.id === d.remix; })[0]; if (sd) { R.seed = sd; showTab("remix"); runRemix(); window.scrollTo(0, 0); } }
-    else if (d.ragain) { var rr = R.results[+d.ragain]; if (rr) { R.seed = { name: rr.name, shop: "", bases: [rr.base], fams: [rr.fam], ings: rr.ings.slice(), forms: copyForms(rr.forms) }; runRemix(); window.scrollTo(0, 0); } }
-    else if (d.rsave) { var sv = R.results[+d.rsave]; if (sv) { remixes.unshift({ name: sv.name, base: sv.base, ings: sv.ings, forms: copyForms(sv.forms), from: sv.src.name + (sv.src.shop ? " (" + sv.src.shop + ")" : ""), change: describeChange(sv) }); remixes = remixes.slice(0, 50); store.set("ds_remixes", remixes); t.textContent = "♥ Saved"; renderRemix(); } }
-    else if (d.rcopy) { var cv = R.results[+d.rcopy]; if (cv) copyText(orderText(cv.base, cv.ings, cv.forms), t); }
-    else if (d.rscopy) { var cs = remixes[+d.rscopy]; if (cs) copyText(orderText(cs.base, cs.ings, cs.forms), t); }
-    else if (d.rsdel) { remixes.splice(+d.rsdel, 1); store.set("ds_remixes", remixes); renderRemix(); }
-    else if (d.formg) { toggleIn(F.forms, d.formg); if (!F.forms.length) F.formOf = []; pick = null; shown = 30; refresh(); }
-    else if (d.formof) { toggleIn(F.formOf, d.formof); pick = null; shown = 30; refresh(); }
-    else if (d.vibe) { F.vibe = norm(F.vibe) === d.vibe ? "" : d.vibe; pick = null; shown = 30; refresh(); }
-    else if (d.shop) { toggleIn(F.shops, d.shop); pick = null; shown = 30; refresh(); }
-    else if (d.mood) { toggleIn(F.moods, d.mood); if (F.moods.length && F.sort === "az") F.sort = "match"; pick = null; shown = 30; refresh(); }
-    else if (d.base) { toggleIn(F.bases, d.base); pick = null; shown = 30; refresh(); }
-    else if (d.unmust) { toggleIn(F.must, d.unmust); pick = null; refresh(); }
-    else if (d.unavoid) { toggleIn(F.avoid, d.unavoid); pick = null; refresh(); }
-    else if (d.addmust) { if (F.must.indexOf(d.addmust) < 0) F.must.push(d.addmust); pick = null; shown = 30; refresh(); window.scrollTo({ top: $("#view-find").offsetTop, behavior: "smooth" }); }
-    else if (d.fav) { if (favs[d.fav]) delete favs[d.fav]; else favs[d.fav] = 1; store.set("ds_favs", favs); renderResults(); }
-    else if (d.tried) { if (tried[d.tried]) delete tried[d.tried]; else tried[d.tried] = 1; store.set("ds_tried", tried); renderResults(); }
-    else if (d.delmenu) {
+    if (d.tab) { showTab(d.tab); return; }
+    if (d.panel) { openPanel = openPanel === d.panel ? null : d.panel; renderControls(); return; }
+    if (d.toggle) { F[d.toggle] = !F[d.toggle]; pick = null; shown = 30; refresh(); return; }
+    if (d.flag) { F[d.flag] = !F[d.flag]; if (d.flag === "caf" && F.caf) F.nocaf = false; if (d.flag === "nocaf" && F.nocaf) F.caf = false; pick = null; shown = 30; refresh(); return; }
+    if (d.board) { F.board = !F.board; pick = null; shown = 30; refresh(); return; }
+    if (d.shopAll) { F.shops = []; pick = null; shown = 30; refresh(); return; }
+    if (d.shop) { toggleIn(F.shops, d.shop); pick = null; shown = 30; refresh(); return; }
+    if (d.mood) { toggleIn(F.moods, d.mood); if (F.moods.length && F.sort === "az") F.sort = "match"; pick = null; shown = 30; refresh(); return; }
+    if (d.base) { toggleIn(F.bases, d.base); pick = null; shown = 30; refresh(); return; }
+    if (d.unmust) { toggleIn(F.must, d.unmust); pick = null; refresh(); return; }
+    if (d.unavoid) { toggleIn(F.avoid, d.unavoid); pick = null; refresh(); return; }
+    if (d.formg) { toggleIn(F.forms, d.formg); if (!F.forms.length) F.formOf = []; pick = null; shown = 30; refresh(); return; }
+    if (d.formof) { toggleIn(F.formOf, d.formof); pick = null; shown = 30; refresh(); return; }
+    if (d.addmust) { if (F.must.indexOf(d.addmust) < 0) F.must.push(d.addmust); pick = null; shown = 30; refresh(); if (curTab !== "find") showTab("find"); scrollToEl($("#view-find")); return; }
+    if (d.vibe) { F.vibe = norm(F.vibe) === d.vibe ? "" : d.vibe; pick = null; shown = 30; refresh(); return; }
+    if (d.clear) { clearFilter(d.clear); pick = null; shown = 30; refresh(); return; }
+    if (d.reset) { resetFilters(); return; }
+    if (d.fav) { if (favs[d.fav]) delete favs[d.fav]; else favs[d.fav] = 1; store.set("ds_favs", favs); rerenderCards(); return; }
+    if (d.tried) { if (tried[d.tried]) delete tried[d.tried]; else tried[d.tried] = 1; store.set("ds_tried", tried); rerenderCards(); return; }
+    if (d.remix) { var sd = ALL.filter(function (x) { return x.id === d.remix; })[0]; if (sd) { R.seed = sd; showTab("remix"); runRemix(); } return; }
+    if (d.rmode) { R.mode = d.rmode; runRemix(); return; }
+    if (d.ragain) { var rr = R.results[+d.ragain]; if (rr) { R.seed = { name: rr.name, shop: "", bases: [rr.base], fams: [rr.fam], ings: rr.ings.slice(), forms: copyForms(rr.forms) }; runRemix(); window.scrollTo(0, 0); } return; }
+    if (d.rsave) {
+      var sv = R.results[+d.rsave];
+      if (sv) {
+        remixes.unshift({ name: sv.name, base: sv.base, ings: sv.ings, forms: copyForms(sv.forms), from: sv.src.name + (sv.src.shop ? " (" + sv.src.shop + ")" : ""), change: describeChange(sv) });
+        remixes = remixes.slice(0, 50); store.set("ds_remixes", remixes);
+        t.innerHTML = ico("check") + "Saved"; t.disabled = true;
+      }
+      return;
+    }
+    if (d.rcopy) { var cv = R.results[+d.rcopy]; if (cv) copyText(orderText(cv.base, cv.ings, cv.forms), t); return; }
+    if (d.rscopy) { var cs = remixes[+d.rscopy]; if (cs) copyText(orderText(cs.base, cs.ings, cs.forms), t); return; }
+    if (d.rsdel) { remixes.splice(+d.rsdel, 1); store.set("ds_remixes", remixes); renderFavs(); return; }
+    if (d.favtab) { favTab = d.favtab; renderFavs(); return; }
+    if (d.delmenu) {
       if (!confirm("Delete the menu \"" + d.delmenu + "\" that you added?")) return;
       custom = custom.filter(function (m) { return m.shop !== d.delmenu; }); store.set("ds_custom", custom);
       F.shops = F.shops.filter(function (s) { return s !== d.delmenu; }); build(); renderMenus(); refresh();
     }
   });
-  [["o-sf", "sf"], ["o-caf", "caf"], ["o-nocaf", "nocaf"], ["o-fav", "fav"], ["o-new", "fresh"]].forEach(function (p) {
-    $("#" + p[0]).addEventListener("click", function () {
-      F[p[1]] = !F[p[1]];
-      if (p[1] === "caf" && F.caf) F.nocaf = false;
-      if (p[1] === "nocaf" && F.nocaf) F.caf = false;
-      pick = null; shown = 30; refresh();
-    });
-  });
-  function addTyped(inputId, arr) {
-    var el = $(inputId);
-    function commit() {
-      var k = keyOf(el.value); if (!k) return;
-      if (arr().indexOf(k) < 0) arr().push(k);
-      el.value = ""; pick = null; shown = 30; refresh();
-    }
-    el.addEventListener("change", commit);
-    el.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); commit(); } });
+
+  function resetFilters() {
+    F = { shops: F.shops, moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, forms: [], formOf: [], board: false, q: "", vibe: "", sort: "match" };
+    pick = null; shown = 30; openPanel = null; refresh();
   }
-  addTyped("#f-must-in", function () { return F.must; });
-  addTyped("#f-avoid-in", function () { return F.avoid; });
-  $("#o-board").addEventListener("click", function () { F.board = !F.board; pick = null; shown = 30; refresh(); });
-  $("#f-vibe").addEventListener("input", function (e) { F.vibe = e.target.value; pick = null; shown = 30; persist(); renderControls(); renderResults(); });
-  $("#f-q").addEventListener("input", function (e) { F.q = e.target.value; pick = null; shown = 30; persist(); renderResults(); });
-  $("#f-sort").addEventListener("change", function (e) { F.sort = e.target.value; refresh(); });
-  $("#b-more").addEventListener("click", function () { shown += 30; renderResults(); });
-  $("#b-reset").addEventListener("click", function () { F = { shops: F.shops, moods: [], bases: [], must: [], avoid: [], sf: false, caf: false, nocaf: false, fav: false, fresh: false, forms: [], formOf: [], board: false, q: "", vibe: "", sort: "match" }; pick = null; shown = 30; refresh(); });
-  $("#b-surprise").addEventListener("click", function () {
-    var pool = renderList.length ? renderList : []; if (!pool.length) return;
-    // weight toward better matches when moods are chosen
-    var w = pool.map(function (x) { return ranking_now() ? Math.max(x.s, 0.1) : 1; }), sum = w.reduce(function (a, b) { return a + b; }, 0), r = Math.random() * sum, i = 0;
-    while (i < pool.length - 1 && r > w[i]) { r -= w[i]; i++; }
-    pick = pool[i].d.id; renderResults(); window.scrollTo({ top: $("#f-results").offsetTop - 60, behavior: "smooth" });
-  });
+
+  function commitIngredient(el, listName) {
+    var k = keyOf(el.value); if (!k) return;
+    var arr = F[listName];
+    if (arr.indexOf(k) < 0) arr.push(k);
+    var id = el.id; pick = null; shown = 30; refresh();
+    var again = $("#" + id); if (again) { again.value = ""; again.focus(); }
+  }
   document.addEventListener("change", function (e) {
-    var n = e.target.dataset && e.target.dataset.incl; if (!n) return;
-    if (e.target.checked) delete disabled[n]; else disabled[n] = true;
+    var el = e.target;
+    if (el.id === "f-must-in") { commitIngredient(el, "must"); return; }
+    if (el.id === "f-avoid-in") { commitIngredient(el, "avoid"); return; }
+    var n = el.dataset && el.dataset.incl; if (!n) return;
+    if (el.checked) delete disabled[n]; else disabled[n] = true;
     store.set("ds_disabled", disabled); F.shops = F.shops.filter(function (s) { return !disabled[s]; }); refresh();
   });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    var el = e.target;
+    if (el.id === "f-must-in") { e.preventDefault(); commitIngredient(el, "must"); }
+    else if (el.id === "f-avoid-in") { e.preventDefault(); commitIngredient(el, "avoid"); }
+  });
 
-  function showTab(which) {
-    $("#view-find").classList.toggle("hidden", which !== "find");
-    $("#view-menus").classList.toggle("hidden", which !== "menus");
-    $("#view-remix").classList.toggle("hidden", which !== "remix");
-    $("#tab-remix").setAttribute("aria-selected", String(which === "remix"));
-    $("#tab-find").setAttribute("aria-selected", String(which === "find"));
-    $("#tab-menus").setAttribute("aria-selected", String(which === "menus"));
-    if (which === "menus") renderMenus();
-    if (which === "remix") { if (!R.results.length) runRemix(); else renderRemix(); }
-  }
-  $("#tab-find").addEventListener("click", function () { showTab("find"); });
-  $("#tab-menus").addEventListener("click", function () { showTab("menus"); });
-  $("#tab-remix").addEventListener("click", function () { showTab("remix"); });
+  $("#f-vibe").addEventListener("input", function (e) { F.vibe = e.target.value; pick = null; shown = 30; persist(); renderControls(); renderResults(); });
+  $("#f-sort").addEventListener("change", function (e) { F.sort = e.target.value; refresh(); });
+  $("#b-more").addEventListener("click", function () { shown += 30; renderResults(); });
+  $("#b-reset").addEventListener("click", resetFilters);
+  $("#b-surprise").addEventListener("click", function () {
+    var pool = renderList.length ? renderList : []; if (!pool.length) return;
+    var rk = ranking_now();
+    var w = pool.map(function (x) { return rk ? Math.max(x.s, 0.1) : 1; }), sum = w.reduce(function (a, b) { return a + b; }, 0), r = Math.random() * sum, i = 0;
+    while (i < pool.length - 1 && r > w[i]) { r -= w[i]; i++; }
+    pick = pool[i].d.id; renderResults(); scrollToEl($("#f-results"), 90);
+  });
+  function ranking_now() { return !!(F.moods.length || PROF); }
   $("#r-go").addEventListener("click", runRemix);
   $("#r-clear").addEventListener("click", function () { R.seed = null; runRemix(); });
+  $("#b-settings").addEventListener("click", function () { showTab("menus"); scrollToEl($("#backup"), 70); });
 
   $("#m-add").addEventListener("click", function () {
     var shop = $("#m-shop").value.trim(), cat = $("#m-cat").value.trim() || "Dirty Soda", text = $("#m-text").value;
@@ -1027,7 +1371,7 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     $("#m-errs").textContent = r.errs.join("\n"); $("#m-text").value = "";
   });
   $("#b-export").addEventListener("click", function () {
-    var txt = JSON.stringify({ v: 1, custom: custom, favs: favs, tried: tried, disabled: disabled });
+    var txt = JSON.stringify({ v: 1, custom: custom, favs: favs, tried: tried, disabled: disabled, remixes: remixes });
     $("#m-backup").value = txt;
     if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { $("#b-msg").textContent = "Copied."; }, function () { $("#b-msg").textContent = "Select the text and copy it."; });
     else $("#b-msg").textContent = "Select the text and copy it.";
@@ -1036,17 +1380,21 @@ Save Me Jade: Diet Dr Pepper, Sugar Free Vanilla, Sugar Free Coconut</pre>
     try {
       var o = JSON.parse($("#m-backup").value);
       if (!o || o.v !== 1) throw new Error("Not a backup");
-      custom = o.custom || []; favs = o.favs || {}; tried = o.tried || {}; disabled = o.disabled || {};
-      store.set("ds_custom", custom); store.set("ds_favs", favs); store.set("ds_tried", tried); store.set("ds_disabled", disabled);
+      custom = o.custom || []; favs = o.favs || {}; tried = o.tried || {}; disabled = o.disabled || {}; remixes = o.remixes || remixes;
+      store.set("ds_custom", custom); store.set("ds_favs", favs); store.set("ds_tried", tried); store.set("ds_disabled", disabled); store.set("ds_remixes", remixes);
       build(); renderMenus(); refresh(); $("#b-msg").textContent = "Restored.";
     } catch (err) { $("#b-msg").textContent = "That does not look like a backup."; }
   });
 
   /* ---------- init ---------- */
   build();
+  F.q = "";
+  if (["match", "az", "shop"].indexOf(F.sort) < 0) F.sort = "match";
   F.shops = F.shops.filter(function (s) { return SHOPS.some(function (x) { return x.name === s; }); });
   refresh();
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) { navigator.serviceWorker.register("sw.js").catch(function () {}); }
   window.__ds = { ALL: function () { return ALL; }, parsePasted: parsePasted, canon: canon, baseFamily: baseFamily, makeItem: makeItem };
+
 })();
 </script>
 </body>
