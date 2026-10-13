@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vivo — Wearable Health Analyst</title>
+<meta name="description" content="Upload a wearable export (Oura, Whoop, Garmin, Fitbit, or generic CSV/JSON) and get a data-grounded baseline profile, trend analysis, and prioritized leverage points — computed entirely in your browser." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="css/style.css?v=1" />
+</head>
+<body>
+
+  <!-- ═══════════ Landing: upload / connect ═══════════ -->
+  <div id="landing-view">
+    <header class="site-header">
+      <div class="site-header-inner">
+        <div class="site-brand">
+          <span class="logo-mount" data-size="24"></span>
+          <span class="site-title">vivo</span>
+        </div>
+        <span class="site-subtitle">wearable health analyst</span>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="hero-text">
+          <p class="eyebrow">Your data. A brighter you.</p>
+          <h1>Turn your wearable data into a <em>brighter</em> you.</h1>
+          <p class="hero-copy">Upload an export from Oura, Whoop, Garmin, or Fitbit — or connect Whoop directly. Get a baseline profile, trend analysis, and ranked leverage points, grounded entirely in your own numbers, computed right here in this browser.</p>
+        </div>
+
+        <section id="upload-section" class="card upload-card">
+          <div class="upload-card-header">
+            <span class="upload-card-title">Upload your data</span>
+            <span class="num muted-on-card">.csv / .json</span>
+          </div>
+          <div class="dropzone">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="#14b8a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="#14b8a6" stroke-width="2" stroke-linecap="round"/></svg>
+            <input type="file" id="file-input" accept=".csv,.json,.txt" multiple />
+            <span class="dropzone-hint">CSV or JSON, one or more files</span>
+          </div>
+          <ul id="file-list" class="plain-list"></ul>
+          <button type="button" id="analyze-btn" class="btn" disabled>Analyze My Data</button>
+          <p id="upload-error" class="error-text"></p>
+
+          <div id="whoop-section" hidden>
+            <div class="connect-divider"><span>or</span></div>
+
+            <div id="whoop-disconnected-block">
+              <button type="button" id="whoop-connect-btn" class="btn btn-secondary">Connect Whoop</button>
+            </div>
+            <div id="whoop-connected-block" hidden>
+              <div class="whoop-status"><span class="status-dot"></span> Whoop connected</div>
+              <div class="row">
+                <button type="button" id="whoop-sync-btn" class="btn btn-secondary">Sync Whoop Data</button>
+                <button type="button" id="whoop-disconnect-btn">Disconnect</button>
+              </div>
+            </div>
+            <p id="whoop-error" class="error-text"></p>
+          </div>
+
+          <p class="privacy-note">No account. Nothing is uploaded anywhere unless you turn on optional AI assistance below, or connect Whoop (which goes through a small relay that only exchanges your login for an access token — see Vivo's architecture notes).</p>
+        </section>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <p>File parsing and every baseline/pattern calculation happen locally in this browser. Your last computed report is saved to this browser's local storage so it survives a reload — it never leaves your device, isn't synced anywhere, and can be cleared from the dashboard sidebar. Nothing is sent anywhere unless you enable optional AI assistance, which sends only the computed summary (not your raw file) to Anthropic using your own API key.</p>
+    </footer>
+  </div>
+
+  <!-- ═══════════ Dashboard: sidebar nav + views ═══════════ -->
+  <div id="dashboard-view" hidden>
+    <div class="dashboard-shell">
+      <div class="nav-scrim" id="nav-scrim" hidden></div>
+
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <span class="logo-mount" data-size="26"></span>
+          <span>vivo</span>
+          <button type="button" class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close menu"></button>
+        </div>
+        <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <div class="sidebar-footer">
+          <div id="dashboard-whoop-section" hidden>
+            <div id="dashboard-whoop-disconnected-block">
+              <button type="button" id="dashboard-whoop-connect-btn" class="btn-secondary">Connect Whoop</button>
+            </div>
+            <div id="dashboard-whoop-connected-block" hidden>
+              <div class="whoop-status"><span class="status-dot"></span> Whoop connected</div>
+              <div class="row">
+                <button type="button" id="dashboard-whoop-sync-btn" class="btn-secondary">Sync</button>
+                <button type="button" id="dashboard-whoop-disconnect-btn">Disconnect</button>
+              </div>
+            </div>
+            <p id="dashboard-whoop-error" class="error-text"></p>
+          </div>
+          <button type="button" id="new-upload-btn" class="sidebar-link">↑ Upload new data</button>
+          <button type="button" id="clear-cache-btn" class="sidebar-link">Clear saved report</button>
+        </div>
+      </aside>
+
+      <div class="dashboard-main">
+        <header class="dashboard-topbar">
+          <button type="button" class="hamburger-btn" id="mobile-nav-toggle" aria-label="Open menu"></button>
+          <div class="topbar-brand">
+            <span class="logo-mount" data-size="20"></span>
+            <span>vivo</span>
+          </div>
+          <div class="topbar-info">
+            <div class="topbar-greeting" id="topbar-greeting">Your dashboard</div>
+            <div class="topbar-range" id="topbar-range"></div>
+          </div>
+        </header>
+
+        <main class="dashboard-content">
+          <div id="restored-banner" class="restored-banner" hidden>
+            <span>Showing your last analysis, saved in this browser.</span>
+            <button type="button" id="dismiss-restored-btn">Dismiss</button>
+          </div>
+          <div id="dashboard-content-root"></div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -7,9 +7,9 @@
  * placeholder for one.
  */
 
-const STORAGE_KEY = 'pulse:last-summary:v1';
+const STORAGE_KEY = 'vivo:last-summary:v1';
 
-/** @returns {{ inventory: object, baselines: object, patterns: object, aiReport?: object } | null} */
+/** @returns {{ inventory: object, baselines: object, patterns: object, records: object[], aiReport?: object } | null} */
 export function loadCachedSummary() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -18,7 +18,7 @@ export function loadCachedSummary() {
     if (!parsed?.summary?.inventory || !parsed?.summary?.baselines || !parsed?.summary?.patterns) return null;
     return parsed.summary;
   } catch (err) {
-    console.error('Pulse: failed to load cached report.', err);
+    console.error('Vivo: failed to load cached report.', err);
     return null;
   }
 }
@@ -27,7 +27,7 @@ export function saveCachedSummary(summary) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ summary, savedAt: new Date().toISOString() }));
   } catch (err) {
-    console.error('Pulse: failed to save report locally (storage full or unavailable).', err);
+    console.error('Vivo: failed to save report locally (storage full or unavailable).', err);
   }
 }
 

@@ -13,19 +13,19 @@
 
 // Public by OAuth2 design — a client_id is meant to appear in browser code
 // and redirect URLs, unlike the client_secret (which never leaves the relay
-// Worker). This is Pulse's own registered Whoop app.
+// Worker). This is Vivo's own registered Whoop app.
 const CLIENT_ID = 'c790f331-06ba-4cb0-b179-90540cdcdb0d';
 
 // Set this to the deployed Worker's URL (see whoop-relay/README.md) before
 // "Connect Whoop" will work — it's intentionally not guessed at here.
-export const RELAY_BASE_URL = 'https://pulse-whoop-relay.YOUR-SUBDOMAIN.workers.dev';
+export const RELAY_BASE_URL = 'https://vivo-whoop-relay.YOUR-SUBDOMAIN.workers.dev';
 
 const AUTHORIZE_URL = 'https://api.prod.whoop.com/oauth/oauth2/auth';
-const REDIRECT_URI = 'https://thejacobbarney.com/pulse/oauth-callback.html';
+const REDIRECT_URI = 'https://thejacobbarney.com/vivo/oauth-callback.html';
 const SCOPES = ['read:cycles', 'read:recovery', 'read:sleep', 'read:workout', 'read:profile', 'read:body_measurement', 'offline'];
 
-const TOKEN_KEY = 'pulse:whoop-auth:v1';
-const STATE_KEY = 'pulse:whoop-oauth-state';
+const TOKEN_KEY = 'vivo:whoop-auth:v1';
+const STATE_KEY = 'vivo:whoop-oauth-state';
 
 // Refresh this many seconds before actual expiry, so a request never races a
 // token that's valid when checked but expired by the time it reaches Whoop.

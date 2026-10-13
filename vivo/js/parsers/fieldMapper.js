@@ -1,7 +1,7 @@
 /**
  * Header-name heuristics that map an uploaded export's columns onto a
  * fixed set of canonical daily metrics, regardless of which device or
- * platform produced the file. This is what lets Pulse work with an Oura,
+ * platform produced the file. This is what lets Vivo work with an Oura,
  * Whoop, Garmin, or Fitbit CSV/JSON export (or a hand-rolled one) without
  * a separate parser per vendor.
  *

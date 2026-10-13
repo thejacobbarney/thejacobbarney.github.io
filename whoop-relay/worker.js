@@ -1,7 +1,7 @@
 /**
- * Pulse — Whoop OAuth relay (Cloudflare Worker)
+ * Vivo — Whoop OAuth relay (Cloudflare Worker)
  *
- * The ONE thing Pulse's otherwise fully client-side architecture cannot do in
+ * The ONE thing Vivo's otherwise fully client-side architecture cannot do in
  * the browser: Whoop's OAuth2 token endpoint requires `client_secret_post`
  * authentication (client_id + client_secret together), and a secret embedded
  * in client-side JS on a public static site is not a secret. This Worker is
@@ -16,10 +16,10 @@
  *                                               with the caller's Authorization header
  *                                               passed through unchanged
  *
- * The browser (pulse/js/whoopAuth.js, pulse/js/parsers/whoopApi.js) is the only
+ * The browser (vivo/js/whoopAuth.js, vivo/js/parsers/whoopApi.js) is the only
  * place access/refresh tokens are stored (localStorage) — this Worker never
  * sees them again after handing them back, and never writes anything to disk
- * or a database. See pulse/ARCHITECTURE.md for the full data-flow writeup.
+ * or a database. See vivo/ARCHITECTURE.md for the full data-flow writeup.
  *
  * Required secrets (set via `wrangler secret put <name>` or the dashboard —
  * never commit these):

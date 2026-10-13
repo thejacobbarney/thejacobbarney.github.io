@@ -2,7 +2,7 @@
  * Shared AI assistance settings panel (bring-your-own-key). Renders the
  * enable checkbox + API key/model fields into any container, backed by
  * aiConfig.js. The report's "Top 5 Leverage Points" and "Weekly Protocol"
- * sections are the only part of Pulse that uses this — every other
+ * sections are the only part of Vivo that uses this — every other
  * analysis (baselines, patterns) runs fully offline.
  */
 
@@ -16,7 +16,7 @@ export function renderAiSettingsPanel(container, { onChange } = {}) {
   container.innerHTML = `
     <fieldset class="ai-settings-panel">
       <legend>AI-generated leverage points &amp; protocol (optional)</legend>
-      <p class="muted">Pulse computes every baseline and pattern in this browser, fully offline. Turning this on additionally sends the computed summary — not your raw file — straight from this browser to Anthropic's API using your own key, to synthesize the narrative "Top 5 Leverage Points" and weekly protocol. Your key is stored only in this browser's local storage — never on any server of ours — and Anthropic bills your account for usage at standard rates. Local storage isn't encrypted, so don't enable this on a shared computer.</p>
+      <p class="muted">Vivo computes every baseline and pattern in this browser, fully offline. Turning this on additionally sends the computed summary — not your raw file — straight from this browser to Anthropic's API using your own key, to synthesize the narrative "Top 5 Leverage Points" and weekly protocol. Your key is stored only in this browser's local storage — never on any server of ours — and Anthropic bills your account for usage at standard rates. Local storage isn't encrypted, so don't enable this on a shared computer.</p>
       <label class="checkbox-label">
         <input type="checkbox" class="ai-enabled" ${config.enabled ? 'checked' : ''} /> Use AI assistance
       </label>

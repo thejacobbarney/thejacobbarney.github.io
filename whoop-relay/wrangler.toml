@@ -1,4 +1,4 @@
-name = "pulse-whoop-relay"
+name = "vivo-whoop-relay"
 main = "worker.js"
 compatibility_date = "2025-01-01"
 

@@ -1,7 +1,7 @@
 /**
  * AI analysis configuration — bring-your-own-key.
  *
- * Pulse is a static, backend-free site, so there is nowhere for an API key
+ * Vivo is a static, backend-free site, so there is nowhere for an API key
  * to live except the user's own browser. This module is the one place that
  * reads/writes the AI config to localStorage.
  *
@@ -11,7 +11,7 @@
  * BYOK integration, not something this module can fix.
  */
 
-const STORAGE_KEY = 'pulse:ai-config:v1';
+const STORAGE_KEY = 'vivo:ai-config:v1';
 
 const DEFAULTS = {
   enabled: false,
@@ -25,7 +25,7 @@ export function loadAiConfig() {
     if (!raw) return { ...DEFAULTS };
     return { ...DEFAULTS, ...JSON.parse(raw) };
   } catch (err) {
-    console.error('Pulse: failed to load AI config.', err);
+    console.error('Vivo: failed to load AI config.', err);
     return { ...DEFAULTS };
   }
 }
