@@ -1,0 +1,18 @@
+name = "vivo-whoop-relay"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# Not secret — the production site origin allowed to call this Worker, and
+# the Whoop API base path this Worker proxies /proxy/* requests to. Set the
+# real values here before deploying (`wrangler deploy`), or set them as plain
+# (non-secret) variables in the Cloudflare dashboard if you're using the
+# paste-the-code Quick Edit path instead of the CLI — see README.md.
+[vars]
+ALLOWED_ORIGIN = "https://thejacobbarney.com"
+WHOOP_API_BASE = "https://api.prod.whoop.com/developer/v2"
+
+# WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET are NOT set here — they're secrets.
+# Set them with:
+#   wrangler secret put WHOOP_CLIENT_ID
+#   wrangler secret put WHOOP_CLIENT_SECRET
+# (or via the dashboard's Settings -> Variables -> "Encrypt" toggle).

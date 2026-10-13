@@ -17,7 +17,7 @@ const BOOLEAN_TAG_FIELDS = new Set(['alcoholTag', 'caffeineTag', 'travelTag', 'l
  * ever reaches mergeParsedFiles, so a busy training day doesn't silently lose every workout but
  * the last, and a nap doesn't get averaged into the same night's real sleep numbers.
  */
-function aggregateByDate(records) {
+export function aggregateByDate(records) {
   const groups = new Map();
   for (const r of records) {
     if (!groups.has(r.date)) groups.set(r.date, []);

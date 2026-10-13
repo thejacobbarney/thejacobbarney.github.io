@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Connecting Whoop — Vivo</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/style.css?v=1" />
+<style>
+  body { background: var(--evergreen); color: var(--text-on-dark); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .callback-card { max-width: 420px; padding: 2rem; text-align: center; }
+  .callback-card h1 { font-size: 1.2rem; margin-bottom: 0.75rem; }
+  .callback-card p { color: var(--text-on-dark-muted); font-size: 0.9rem; line-height: 1.5; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--sidebar-border); border-top-color: var(--mint); border-radius: 50%; margin: 0 auto 1.25rem; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .callback-card .btn { margin-top: 1.25rem; }
+</style>
+</head>
+<body>
+  <div class="callback-card">
+    <div id="spinner" class="spinner"></div>
+    <h1 id="status-title">Connecting your Whoop account…</h1>
+    <p id="status-detail">Hang on a moment.</p>
+    <a id="back-link" class="btn" href="index.html" hidden>Back to Vivo</a>
+  </div>
+
+  <script type="module">
+    import { completeConnect } from './js/whoopAuth.js';
+
+    const spinner = document.getElementById('spinner');
+    const title = document.getElementById('status-title');
+    const detail = document.getElementById('status-detail');
+    const backLink = document.getElementById('back-link');
+
+    async function run() {
+      try {
+        await completeConnect(new URLSearchParams(window.location.search));
+        title.textContent = 'Connected.';
+        detail.textContent = 'Taking you back to Vivo…';
+        spinner.hidden = true;
+        window.location.replace('index.html?whoop=connected');
+      } catch (err) {
+        spinner.hidden = true;
+        title.textContent = "Couldn't connect Whoop";
+        detail.textContent = err.message || 'Something went wrong during the Whoop connection.';
+        backLink.hidden = false;
+      }
+    }
+    run();
+  </script>
+</body>
+</html>
