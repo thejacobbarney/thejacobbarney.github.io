@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=3" />
+<link rel="stylesheet" href="css/style.css?v=4" />
 </head>
 <body>
   <header class="site-header">
@@ -42,7 +42,24 @@
         <ul id="file-list" class="plain-list"></ul>
         <button type="button" id="analyze-btn" class="btn" disabled>Analyze My Data</button>
         <p id="upload-error" class="error-text"></p>
-        <p class="privacy-note">No account. Nothing is uploaded anywhere unless you turn on optional AI assistance below.</p>
+
+        <div id="whoop-section" hidden>
+          <div class="connect-divider"><span>or</span></div>
+
+          <div id="whoop-disconnected-block">
+            <button type="button" id="whoop-connect-btn" class="btn btn-secondary">Connect Whoop</button>
+          </div>
+          <div id="whoop-connected-block" hidden>
+            <div class="whoop-status"><span class="status-dot"></span> Whoop connected</div>
+            <div class="row">
+              <button type="button" id="whoop-sync-btn" class="btn btn-secondary">Sync Whoop Data</button>
+              <button type="button" id="whoop-disconnect-btn">Disconnect</button>
+            </div>
+          </div>
+          <p id="whoop-error" class="error-text"></p>
+        </div>
+
+        <p class="privacy-note">No account. Nothing is uploaded anywhere unless you turn on optional AI assistance below, or connect Whoop (which goes through a small relay that only exchanges your login for an access token — see Pulse's architecture notes).</p>
       </section>
     </div>
   </section>

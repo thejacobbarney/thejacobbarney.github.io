@@ -4,18 +4,22 @@ Pulse is a client-only, zero-build-step web app (vanilla HTML/CSS/JS, ES modules
 wearable data export — Oura, Whoop, Garmin, Fitbit, or any tracker's CSV/JSON export — into a
 data-grounded baseline profile, pattern analysis, and prioritized list of leverage points.
 
-Everything runs in the browser. There is no backend, no auth, and no build tool. File parsing and
-every statistical calculation (baselines, trends, correlations, elevation events) happen locally —
-the raw file never leaves the machine unless the optional AI assistance feature is turned on, and
-even then only a computed JSON summary is sent, never the raw per-day rows.
+Everything runs in the browser by default. There is no backend for the core app, no auth, and no
+build tool. File parsing and every statistical calculation (baselines, trends, correlations,
+elevation events) happen locally — the raw file never leaves the machine unless the optional AI
+assistance feature is turned on, and even then only a computed JSON summary is sent, never the raw
+per-day rows. The one exception is also optional: "Connect Whoop" (§9) talks to a small, stateless
+relay service, because Whoop's OAuth2 flow has a hard requirement the rest of this app's
+architecture doesn't — see that section for why and what it actually does.
 
 ## 1. File layout
 
 ```
 pulse/
   index.html                    Page shell: dark hero + upload UI, AI settings, #vitals-strip + #report-root
+  oauth-callback.html            Whoop OAuth redirect target — completes the connection, then returns here
   css/style.css                  Design system: dark ink / white paper tokens, Sora + Plus Jakarta Sans +
-                                   JetBrains Mono, card+shadow components — see §7
+                                   JetBrains Mono, card+shadow components — see §6
   js/
     stats.js                      Dependency-free math: mean/stddev/percentile/linreg/correlation,
                                     plus circular-safe bedtime-hour handling
@@ -23,13 +27,15 @@ pulse/
     aiConfig.js                    localStorage read/write for the optional bring-your-own-key AI settings
     aiVerify.js                    "Test connection" — smallest possible live API call
     reportCache.js                  localStorage read/write for the last computed report (local-only persistence)
-    app.js                         Wires upload -> parse -> analyze -> render, and the AI report button
+    whoopAuth.js                    Whoop OAuth: authorize-URL + CSRF state, token storage, auto-refresh — see §9
+    app.js                         Wires upload/Whoop-sync -> parse -> analyze -> render, and the AI report button
     components/
       aiSettingsPanel.js            Shared enable/key/model UI (same contract as Iceberg's)
     parsers/
       csv.js                          Hand-rolled RFC-4180-ish CSV parser (quoted fields, no dependency)
       fieldMapper.js                  Header-name heuristics: raw column -> canonical metric field
       fileParser.js                    Dispatches CSV/JSON, normalizes rows, merges multiple files by date
+      whoopApi.js                      Live Whoop API fetch + field mapping onto the same canonical shape — see §9
     analysis/
       metricCatalog.js                 Canonical field labels/units/categories — single source of truth
       inventory.js                      Step 1: file recognition, categories present, date range, gaps, completeness
@@ -39,6 +45,11 @@ pulse/
       renderReport.js                   Renders Data Summary / Baseline Profile / Pattern Analysis as HTML
       renderVitals.js                    The dark "vitals strip": a Whoop-style recovery ring + secondary tiles
       aiReport.js                       Optional BYOK call: computed summary -> Top 5 Leverage Points + Weekly Protocol
+
+whoop-relay/                      A separate deployable (Cloudflare Worker) — not part of the static site.
+  worker.js                         The entire relay: token exchange, token refresh, API passthrough. See §9.
+  wrangler.toml                     CLI deploy config
+  README.md                         Deployment steps (dashboard and CLI paths)
 ```
 
 Data flow is strictly one-directional and each layer only talks to the layer below it:
@@ -250,6 +261,76 @@ manual `?v=N` query string. A visual redesign shipped once with an unversioned l
 visitors kept seeing the old stylesheet indefinitely (their browser had a cached copy of the exact
 same URL from before the deploy, and nothing about that URL changed to tell it otherwise) — the
 HTML itself updated fine, since GitHub Pages doesn't cache as aggressively as browsers do, but
-`css/style.css` didn't. **Bump `?v=N` in `index.html` any time `css/style.css` changes** — it costs
-one line and guarantees every visitor gets the new one instead of hoping their cache expires on its
-own.
+`css/style.css` didn't. **Bump `?v=N` in both `index.html` and `oauth-callback.html` any time
+`css/style.css` changes** — it costs one line each and guarantees every visitor gets the new one
+instead of hoping their cache expires on its own.
+
+## 9. Connecting Whoop directly (OAuth) — and the one place this isn't 100% client-side
+
+Manual CSV/JSON upload (§2) works for any device and needs nothing beyond the browser. "Connect
+Whoop" is an added, optional second path for Whoop users specifically: authorize once, then pull
+fresh data on demand instead of re-exporting a file each time. It's additive — uploading a file
+still works exactly as before, connected or not — and it's the one feature in this app that isn't
+fully self-contained in the browser, for a reason worth being explicit about.
+
+**Why it needs a server at all.** Whoop's OAuth2 token exchange requires `client_secret_post`
+authentication — the client secret has to be presented alongside the client ID when trading an
+authorization code for tokens. There's no documented PKCE / public-client option that would let a
+pure static site do this safely. A secret embedded in this repo's client-side JS would be visible
+to anyone who views source on a public GitHub Pages site — not a secret at all. So a tiny piece of
+this feature necessarily lives outside the browser.
+
+**How small "necessarily" turns out to be.** `whoop-relay/worker.js` is a stateless Cloudflare
+Worker with exactly three jobs, each a thin passthrough to Whoop's own API:
+
+- `POST /token` — exchanges an authorization code for tokens (the step that needs the secret)
+- `POST /refresh` — exchanges a refresh token for a new access/refresh pair (same reason)
+- `GET /proxy/*` — forwards an already-authenticated request to Whoop's data API, passing the
+  caller's own `Authorization` header through unchanged (this one doesn't strictly need the
+  secret — it exists because Whoop's CORS policy for browser-direct calls isn't documented either
+  way, and proxying through something that can set its own CORS headers sidesteps the question
+  entirely rather than hoping it works)
+
+It holds no database, no KV namespace, no user accounts — nothing persists there between requests.
+The actual Whoop access and refresh tokens are generated by Whoop and stored only in the browser's
+`localStorage` (`pulse:whoop-auth:v1`, read/written exclusively by `whoopAuth.js`), the same pattern
+`aiConfig.js` already uses for the Anthropic key. The Worker sees a token pass through once per
+exchange and keeps nothing.
+
+**The flow, end to end:**
+
+1. `whoopAuth.js: startConnect()` builds Whoop's authorize URL (client ID — not secret, meant to be
+   public — redirect URI, scopes, a fresh CSRF `state` stashed in `sessionStorage`) and redirects
+   the browser to Whoop's consent screen.
+2. Whoop redirects back to `oauth-callback.html` with `?code=...&state=...`. That page calls
+   `whoopAuth.js: completeConnect()`, which checks `state` against what was stashed (rejecting a
+   mismatch rather than trusting an arbitrary redirect), then POSTs the code to the relay's
+   `/token` endpoint and stores what comes back.
+3. Back on the main page, `app.js` sees `?whoop=connected` in the URL, cleans it up, and immediately
+   calls `whoopApi.js: fetchWhoopData()` rather than making the user click Sync a second time.
+4. `fetchWhoopData()` pages through the relay's `/proxy/cycle`, `/proxy/recovery`,
+   `/proxy/activity/sleep`, and `/proxy/activity/workout`, maps each response onto Pulse's existing
+   canonical record shape (the same `{ date, rhr, hrv, sleepTotalMin, ... }` shape `fieldMapper.js`
+   produces from a CSV), and hands the result to the exact same
+   `mergeParsedFiles` → `buildInventory`/`buildBaselines`/`buildPatterns` pipeline a file upload
+   goes through. From that point on, a Whoop API connection and a CSV upload are indistinguishable
+   to the rest of the app.
+5. `whoopAuth.js: getValidAccessToken()` is called before every data request; if the stored access
+   token is expired (or about to be), it transparently calls the relay's `/refresh` first. Whoop
+   **rotates** refresh tokens — each refresh invalidates the previous one — so the newly-returned
+   refresh token is re-saved every time, not just the access token. A failed refresh clears the
+   stored connection rather than leaving a silently-broken "connected" state on screen.
+
+**A real, flagged limitation: the field mapping is unverified against a live response.** Whoop's
+developer documentation wasn't reachable from the environment this was built in (blocked by
+network policy), so `whoopApi.js`'s mapping — which JSON fields become `recoveryScore`, `hrv`,
+`sleepTotalMin`, and so on — is a best-effort reconstruction from secondary sources and general
+knowledge of the API, not something fetched and checked against a real account. It's covered by
+unit tests against *synthetic* responses shaped the way the mapper expects, which proves the
+conversion math and pagination logic are internally correct, but proves nothing about whether
+Whoop's actual response matches that shape. `safeMap()` in that file is the deliberate hedge: a
+record that doesn't match what's expected is skipped and counted (surfaced as a warning in the UI)
+rather than silently coerced into a plausible-looking but wrong number — important for a health
+app specifically, where a wrong number that looks reasonable is worse than a visibly missing one.
+The real test is the first live connection in Whoop's Sandbox tier (see `whoop-relay/README.md`);
+any mismatch found there is a mapping fix, not a sign the overall design is wrong.
