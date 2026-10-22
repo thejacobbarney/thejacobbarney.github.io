@@ -1,0 +1,24 @@
+# Render Blueprint for the ESPN AI fantasy managers dashboard.
+# Deliberately a single web service with auto-deploy OFF: nothing builds until you click deploy.
+# Secrets are never stored here; fill the sync:false values in the Render dashboard.
+# The service ships with config/league.json "paused": true, and ESPN writes are refused while paused.
+services:
+  - type: web
+    name: ff-ai-managers-dashboard
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./ff-ai-managers/Dockerfile
+    dockerContext: ./ff-ai-managers
+    autoDeploy: false
+    healthCheckPath: /health
+    envVars:
+      - key: DASHBOARD_API_TOKEN
+        sync: false
+      - key: LEAGUE_ID
+        sync: false
+      - key: SEASON
+        value: "2026"
+      - key: SWID
+        sync: false
+      - key: ESPN_S2
+        sync: false

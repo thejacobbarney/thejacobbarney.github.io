@@ -1,0 +1,7 @@
+# Install with: (crontab -l 2>/dev/null; sed "s|__DIR__|$PWD|g" migration/crontab.txt) | crontab -
+# Times are America/Phoenix (no DST). CRON_TZ works on cronie/systemd hosts; otherwise set the server TZ to America/Phoenix.
+CRON_TZ=America/Phoenix
+0 21 * * 2  cd __DIR__ && PATH=__DIR__/.venv/bin:$PATH ./run_week.sh tuesday   >> shared/cron.log 2>&1
+0 6  * * 3  cd __DIR__ && PATH=__DIR__/.venv/bin:$PATH ./run_week.sh wednesday >> shared/cron.log 2>&1
+0 9  * * 4  cd __DIR__ && PATH=__DIR__/.venv/bin:$PATH ./run_week.sh thursday  >> shared/cron.log 2>&1
+30 8 * * 0  cd __DIR__ && PATH=__DIR__/.venv/bin:$PATH ./run_week.sh sunday    >> shared/cron.log 2>&1

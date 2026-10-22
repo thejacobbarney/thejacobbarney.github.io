@@ -1,0 +1,72 @@
+{
+  "my_team_id": 1,
+  "bot_teams": {
+    "4": {
+      "persona": "contrarian",
+      "espn_account": ""
+    },
+    "9": {
+      "persona": "trade_shark",
+      "espn_account": ""
+    },
+    "3": {
+      "persona": "quant",
+      "espn_account": ""
+    },
+    "2": {
+      "persona": "safe_floor",
+      "espn_account": ""
+    },
+    "10": {
+      "persona": "stash_king",
+      "espn_account": ""
+    }
+  },
+  "guardrails": {
+    "max_waiver_claims_per_week": 3,
+    "max_trade_proposals_per_week": 2,
+    "max_bot_to_bot_trades_per_season": 1,
+    "protect_top_n": 5,
+    "bot_trades_with_my_team": "propose_only_league_review",
+    "protect_if_owned_pct_at_least": 60,
+    "min_upgrade_pts": 3.0,
+    "min_upgrade_pct_of_dropped": 25,
+    "min_upgrade_pts_stream": 1.0,
+    "auto_approve_types": [
+      "START",
+      "BENCH",
+      "IR"
+    ],
+    "require_commissioner_approval_for": [
+      "WAIVER",
+      "TRADE_IDEA"
+    ],
+    "add_drop_cooldown_minutes": 30,
+    "_cooldown_help": "Applies only between DIFFERENT bot teams: a bot cannot make a free-agent add/drop within N minutes of another bot team's add/drop (checked against ESPN's activity feed). The same team may make several add/drops or waiver claims back to back. Waiver claim submissions and lineup/IR moves are exempt."
+  },
+  "paused": true,
+  "drop_overrides": {},
+  "_drop_overrides_help": "Map player_id -> reason to allow dropping a protected player. The reason is logged.",
+  "assist_teams": {
+    "1": {
+      "persona": "balanced",
+      "owner": "commissioner",
+      "output": "my_team"
+    },
+    "5": {
+      "persona": "balanced",
+      "owner": "manager",
+      "output": "assist/team_5"
+    },
+    "8": {
+      "persona": "balanced",
+      "owner": "manager",
+      "output": "assist/team_8"
+    }
+  },
+  "_assist_help": "Assist teams get suggestions only: lineup alerts and up to 2 waiver ideas. Nothing is auto-executed and nothing goes to approve.py; the team's own manager decides. Assist output is never read by bots, and team 5's suggestions stay in my_team/.",
+  "execution": {
+    "mode": "league_manager",
+    "help": "Moves use LM tools from the commissioner login (SWID/ESPN_S2). Waiver claims are submitted as the team owner (normal priority). Per-team manager cookies (SWID_TEAM_<id>/ESPN_S2_TEAM_<id>) are optional and unused."
+  }
+}
