@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /datebloom/
+
+Sitemap: https://thejacobbarney.com/sitemap.xml

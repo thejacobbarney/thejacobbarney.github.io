@@ -1,6 +1,3 @@
-<!-- Redeploy trigger: thejacobbarney.com root was 404ing at the custom domain despite
-     the last Pages build (commit 40f8c3d) completing successfully, per GitHub Actions.
-     No functional change; pushing to force a fresh Pages build/domain check. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,13 +14,21 @@
   <meta property="og:title" content="Jake Barney — Finance Professional">
   <meta property="og:description" content="Financial Analyst at Boeing · $1B+ Portfolio · FP&A, EVMS, and process automation. Writing about finance, data, and decisions.">
   <meta property="og:site_name" content="Jake Barney">
+  <meta property="og:image" content="https://thejacobbarney.com/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Jake Barney, Finance Professional. FP&A, EVMS, and process automation.">
 
   <!-- Twitter / X card -->
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Jake Barney — Finance Professional">
   <meta name="twitter:description" content="Financial Analyst at Boeing · $1B+ Portfolio · FP&A, EVMS, and process automation.">
+  <meta name="twitter:image" content="https://thejacobbarney.com/og.png">
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <style>
     /* ─── DESIGN TOKENS ─────────────────────────────── */
@@ -41,7 +46,7 @@
       --border-soft:   #EDEBE8;
       --text:          #181818;
       --text-secondary:#5A5F68;
-      --text-muted:    #9298A0;
+      --text-muted:    #666C75;
       --serif:         'Playfair Display', Georgia, serif;
       --sans:          'Inter', system-ui, -apple-system, sans-serif;
       --ease:          cubic-bezier(0.4, 0, 0.2, 1);
@@ -229,6 +234,11 @@
       display: flex; gap: 0.9rem; flex-wrap: wrap;
       opacity: 0; animation: riseUp 0.7s var(--ease) 0.6s forwards;
     }
+    #hero-inner {
+      min-height: 100vh;
+      display: flex; flex-direction: column; justify-content: center;
+      padding-top: 5rem; padding-bottom: 3rem;
+    }
     .hero-scroll {
       position: absolute; bottom: 2.5rem; left: 2rem;
       display: flex; align-items: center; gap: 0.65rem;
@@ -302,6 +312,8 @@
       font-size: 0.875rem; color: var(--text);
       line-height: 1.6;
     }
+    .info-sub { color: var(--text-secondary); font-size: 0.85rem; }
+    .info-card-value.small { font-size: 0.875rem; color: var(--text-secondary); }
     .info-list {
       display: flex; flex-direction: column; gap: 0.3rem;
     }
@@ -339,6 +351,8 @@
       border-color: var(--border);
     }
     .tl-header {
+      width: 100%;
+      font: inherit; color: inherit; text-align: left;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -349,22 +363,36 @@
       transition: border-color 0.2s, box-shadow 0.2s;
       user-select: none;
     }
+    .tl-header:focus-visible,
+    .nav-hamburger:focus-visible,
+    a:focus-visible, .btn:focus-visible {
+      outline: 2px solid var(--navy);
+      outline-offset: 3px;
+    }
+    .tl-item.inactive .tl-header { background: var(--surface-raised); }
+    .tl-item.inactive .tl-dot { border-color: var(--border); }
+    .tl-item.inactive .tl-company { color: var(--text-muted); }
+    .tl-item.inactive .tl-role { font-size: 0.93rem; font-weight: 500; }
     .tl-header:hover { border-color: var(--gunmetal); box-shadow: var(--shadow-xs); }
     .tl-header.open {
       border-color: var(--navy);
       border-bottom-left-radius: 0;
       border-bottom-right-radius: 0;
     }
+    .tl-titles { display: block; min-width: 0; }
     .tl-company {
+      display: block;
       font-size: 0.73rem; font-weight: 700;
       letter-spacing: 0.08em; text-transform: uppercase;
       color: var(--navy); margin-bottom: 0.2rem;
     }
     .tl-role {
+      display: block;
       font-size: 1rem; font-weight: 600;
       color: var(--text); margin-bottom: 0.15rem;
     }
     .tl-date {
+      display: block;
       font-size: 0.8rem; color: var(--text-muted);
     }
     .tl-right {
@@ -385,15 +413,19 @@
     }
     .tl-header.open .tl-chevron { transform: rotate(180deg); }
     .tl-body {
-      max-height: 0; overflow: hidden;
-      transition: max-height 0.45s var(--ease);
+      display: grid; grid-template-rows: 0fr;
+      transition: grid-template-rows 0.45s var(--ease);
       background: var(--surface);
-      border: 1px solid var(--navy);
-      border-top: none;
+      border: 0 solid var(--navy);
       border-bottom-left-radius: var(--radius);
       border-bottom-right-radius: var(--radius);
     }
-    .tl-body.open { max-height: 700px; }
+    .tl-body.open {
+      grid-template-rows: 1fr;
+      border-width: 0 1px 1px;
+    }
+    .tl-item.inactive .tl-body.open { border-color: var(--border); }
+    .tl-body-clip { overflow: hidden; min-height: 0; }
     .tl-body-inner { padding: 1.25rem 1.4rem; }
     .tl-bullets {
       display: flex; flex-direction: column; gap: 0.8rem;
@@ -675,7 +707,7 @@
       max-width: 900px; margin: 0 auto;
     }
     #contact-section .section-eyebrow {
-      color: rgba(255,255,255,0.45);
+      color: rgba(255,255,255,0.7);
     }
     #contact-section .section-eyebrow::after {
       background: rgba(255,255,255,0.3);
@@ -701,12 +733,19 @@
       display: flex; justify-content: space-between;
       align-items: center; flex-wrap: wrap; gap: 1rem;
     }
+    .ai-note {
+      margin-top: 1.25rem;
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.76rem; color: rgba(255,255,255,0.65); letter-spacing: 0.04em;
+    }
+    .ai-note svg { stroke: rgba(255,255,255,0.6); }
+    .lab-github-cta svg { flex-shrink: 0; color: var(--gunmetal); }
     .footer-sig {
       font-family: var(--serif);
-      font-size: 0.95rem; color: rgba(255,255,255,0.5);
+      font-size: 0.95rem; color: rgba(255,255,255,0.7);
     }
     .footer-note {
-      font-size: 0.78rem; color: rgba(255,255,255,0.35);
+      font-size: 0.78rem; color: rgba(255,255,255,0.65);
     }
 
     /* ─── ANIMATIONS ──────────────────────────────────── */
@@ -792,7 +831,7 @@
     .personal-card-url {
       font-size: 0.72rem; font-weight: 600;
       letter-spacing: 0.07em;
-      color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.72);
     }
     .personal-card-body {
       padding: 1.5rem 1.75rem 1.75rem;
@@ -893,11 +932,13 @@
     .mobile-menu ul li a:hover { color: var(--navy); }
 
     /* ─── RESPONSIVE ──────────────────────────────────── */
-    @media (max-width: 768px) {
+    @media (max-width: 1000px) {
       nav { padding: 0 1.25rem; }
       .nav-links { display: none; }
       .nav-hamburger { display: flex; }
       .mobile-menu { display: block; }
+    }
+    @media (max-width: 768px) {
       .section-wrap { padding: 4rem 1.25rem; }
       .about-layout { grid-template-columns: 1fr; gap: 2.5rem; }
       .project-grid { grid-template-columns: 1fr; }
@@ -921,12 +962,29 @@
       .project-card { padding: 1.35rem; }
       .lab-card { padding: 1.35rem 1.4rem; }
     }
+
+    /* ─── NO-JS / REDUCED MOTION ──────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; }
+      .hero-eyebrow, .hero-name, .hero-role, .hero-tagline,
+      .hero-actions, .stat-row, .hero-scroll {
+        animation: none; opacity: 1;
+      }
+      .appear { opacity: 1; transform: none; }
+    }
   </style>
+  <noscript>
+    <style>
+      .appear { opacity: 1; transform: none; }
+      .tl-body { grid-template-rows: 1fr; border-width: 0 1px 1px; }
+    </style>
+  </noscript>
 </head>
 <body>
 
   <!-- ═══ NAV ══════════════════════════════════════════ -->
-  <nav id="nav">
+  <nav id="nav" aria-label="Primary">
     <a href="#hero" class="nav-logo">JB</a>
     <ul class="nav-links">
       <li><a href="#about">About</a></li>
@@ -938,7 +996,7 @@
       <li><a href="#skills">Skills</a></li>
       <li><a href="#contact-section">Contact</a></li>
     </ul>
-    <button class="nav-hamburger" id="hamburger" aria-label="Open menu" onclick="toggleMenu()">
+    <button class="nav-hamburger" id="hamburger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu" onclick="toggleMenu()">
       <span></span><span></span><span></span>
     </button>
   </nav>
@@ -957,8 +1015,8 @@
   </div>
 
   <!-- ═══ HERO ══════════════════════════════════════════ -->
-  <div id="hero" style="position:relative;">
-    <section id="hero-inner" class="section-wrap" style="min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding-top:5rem; padding-bottom:3rem;">
+  <div id="hero">
+    <section id="hero-inner" class="section-wrap">
 
       <p class="hero-eyebrow">Finance Professional &nbsp;·&nbsp; Mesa, Arizona</p>
 
@@ -1004,7 +1062,7 @@
       </div>
     </section>
 
-    <div class="hero-scroll" style="position:absolute; bottom:2.5rem;">
+    <div class="hero-scroll" aria-hidden="true">
       <div class="scroll-line"></div>
       <span>Scroll</span>
     </div>
@@ -1030,7 +1088,7 @@
           <div class="info-card-label">Education</div>
           <div class="info-card-value">
             <strong>B.S. Finance</strong><br>
-            <span style="color:var(--text-secondary); font-size:0.85rem;">Utah Valley University · 2024<br>Minor: Economics &amp; Business Management</span>
+            <span class="info-sub">Utah Valley University · 2024<br>Minor: Economics &amp; Business Management</span>
           </div>
         </div>
         <div class="info-card">
@@ -1051,7 +1109,7 @@
         </div>
         <div class="info-card">
           <div class="info-card-label">Location</div>
-          <div class="info-card-value" style="font-size:0.875rem; color:var(--text-secondary);">Mesa, Arizona &nbsp;·&nbsp; Open to relocation</div>
+          <div class="info-card-value small">Mesa, Arizona &nbsp;·&nbsp; Open to relocation</div>
         </div>
       </div>
     </div>
@@ -1071,18 +1129,18 @@
       <!-- Boeing FA II -->
       <div class="tl-item">
         <div class="tl-dot"></div>
-        <div class="tl-header" onclick="toggleTL(this)">
-          <div>
-            <div class="tl-company">The Boeing Company</div>
-            <div class="tl-role">Financial Analyst II &nbsp;·&nbsp; Finance Program</div>
-            <div class="tl-date">Sept 2025 – Present &nbsp;·&nbsp; Mesa, AZ</div>
-          </div>
-          <div class="tl-right">
+        <button type="button" class="tl-header" onclick="toggleTL(this)" aria-expanded="false" aria-controls="tl-body-1" id="tl-head-1">
+          <span class="tl-titles">
+            <span class="tl-company">The Boeing Company</span>
+            <span class="tl-role">Financial Analyst II &nbsp;·&nbsp; Finance Program</span>
+            <span class="tl-date">Sept 2025 – Present &nbsp;·&nbsp; Mesa, AZ</span>
+          </span>
+          <span class="tl-right">
             <span class="tl-badge badge-current">Current</span>
             <svg class="tl-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-        </div>
-        <div class="tl-body">
+          </span>
+        </button>
+        <div class="tl-body" id="tl-body-1" role="region" aria-labelledby="tl-head-1"><div class="tl-body-clip">
           <div class="tl-body-inner">
             <ul class="tl-bullets">
               <li>Led EAC development and cash flow forecasting for the $1B+ F-15 defense portfolio, conducting sensitivity and scenario analyses to quantify the cash impact of operational decisions and directly informing senior management's capital allocation and risk strategies.</li>
@@ -1101,24 +1159,24 @@
               <span class="chip">AI Analytics</span>
             </div>
           </div>
-        </div>
+        </div></div>
       </div>
 
       <!-- Boeing FA I -->
       <div class="tl-item">
         <div class="tl-dot"></div>
-        <div class="tl-header" onclick="toggleTL(this)">
-          <div>
-            <div class="tl-company">The Boeing Company</div>
-            <div class="tl-role">Financial Analyst I &nbsp;·&nbsp; Finance Program</div>
-            <div class="tl-date">Nov 2024 – Sept 2025 &nbsp;·&nbsp; Mesa, AZ</div>
-          </div>
-          <div class="tl-right">
+        <button type="button" class="tl-header" onclick="toggleTL(this)" aria-expanded="false" aria-controls="tl-body-2" id="tl-head-2">
+          <span class="tl-titles">
+            <span class="tl-company">The Boeing Company</span>
+            <span class="tl-role">Financial Analyst I &nbsp;·&nbsp; Finance Program</span>
+            <span class="tl-date">Nov 2024 – Sept 2025 &nbsp;·&nbsp; Mesa, AZ</span>
+          </span>
+          <span class="tl-right">
             <span class="tl-badge badge-promoted">Promoted</span>
             <svg class="tl-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-        </div>
-        <div class="tl-body">
+          </span>
+        </button>
+        <div class="tl-body" id="tl-body-2" role="region" aria-labelledby="tl-head-2"><div class="tl-body-clip">
           <div class="tl-body-inner">
             <ul class="tl-bullets">
               <li>Executed forecasting and EAC cycles for 10+ DFARS/non-DFARS programs within a $1B+ portfolio, supporting cash flow planning, working capital compliance, and alignment with Boeing financial policies.</li>
@@ -1134,24 +1192,24 @@
               <span class="chip">EVM</span>
             </div>
           </div>
-        </div>
+        </div></div>
       </div>
 
       <!-- Enlite -->
       <div class="tl-item">
         <div class="tl-dot"></div>
-        <div class="tl-header" onclick="toggleTL(this)">
-          <div>
-            <div class="tl-company">Enlite Home</div>
-            <div class="tl-role">Operations Manager &nbsp;·&nbsp; (Promoted from Operations Coordinator)</div>
-            <div class="tl-date">Aug 2022 – May 2024 &nbsp;·&nbsp; Provo, UT</div>
-          </div>
-          <div class="tl-right">
+        <button type="button" class="tl-header" onclick="toggleTL(this)" aria-expanded="false" aria-controls="tl-body-3" id="tl-head-3">
+          <span class="tl-titles">
+            <span class="tl-company">Enlite Home</span>
+            <span class="tl-role">Operations Manager &nbsp;·&nbsp; (Promoted from Operations Coordinator)</span>
+            <span class="tl-date">Aug 2022 – May 2024 &nbsp;·&nbsp; Provo, UT</span>
+          </span>
+          <span class="tl-right">
             <span class="tl-badge badge-promoted">Promoted</span>
             <svg class="tl-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-        </div>
-        <div class="tl-body">
+          </span>
+        </button>
+        <div class="tl-body" id="tl-body-3" role="region" aria-labelledby="tl-head-3"><div class="tl-body-clip">
           <div class="tl-body-inner">
             <ul class="tl-bullets">
               <li>Directed housing and logistics operations for 150+ contractors across multiple sites, building coordination systems from scratch to handle scale the organization hadn't previously managed.</li>
@@ -1168,41 +1226,41 @@
               <span class="chip">Process Design</span>
             </div>
           </div>
-        </div>
+        </div></div>
       </div>
 
       <!-- Wells Fargo -->
       <div class="tl-item inactive">
-        <div class="tl-dot" style="border-color:var(--border);"></div>
-        <div class="tl-header" onclick="toggleTL(this)" style="background:var(--surface-raised);">
-          <div>
-            <div class="tl-company" style="color:var(--text-muted);">Wells Fargo</div>
-            <div class="tl-role" style="font-size:0.93rem; font-weight:500;">Bank Teller</div>
-            <div class="tl-date">Dec 2017 – May 2021 &nbsp;·&nbsp; Chandler, AZ</div>
-          </div>
+        <div class="tl-dot"></div>
+        <button type="button" class="tl-header" onclick="toggleTL(this)" aria-expanded="false" aria-controls="tl-body-4" id="tl-head-4">
+          <span class="tl-titles">
+            <span class="tl-company">Wells Fargo</span>
+            <span class="tl-role">Bank Teller</span>
+            <span class="tl-date">Dec 2017 – May 2021 &nbsp;·&nbsp; Chandler, AZ</span>
+          </span>
           <svg class="tl-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="tl-body" style="border-color:var(--border);">
+        </button>
+        <div class="tl-body" id="tl-body-4" role="region" aria-labelledby="tl-head-4"><div class="tl-body-clip">
           <div class="tl-body-inner">
             <ul class="tl-bullets">
               <li>Executed complex cash transactions, balanced cash box daily, and educated customers on digital tools. Served bilingual English/Spanish-speaking customers — building communication and relationship skills that carry forward to this day.</li>
             </ul>
           </div>
-        </div>
+        </div></div>
       </div>
 
       <!-- Adobe Student Ambassador -->
       <div class="tl-item inactive">
-        <div class="tl-dot" style="border-color:var(--border);"></div>
-        <div class="tl-header" onclick="toggleTL(this)" style="background:var(--surface-raised);">
-          <div>
-            <div class="tl-company" style="color:var(--text-muted);">Mesa Community College</div>
-            <div class="tl-role" style="font-size:0.93rem; font-weight:500;">Adobe Student Ambassador</div>
-            <div class="tl-date">Aug 2018 – Apr 2020 &nbsp;·&nbsp; Mesa, AZ</div>
-          </div>
+        <div class="tl-dot"></div>
+        <button type="button" class="tl-header" onclick="toggleTL(this)" aria-expanded="false" aria-controls="tl-body-5" id="tl-head-5">
+          <span class="tl-titles">
+            <span class="tl-company">Mesa Community College</span>
+            <span class="tl-role">Adobe Student Ambassador</span>
+            <span class="tl-date">Aug 2018 – Apr 2020 &nbsp;·&nbsp; Mesa, AZ</span>
+          </span>
           <svg class="tl-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="tl-body" style="border-color:var(--border);">
+        </button>
+        <div class="tl-body" id="tl-body-5" role="region" aria-labelledby="tl-head-5"><div class="tl-body-clip">
           <div class="tl-body-inner">
             <ul class="tl-bullets">
               <li>Developed and ran virtual-media workshops across campus, reaching 76 faculty members and over 1,850 participants in a single academic year — building a program from scratch and scaling it across departments.</li>
@@ -1217,7 +1275,7 @@
               <span class="chip">Faculty Training</span>
             </div>
           </div>
-        </div>
+        </div></div>
       </div>
 
     </div>
@@ -1291,7 +1349,7 @@
     <div class="writing-list appear appear-delay-2">
 
       <a href="https://www.linkedin.com/feed/update/urn:li:activity:7429290021964369920/" target="_blank" rel="noopener" class="writing-item">
-        <div class="writing-num">01</div>
+        <div class="writing-num" aria-hidden="true">01</div>
         <div class="writing-content">
           <div class="writing-cat">LinkedIn &nbsp;·&nbsp; Finance &amp; Systems</div>
           <div class="writing-title">On the gap between good data and good decisions</div>
@@ -1301,7 +1359,7 @@
       </a>
 
       <a href="https://www.linkedin.com/feed/update/urn:li:activity:7438283667988426753/" target="_blank" rel="noopener" class="writing-item">
-        <div class="writing-num">02</div>
+        <div class="writing-num" aria-hidden="true">02</div>
         <div class="writing-content">
           <div class="writing-cat">LinkedIn &nbsp;·&nbsp; FP&amp;A &amp; Craft</div>
           <div class="writing-title">What defense-grade financial discipline teaches you</div>
@@ -1402,7 +1460,7 @@
     </div>
 
     <div class="lab-github-cta appear appear-delay-3">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="flex-shrink:0; color:var(--gunmetal);"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
       <span>All models and tools are open source — find them at</span>
       <a href="https://github.com/thejacobbarney" target="_blank" rel="noopener">
         github.com/thejacobbarney ↗
@@ -1423,30 +1481,6 @@
     </p>
 
     <div class="personal-grid appear appear-delay-2">
-
-      <!-- Costa Rica Dashboard -->
-      <div class="personal-card">
-        <div class="personal-card-header">
-          <div class="personal-card-emoji">🌿</div>
-          <div class="personal-card-name">Costa Rica — Interactive Travel Dashboard</div>
-          <div class="personal-card-url">thejacobbarney.com/costa-rica-26</div>
-        </div>
-        <div class="personal-card-body">
-          <div>
-            <div class="personal-card-why">Why I built it</div>
-            <p class="personal-card-desc">After a trip to Costa Rica I wanted to do something more interesting with the data than a photo album. This interactive dashboard maps the full itinerary, tracks costs by category and location, and visualizes the route across the country. The same analysis I run on $1B+ portfolios at work — applied to somewhere I actually went. A reminder that the tools don't care what the subject is.</p>
-          </div>
-          <div class="personal-card-footer">
-            <div class="personal-tags">
-              <span class="personal-tag">Python</span>
-              <span class="personal-tag">Plotly</span>
-              <span class="personal-tag">Maps</span>
-              <span class="personal-tag">Data Viz</span>
-            </div>
-            <a href="https://thejacobbarney.com/costa-rica-26/" target="_blank" rel="noopener" class="personal-cta">View Dashboard ↗</a>
-          </div>
-        </div>
-      </div>
 
       <!-- The Lab — quotes + game -->
       <div class="personal-card">
@@ -1625,7 +1659,7 @@
   <!-- ═══ CONTACT ════════════════════════════════════════ -->
   <div id="contact-section">
     <div class="contact-inner">
-      <p class="section-eyebrow" style="color:rgba(255,255,255,0.45);">Contact</p>
+      <p class="section-eyebrow">Contact</p>
       <h2 class="contact-title">Let's connect.</h2>
       <p class="contact-sub">Whether you're building a finance team, curious what defense-grade financial discipline could bring to a commercial organization, or just want to talk FP&amp;A — I'd like to hear from you.</p>
       <div class="contact-actions">
@@ -1637,9 +1671,9 @@
         <span class="footer-sig">Jake Barney</span>
         <span class="footer-note">Finance Professional &nbsp;·&nbsp; Mesa, Arizona &nbsp;·&nbsp; 2026</span>
       </div>
-      <div style="margin-top:1.25rem; display:flex; align-items:center; gap:0.5rem;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.8"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-        <span style="font-size:0.76rem; color:rgba(255,255,255,0.35); letter-spacing:0.04em;">Proudly built using AI tools</span>
+      <div class="ai-note">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+        <span>Proudly built using AI tools</span>
       </div>
     </div>
   </div>
@@ -1653,16 +1687,24 @@
     }, { passive: true });
 
     // Hamburger menu
-    function toggleMenu() {
+    function setMenu(open) {
       const btn = document.getElementById('hamburger');
       const menu = document.getElementById('mobileMenu');
-      btn.classList.toggle('open');
-      menu.classList.toggle('open');
+      btn.classList.toggle('open', open);
+      menu.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', String(open));
+      btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
     }
-    function closeMenu() {
-      document.getElementById('hamburger').classList.remove('open');
-      document.getElementById('mobileMenu').classList.remove('open');
+    function toggleMenu() {
+      setMenu(!document.getElementById('mobileMenu').classList.contains('open'));
     }
+    function closeMenu() { setMenu(false); }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('mobileMenu').classList.contains('open')) {
+        closeMenu();
+        document.getElementById('hamburger').focus();
+      }
+    });
     // Close on outside tap
     document.addEventListener('click', e => {
       const btn = document.getElementById('hamburger');
@@ -1677,11 +1719,15 @@
       const body = header.nextElementSibling;
       const isOpen = body.classList.contains('open');
       // Close all
-      document.querySelectorAll('.tl-header').forEach(h => h.classList.remove('open'));
+      document.querySelectorAll('.tl-header').forEach(h => {
+        h.classList.remove('open');
+        h.setAttribute('aria-expanded', 'false');
+      });
       document.querySelectorAll('.tl-body').forEach(b => b.classList.remove('open'));
       // Toggle clicked
       if (!isOpen) {
         header.classList.add('open');
+        header.setAttribute('aria-expanded', 'true');
         body.classList.add('open');
       }
     }
