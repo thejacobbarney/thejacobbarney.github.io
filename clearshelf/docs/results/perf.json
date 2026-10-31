@@ -1,0 +1,45 @@
+{
+  "runs": 9,
+  "without": {
+    "domContentLoadedMs": 34.8,
+    "loadMs": 69.7,
+    "scriptMs": 0,
+    "taskMs": 78.78,
+    "layoutMs": 21.37,
+    "styleMs": 9.05,
+    "jsHeapMB": 0.66,
+    "domNodes": 9119,
+    "sponsoredHidden": 0,
+    "sponsoredTotal": 49,
+    "mutationStress": {
+      "wallMs": 819,
+      "longestTaskMs": 0,
+      "sponsoredHiddenAfter": 0
+    },
+    "engine": null
+  },
+  "with": {
+    "domContentLoadedMs": 78.3,
+    "loadMs": 130.3,
+    "scriptMs": 56.55,
+    "taskMs": 146.7,
+    "layoutMs": 18.18,
+    "styleMs": 11.17,
+    "jsHeapMB": 2.44,
+    "domNodes": 9131,
+    "sponsoredHidden": 49,
+    "sponsoredTotal": 49,
+    "mutationStress": {
+      "wallMs": 829,
+      "longestTaskMs": 0,
+      "sponsoredHiddenAfter": 149
+    },
+    "engine": {
+      "scans": 6,
+      "ms": 66.60000000009313,
+      "maxMs": 18,
+      "signals": 2037,
+      "lastMs": 7.300000000046566
+    }
+  }
+}

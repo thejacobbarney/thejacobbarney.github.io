@@ -1,0 +1,415 @@
+{
+  "pages": 240,
+  "results": [
+    {
+      "id": "baseline-balanced",
+      "label": "Baseline markup, Balanced",
+      "pages": 240,
+      "sponsored": 1365,
+      "organic": 4624,
+      "tp": 1365,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "organicPreserved": 1,
+      "protectedHidden": 0,
+      "unresolvedLabels": 0,
+      "byVariant": {
+        "carousel-heading-plain": {
+          "n": 24,
+          "hit": 24
+        },
+        "brand": {
+          "n": 101,
+          "hit": 101
+        },
+        "ariaonly": {
+          "n": 87,
+          "hit": 87
+        },
+        "linkonly": {
+          "n": 97,
+          "hit": 97
+        },
+        "german": {
+          "n": 86,
+          "hit": 86
+        },
+        "legacy": {
+          "n": 73,
+          "hit": 73
+        },
+        "textonly": {
+          "n": 106,
+          "hit": 106
+        },
+        "modern": {
+          "n": 290,
+          "hit": 290
+        },
+        "spanish": {
+          "n": 94,
+          "hit": 94
+        },
+        "glyph": {
+          "n": 86,
+          "hit": 86
+        },
+        "search-carousel": {
+          "n": 70,
+          "hit": 70
+        },
+        "video": {
+          "n": 45,
+          "hit": 45
+        },
+        "home-card": {
+          "n": 124,
+          "hit": 124
+        },
+        "iframe-banner": {
+          "n": 34,
+          "hit": 34
+        },
+        "carousel-perCard": {
+          "n": 23,
+          "hit": 23
+        },
+        "carousel-heading": {
+          "n": 25,
+          "hit": 25
+        }
+      },
+      "falsePosVariants": {}
+    },
+    {
+      "id": "baseline-strict",
+      "label": "Baseline markup, Strict",
+      "pages": 240,
+      "sponsored": 1365,
+      "organic": 4624,
+      "tp": 739,
+      "fp": 0,
+      "fn": 626,
+      "precision": 1,
+      "recall": 0.5413919413919414,
+      "organicPreserved": 1,
+      "protectedHidden": 0,
+      "unresolvedLabels": 0,
+      "byVariant": {
+        "carousel-heading-plain": {
+          "n": 24,
+          "hit": 24
+        },
+        "brand": {
+          "n": 101,
+          "hit": 101
+        },
+        "ariaonly": {
+          "n": 87,
+          "hit": 0
+        },
+        "linkonly": {
+          "n": 97,
+          "hit": 0
+        },
+        "german": {
+          "n": 86,
+          "hit": 0
+        },
+        "legacy": {
+          "n": 73,
+          "hit": 73
+        },
+        "textonly": {
+          "n": 106,
+          "hit": 0
+        },
+        "modern": {
+          "n": 290,
+          "hit": 290
+        },
+        "spanish": {
+          "n": 94,
+          "hit": 0
+        },
+        "glyph": {
+          "n": 86,
+          "hit": 0
+        },
+        "search-carousel": {
+          "n": 70,
+          "hit": 0
+        },
+        "video": {
+          "n": 45,
+          "hit": 45
+        },
+        "home-card": {
+          "n": 124,
+          "hit": 124
+        },
+        "iframe-banner": {
+          "n": 34,
+          "hit": 34
+        },
+        "carousel-perCard": {
+          "n": 23,
+          "hit": 23
+        },
+        "carousel-heading": {
+          "n": 25,
+          "hit": 25
+        }
+      },
+      "falsePosVariants": {}
+    },
+    {
+      "id": "baseline-aggressive",
+      "label": "Baseline markup, Aggressive",
+      "pages": 240,
+      "sponsored": 1365,
+      "organic": 4624,
+      "tp": 1365,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "organicPreserved": 1,
+      "protectedHidden": 0,
+      "unresolvedLabels": 0,
+      "byVariant": {
+        "carousel-heading-plain": {
+          "n": 24,
+          "hit": 24
+        },
+        "brand": {
+          "n": 101,
+          "hit": 101
+        },
+        "ariaonly": {
+          "n": 87,
+          "hit": 87
+        },
+        "linkonly": {
+          "n": 97,
+          "hit": 97
+        },
+        "german": {
+          "n": 86,
+          "hit": 86
+        },
+        "legacy": {
+          "n": 73,
+          "hit": 73
+        },
+        "textonly": {
+          "n": 106,
+          "hit": 106
+        },
+        "modern": {
+          "n": 290,
+          "hit": 290
+        },
+        "spanish": {
+          "n": 94,
+          "hit": 94
+        },
+        "glyph": {
+          "n": 86,
+          "hit": 86
+        },
+        "search-carousel": {
+          "n": 70,
+          "hit": 70
+        },
+        "video": {
+          "n": 45,
+          "hit": 45
+        },
+        "home-card": {
+          "n": 124,
+          "hit": 124
+        },
+        "iframe-banner": {
+          "n": 34,
+          "hit": 34
+        },
+        "carousel-perCard": {
+          "n": 23,
+          "hit": 23
+        },
+        "carousel-heading": {
+          "n": 25,
+          "hit": 25
+        }
+      },
+      "falsePosVariants": {}
+    },
+    {
+      "id": "drift-classes",
+      "label": "All CSS classes renamed, Balanced",
+      "pages": 240,
+      "sponsored": 1365,
+      "organic": 4624,
+      "tp": 1365,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "organicPreserved": 1,
+      "protectedHidden": 0,
+      "unresolvedLabels": 0,
+      "byVariant": {
+        "carousel-heading-plain": {
+          "n": 24,
+          "hit": 24
+        },
+        "brand": {
+          "n": 101,
+          "hit": 101
+        },
+        "ariaonly": {
+          "n": 87,
+          "hit": 87
+        },
+        "linkonly": {
+          "n": 97,
+          "hit": 97
+        },
+        "german": {
+          "n": 86,
+          "hit": 86
+        },
+        "legacy": {
+          "n": 73,
+          "hit": 73
+        },
+        "textonly": {
+          "n": 106,
+          "hit": 106
+        },
+        "modern": {
+          "n": 290,
+          "hit": 290
+        },
+        "spanish": {
+          "n": 94,
+          "hit": 94
+        },
+        "glyph": {
+          "n": 86,
+          "hit": 86
+        },
+        "search-carousel": {
+          "n": 70,
+          "hit": 70
+        },
+        "video": {
+          "n": 45,
+          "hit": 45
+        },
+        "home-card": {
+          "n": 124,
+          "hit": 124
+        },
+        "iframe-banner": {
+          "n": 34,
+          "hit": 34
+        },
+        "carousel-perCard": {
+          "n": 23,
+          "hit": 23
+        },
+        "carousel-heading": {
+          "n": 25,
+          "hit": 25
+        }
+      },
+      "falsePosVariants": {}
+    },
+    {
+      "id": "drift-hostile",
+      "label": "Classes and data attributes removed, Balanced",
+      "pages": 240,
+      "sponsored": 1365,
+      "organic": 4624,
+      "tp": 1335,
+      "fp": 0,
+      "fn": 30,
+      "precision": 1,
+      "recall": 0.978021978021978,
+      "organicPreserved": 1,
+      "protectedHidden": 0,
+      "unresolvedLabels": 54,
+      "byVariant": {
+        "carousel-heading-plain": {
+          "n": 24,
+          "hit": 17
+        },
+        "brand": {
+          "n": 101,
+          "hit": 101
+        },
+        "ariaonly": {
+          "n": 87,
+          "hit": 87
+        },
+        "linkonly": {
+          "n": 97,
+          "hit": 97
+        },
+        "german": {
+          "n": 86,
+          "hit": 86
+        },
+        "legacy": {
+          "n": 73,
+          "hit": 73
+        },
+        "textonly": {
+          "n": 106,
+          "hit": 106
+        },
+        "modern": {
+          "n": 290,
+          "hit": 290
+        },
+        "spanish": {
+          "n": 94,
+          "hit": 94
+        },
+        "glyph": {
+          "n": 86,
+          "hit": 86
+        },
+        "search-carousel": {
+          "n": 70,
+          "hit": 70
+        },
+        "video": {
+          "n": 45,
+          "hit": 45
+        },
+        "home-card": {
+          "n": 124,
+          "hit": 124
+        },
+        "iframe-banner": {
+          "n": 34,
+          "hit": 34
+        },
+        "carousel-perCard": {
+          "n": 23,
+          "hit": 0
+        },
+        "carousel-heading": {
+          "n": 25,
+          "hit": 25
+        }
+      },
+      "falsePosVariants": {}
+    }
+  ]
+}

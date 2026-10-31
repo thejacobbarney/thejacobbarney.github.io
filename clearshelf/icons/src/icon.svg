@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f80ff"/>
+      <stop offset="1" stop-color="#1a4fc4"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <!-- three organic tiles stay, the fourth (sponsored) is cleared away -->
+  <rect x="22" y="22" width="40" height="40" rx="9" fill="#fff"/>
+  <rect x="66" y="22" width="40" height="40" rx="9" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="5" stroke-dasharray="7 7"/>
+  <rect x="22" y="66" width="40" height="40" rx="9" fill="#fff"/>
+  <rect x="66" y="66" width="40" height="40" rx="9" fill="#fff"/>
+</svg>

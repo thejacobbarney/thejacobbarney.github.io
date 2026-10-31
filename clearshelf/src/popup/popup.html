@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clearshelf</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img class="logo" src="../../icons/icon-48.png" alt="" width="28" height="28">
+      <div>
+        <h1>Clearshelf</h1>
+        <p class="sub" id="host-line">Sponsored listing remover</p>
+      </div>
+    </div>
+    <label class="switch" title="Turn Clearshelf on or off">
+      <input type="checkbox" id="master" role="switch" aria-label="Enable Clearshelf">
+      <span class="track" aria-hidden="true"><span class="thumb"></span></span>
+    </label>
+  </header>
+
+  <section class="status" id="status" aria-live="polite" data-tone="neutral">
+    <span class="dot" aria-hidden="true"></span>
+    <div>
+      <p class="status-title" id="status-title">Checking this tab</p>
+      <p class="status-detail" id="status-detail"></p>
+    </div>
+  </section>
+
+  <section class="stats" aria-label="Statistics">
+    <div class="stat"><span class="num" id="stat-session">0</span><span class="lbl">Removed this session</span></div>
+    <div class="stat"><span class="num" id="stat-page">0</span><span class="lbl">Removed on this page</span></div>
+    <div class="stat"><span class="num" id="stat-detected">0</span><span class="lbl">Detected now</span></div>
+  </section>
+
+  <div class="tabs" role="tablist" aria-label="Views">
+    <button role="tab" id="tab-overview" aria-selected="true" aria-controls="view-overview">Overview</button>
+    <button role="tab" id="tab-settings" aria-selected="false" aria-controls="view-settings" tabindex="-1">Settings</button>
+  </div>
+
+  <main>
+    <!-- ================================================================ Overview -->
+    <div id="view-overview" role="tabpanel" aria-labelledby="tab-overview">
+      <h2 class="h">On this page</h2>
+      <ul class="kinds" id="kinds"></ul>
+      <p class="empty" id="kinds-empty">Nothing sponsored has been removed on this page yet.</p>
+
+      <div class="actions">
+        <button class="btn" id="btn-rescan" type="button">Rescan page</button>
+        <button class="btn" id="btn-copy" type="button">Copy diagnostics</button>
+      </div>
+      <p class="note" id="copy-note" role="status"></p>
+      <p class="note">Everything runs locally in your browser. No data leaves this device.</p>
+    </div>
+
+    <!-- ================================================================ Settings -->
+    <div id="view-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+      <h2 class="h">Detection</h2>
+      <div class="modes" id="modes" role="radiogroup" aria-label="Detection mode"></div>
+
+      <label class="row">
+        <span><b>Fail-safe</b><small>Pause removal if an unusually large share of results look sponsored, and never hide a container that also holds unflagged results.</small></span>
+        <input type="checkbox" id="opt-failSafe">
+      </label>
+      <label class="row">
+        <span><b>Instant hide</b><small>Hide obvious ads before the page finishes painting, so they never flash.</small></span>
+        <input type="checkbox" id="opt-instantHide">
+      </label>
+
+      <h2 class="h">Remove these placements</h2>
+      <div id="placements"></div>
+
+      <h2 class="h">Active on these pages</h2>
+      <div id="pages"></div>
+
+      <h2 class="h">Allowlist</h2>
+      <p class="note">Never hide anything that matches. Protects products or modules you want to keep.</p>
+      <label class="field">
+        <span>Product ASINs (one per line)</span>
+        <textarea id="allow-asins" rows="3" spellcheck="false" placeholder="B08N5WRWNW"></textarea>
+      </label>
+      <label class="field">
+        <span>CSS selectors (one per line)</span>
+        <textarea id="allow-selectors" rows="3" spellcheck="false" placeholder="#sp_detail"></textarea>
+      </label>
+      <p class="note warn" id="allow-msg" role="status"></p>
+
+      <h2 class="h">Notifications</h2>
+      <label class="row">
+        <span><b>Warn about unsupported layouts</b><small>Show a small notice when sponsored items are found that cannot be removed safely.</small></span>
+        <input type="checkbox" id="opt-notifyUnsupported">
+      </label>
+      <label class="row">
+        <span><b>Toolbar badge</b><small>Show the number removed on the extension icon.</small></span>
+        <input type="checkbox" id="opt-showBadge">
+      </label>
+
+      <h2 class="h">Debug</h2>
+      <label class="row">
+        <span><b>Debug mode</b><small>Outline sponsored items instead of hiding them and show why each decision was made. Logs to the page console.</small></span>
+        <input type="checkbox" id="opt-debug">
+      </label>
+
+      <h2 class="h">Supported sites</h2>
+      <ul class="domains" id="domains"></ul>
+
+      <h2 class="h">Reset</h2>
+      <div class="actions">
+        <button class="btn danger" id="btn-reset" type="button">Reset settings</button>
+        <button class="btn" id="btn-reset-stats" type="button">Reset statistics</button>
+      </div>
+      <p class="note" id="reset-note" role="status"></p>
+      <p class="note ver" id="version"></p>
+    </div>
+  </main>
+
+  <script src="../shared/constants.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
