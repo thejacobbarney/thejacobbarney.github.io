@@ -4,48 +4,6 @@
 
   var STORAGE_KEY = 'jb.debtTracker.v1';
 
-  // Fictional sample. Applied only from the "Load example data" button.
-  var EXAMPLE = {
-    extraMonthlyPayment: 200,
-    debts: [
-      {
-        name: 'Example store card',
-        startingBalance: 1200,
-        currentBalance: 1200,
-        apr: 27.99,
-        minimumPayment: 20,
-        payments: []
-      },
-      {
-        name: 'Example credit card',
-        startingBalance: 4200,
-        currentBalance: 3850,
-        apr: 19.99,
-        minimumPayment: 85,
-        payments: [
-          { date: '2026-09-12', amount: 200 },
-          { date: '2026-10-12', amount: 150 }
-        ]
-      },
-      {
-        name: 'Example student loan',
-        startingBalance: 6400,
-        currentBalance: 6400,
-        apr: 0,
-        minimumPayment: 100,
-        payments: []
-      },
-      {
-        name: 'Example car loan',
-        startingBalance: 15000,
-        currentBalance: 11200,
-        apr: 5.5,
-        minimumPayment: 310,
-        payments: []
-      }
-    ]
-  };
-
   var moneyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
   var state = DebtCalc.emptyState();
   var ui = { historyOpen: new Set(), payOpen: new Set() };
@@ -168,7 +126,7 @@
     try {
       var result = DebtCalc.validateImport(JSON.parse(raw));
       if (!result.ok) {
-        setStatus('Saved data in this browser could not be read, so nothing was loaded. Adding a debt, importing, or loading example data will replace it.', 'error');
+        setStatus('Saved data in this browser could not be read, so nothing was loaded. Adding a debt or importing a file will replace it.', 'error');
         return;
       }
       state = result.data;
@@ -200,10 +158,6 @@
     if (document.activeElement === extraInput) return;
     extraInput.value = moneyInput(state.extraMonthlyPayment || 0);
     extraInput.removeAttribute('aria-invalid');
-  }
-
-  function renderBanner() {
-    document.getElementById('example-banner').hidden = !state.example;
   }
 
   function renderSummary() {
@@ -644,7 +598,7 @@
 
   function renderDebts() {
     if (!state.debts.length) {
-      debtList.innerHTML = '<div class="empty-block"><strong>No debts yet</strong><p class="muted">Add one to track a payoff, or load the example data. The example is labeled and fictional.</p></div>';
+      debtList.innerHTML = '<div class="empty-block"><strong>Nothing entered yet</strong><p class="muted">Add each balance you still owe. Use the name you actually call it. Starting balance is what you are measuring from. Current balance is what you owe today.</p></div>';
       return;
     }
     debtList.innerHTML = state.debts.map(debtCard).join('');
@@ -652,7 +606,6 @@
 
   function renderAll() {
     projection = null;
-    renderBanner();
     renderSummary();
     renderChart();
     renderStrategy();
@@ -888,38 +841,6 @@
     });
   }
 
-  function loadExample() {
-    var run = function () {
-      var result = DebtCalc.validateImport({
-        app: 'jb-debt-tracker',
-        version: 1,
-        example: true,
-        extraMonthlyPayment: EXAMPLE.extraMonthlyPayment,
-        debts: EXAMPLE.debts
-      });
-      if (!result.ok) {
-        setStatus('Example data could not be loaded.', 'error');
-        return;
-      }
-      state = result.data;
-      ui.historyOpen.clear();
-      ui.payOpen.clear();
-      saveState();
-      renderAll();
-      setStatus('Loaded example data. These balances are fictional.', 'ok');
-    };
-    if (state.debts.length || state.extraMonthlyPayment > 0) {
-      confirmAction({
-        title: 'Load example data?',
-        body: 'This replaces what is saved in this browser with fictional sample debts. Nothing is uploaded.',
-        confirmLabel: 'Load example',
-        danger: state.debts.length > 0
-      }).then(function (ok) { if (ok) run(); });
-      return;
-    }
-    run();
-  }
-
   function eraseAll() {
     if (!state.debts.length && !state.extraMonthlyPayment && !state.example) {
       setStatus('Nothing is saved in this browser.', 'ok');
@@ -1045,7 +966,6 @@
     if (event.target === confirmDialog) settleConfirm(false);
   });
 
-  document.getElementById('example-btn').addEventListener('click', loadExample);
   document.getElementById('export-btn').addEventListener('click', exportData);
   document.getElementById('import-btn').addEventListener('click', function () { fileInput.click(); });
   document.getElementById('erase-btn').addEventListener('click', eraseAll);

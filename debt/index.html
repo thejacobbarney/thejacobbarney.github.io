@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Debt payoff</title>
+  <title>Your payoff</title>
   <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="Private payoff tracker. Balances and payments stay in this browser.">
+  <meta name="description" content="Jake Barney’s private payoff ledger. Balances stay in this browser.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -15,27 +15,23 @@
 
   <nav id="nav">
     <a href="../" class="nav-logo" aria-label="Home">JB</a>
-    <span class="nav-title">Debt payoff</span>
+    <span class="nav-title">Your payoff</span>
   </nav>
 
   <main id="content" class="page">
-    <p class="section-eyebrow">Private</p>
-    <h1 class="page-title">Debt payoff tracker</h1>
-    <p class="lede">Balances, payments, and payoff math stay in this browser. Nothing is uploaded. Export a JSON file when you want a backup or a copy on another device.</p>
+    <p class="section-eyebrow">Jake Barney</p>
+    <h1 class="page-title">Your payoff</h1>
+    <p class="lede">Your ledger, not a sample. Add each balance you still owe. Payments and the extra amount stay in this browser, and nothing is uploaded. Export a JSON file when you want a backup or a copy on another device.</p>
 
     <div class="toolbar">
-      <button type="button" class="btn btn-ghost" id="example-btn">Load example data</button>
       <button type="button" class="btn btn-ghost" id="export-btn">Export</button>
       <button type="button" class="btn btn-ghost" id="import-btn">Import</button>
       <button type="button" class="btn btn-danger" id="erase-btn">Erase saved data</button>
       <input id="import-file" type="file" accept="application/json,.json" hidden>
     </div>
-    <p class="fine">Example data is fictional and loads only if you click the button. Import asks before it replaces anything already saved here.</p>
+    <p class="fine">Nothing is filled in for you. Import asks before it replaces what is already saved in this browser.</p>
 
     <p id="status" class="status" role="status" aria-live="polite" hidden></p>
-    <div id="example-banner" class="banner" hidden>
-      Example data. These debts are made up so you can try the page. Erase them before entering your own numbers. They are saved only in this browser.
-    </div>
 
     <section class="card" aria-labelledby="summary-heading">
       <p class="section-eyebrow">Snapshot</p>
@@ -89,7 +85,7 @@
     <div class="footer-inner">
       <div>
         <div class="footer-sig">Jake Barney</div>
-        <p>Stored in this browser only.</p>
+        <p>Your numbers stay in this browser.</p>
       </div>
       <a href="../">thejacobbarney.com</a>
     </div>
