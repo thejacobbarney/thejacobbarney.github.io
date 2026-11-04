@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your payoff</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Jake Barney’s private payoff ledger. Balances stay in this browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+
+  <nav id="nav">
+    <a href="../" class="nav-logo" aria-label="Home">JB</a>
+    <span class="nav-title">Your payoff</span>
+  </nav>
+
+  <main id="content" class="page">
+    <p class="section-eyebrow">Jake Barney</p>
+    <h1 class="page-title">Your payoff</h1>
+    <p class="lede">Your ledger, not a sample. Add each balance you still owe. Payments, notes, and the extra amount stay in this browser, and nothing is uploaded. A share link keeps a read-only copy in the address bar.</p>
+
+    <div id="shared-banner" class="banner" hidden>
+      <p>Shared progress, read only. Opening this link does not read or change what is saved in this browser.</p>
+      <a class="btn btn-navy" href="./">Open my own tracker</a>
+    </div>
+
+    <div class="toolbar editor-only">
+      <button type="button" class="btn btn-ghost" id="share-btn">Share progress</button>
+      <button type="button" class="btn btn-ghost" id="export-btn">Export</button>
+      <button type="button" class="btn btn-ghost" id="import-btn">Import</button>
+      <button type="button" class="btn btn-danger" id="erase-btn">Erase saved data</button>
+      <input id="import-file" type="file" accept="application/json,.json" hidden>
+    </div>
+    <p class="fine editor-only" id="editor-note">Nothing is filled in for you. Import asks before it replaces what is already saved in this browser.</p>
+
+    <p id="status" class="status" role="status" aria-live="polite" hidden></p>
+
+    <section class="card" aria-labelledby="summary-heading">
+      <p class="section-eyebrow">Snapshot</p>
+      <h2 id="summary-heading" class="card-title">Where things stand</h2>
+      <div id="summary"></div>
+    </section>
+
+    <section class="card" aria-labelledby="chart-heading">
+      <p class="section-eyebrow">Timeline</p>
+      <h2 id="chart-heading" class="card-title">Projected balance</h2>
+      <p class="muted">Remaining balance by month if minimums stay the same and the extra payment below keeps going to one debt at a time.</p>
+      <div id="chart-legend" class="legend" hidden></div>
+      <div id="chart"></div>
+      <p id="chart-note" class="fine"></p>
+      <details id="chart-details" class="details" hidden>
+        <summary>Month-by-month balances</summary>
+        <div class="table-scroll" id="chart-table"></div>
+      </details>
+    </section>
+
+    <section class="card" aria-labelledby="plan-heading">
+      <p class="section-eyebrow">Payoff plan</p>
+      <h2 id="plan-heading" class="card-title">Snowball and avalanche</h2>
+      <div class="field extra-field editor-only">
+        <label for="extra">Extra monthly payment</label>
+        <div class="affix">
+          <span aria-hidden="true">$</span>
+          <input id="extra" name="extra" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-describedby="extra-help">
+        </div>
+        <p id="extra-help" class="field-help">On top of each minimum. Avalanche aims it at the highest APR. Snowball aims it at the smallest balance. When a debt hits zero, its minimum joins the extra payment.</p>
+      </div>
+      <p id="cashflow" class="muted"></p>
+      <div id="plans" class="plan-grid"></div>
+      <p id="plan-note" class="plan-note"></p>
+      <p class="fine">Estimates compound monthly at APR ÷ 12, then apply the payment. Lenders use their own day counts. This is a plan, not a statement.</p>
+    </section>
+
+    <section class="card" aria-labelledby="debts-heading">
+      <div class="section-head">
+        <div>
+          <p class="section-eyebrow">Balances</p>
+          <h2 id="debts-heading" class="card-title">Debts</h2>
+        </div>
+        <button type="button" class="btn btn-navy editor-only" id="add-btn">Add a debt</button>
+      </div>
+      <div id="debt-list"></div>
+    </section>
+
+    <section class="card" id="journal-card" aria-labelledby="journal-heading">
+      <p class="section-eyebrow">Journal</p>
+      <h2 id="journal-heading" class="card-title">Progress journal</h2>
+      <p class="muted">Each note stores the paid, remaining, and percent figures from the moment you save it. Milestones for 25%, 50%, 75%, 100%, and a balance hitting zero show up on the same timeline.</p>
+      <form id="journal-form" class="editor-only" autocomplete="off">
+        <div class="form-grid">
+          <div class="field">
+            <label for="journal-date">Date</label>
+            <input id="journal-date" name="date" type="date" required>
+          </div>
+          <div class="field">
+            <label for="journal-title">Title</label>
+            <input id="journal-title" name="title" maxlength="80" required autocomplete="off" placeholder="Short note">
+          </div>
+          <div class="field span-2">
+            <label for="journal-note">Note <span class="optional">(optional)</span></label>
+            <textarea id="journal-note" name="note" maxlength="4000" rows="3" placeholder="What changed, or what you want to remember"></textarea>
+          </div>
+        </div>
+        <div class="dialog-actions journal-actions">
+          <button type="button" class="btn btn-ghost" id="journal-cancel" hidden>Cancel edit</button>
+          <button type="submit" class="btn btn-navy" id="journal-save">Add entry</button>
+        </div>
+      </form>
+      <div id="journal-list"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div>
+        <div class="footer-sig">Jake Barney</div>
+        <p>Your numbers stay in this browser.</p>
+      </div>
+      <a href="../">thejacobbarney.com</a>
+    </div>
+  </footer>
+
+  <dialog id="debt-dialog" aria-labelledby="debt-dialog-title">
+    <form id="debt-form" class="dialog-card" autocomplete="off">
+      <div class="dialog-head">
+        <h2 id="debt-dialog-title" class="card-title">Add a debt</h2>
+        <button type="button" class="icon-x" id="debt-close" aria-label="Close">×</button>
+      </div>
+      <p class="field-help">Starting balance is the baseline for “paid off.” Logging a payment later reduces the current balance and leaves the starting balance as it is.</p>
+      <div id="debt-errors" class="error-list" hidden></div>
+      <div class="form-grid">
+        <div class="field span-2">
+          <label for="debt-name">Name</label>
+          <input id="debt-name" name="name" maxlength="80" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="debt-start">Starting balance</label>
+          <div class="affix">
+            <span aria-hidden="true">$</span>
+            <input id="debt-start" name="starting" inputmode="decimal" required autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label for="debt-current">Current balance</label>
+          <div class="affix">
+            <span aria-hidden="true">$</span>
+            <input id="debt-current" name="current" inputmode="decimal" required autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label for="debt-apr">APR</label>
+          <div class="affix suffix">
+            <input id="debt-apr" name="apr" inputmode="decimal" required autocomplete="off">
+            <span aria-hidden="true">%</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="debt-min">Minimum payment</label>
+          <div class="affix">
+            <span aria-hidden="true">$</span>
+            <input id="debt-min" name="minimum" inputmode="decimal" required autocomplete="off">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-ghost" id="debt-cancel">Cancel</button>
+        <button type="submit" class="btn btn-navy" id="debt-save">Save debt</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="share-dialog" aria-labelledby="share-title">
+    <form class="dialog-card" id="share-form">
+      <div class="dialog-head">
+        <h2 id="share-title" class="card-title">Share progress</h2>
+        <button type="button" class="icon-x" id="share-close" aria-label="Close">×</button>
+      </div>
+      <p class="field-help">The link holds a read-only snapshot in the address bar. Nothing is uploaded, and opening it does not change the other person’s saved tracker.</p>
+      <fieldset class="share-mode">
+        <legend>What to include</legend>
+        <label class="choice"><input type="radio" name="share-mode" value="percent" checked> Percentages only. Balances, payments, and APRs stay off the link.</label>
+        <label class="choice"><input type="radio" name="share-mode" value="full"> Dollar amounts, including balances and APRs.</label>
+      </fieldset>
+      <div id="share-names" class="share-names"></div>
+      <div class="dialog-actions">
+        <button type="submit" class="btn btn-navy" id="share-create">Create link</button>
+      </div>
+      <div id="share-result" hidden>
+        <label for="share-url">Link</label>
+        <textarea id="share-url" class="share-url" readonly rows="4"></textarea>
+        <p id="share-length" class="fine"></p>
+        <p id="share-warn" class="callout" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-navy" id="share-copy">Copy link</button>
+          <button type="button" class="btn btn-ghost" id="share-native" hidden>Share</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <form class="dialog-card" id="confirm-form">
+      <h2 id="confirm-title" class="card-title">Confirm</h2>
+      <p id="confirm-body"></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-navy" id="confirm-ok">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+  <noscript>
+    <p class="noscript">This page needs JavaScript to run the payoff math. It still does not send numbers anywhere.</p>
+  </noscript>
+
+  <script src="calc.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
