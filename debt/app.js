@@ -6,6 +6,10 @@
 
   var moneyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
   var state = DebtCalc.emptyState();
+  var sharedMode = false;
+  var activeShare = null;
+  var editingJournalId = null;
+  var lastShareUrl = '';
   var ui = { historyOpen: new Set(), payOpen: new Set() };
   var projection = null;
   var confirmResolver = null;
@@ -100,11 +104,13 @@
   }
 
   function saveState() {
+    if (sharedMode) return false;
     var payload = {
       version: 1,
       extraMonthlyPayment: state.extraMonthlyPayment,
       example: state.example === true,
-      debts: state.debts
+      debts: state.debts,
+      journal: state.journal || []
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -610,6 +616,7 @@
     renderChart();
     renderStrategy();
     renderDebts();
+    renderJournal();
     syncExtraField();
   }
 
@@ -767,7 +774,8 @@
       version: 1,
       exportedAt: new Date().toISOString(),
       extraMonthlyPayment: state.extraMonthlyPayment,
-      debts: state.debts
+      debts: state.debts,
+      journal: state.journal || []
     };
     if (state.example) payload.example = true;
     var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -802,7 +810,7 @@
         setStatus(result.errors.slice(0, 4).join(' '), 'error');
         return;
       }
-      var needsConfirm = state.debts.length > 0 || state.extraMonthlyPayment > 0 || state.example;
+      var needsConfirm = state.debts.length > 0 || state.extraMonthlyPayment > 0 || state.example || (state.journal && state.journal.length > 0);
       var apply = function () {
         state = result.data;
         ui.historyOpen.clear();
@@ -825,8 +833,9 @@
         title: 'Replace saved debts?',
         body: 'This file has ' + result.data.debts.length + ' ' + noun +
           (preview ? ' (' + preview + ')' : '') +
+          ' and ' + result.data.journal.length + ' journal ' + (result.data.journal.length === 1 ? 'entry' : 'entries') +
           '. Importing replaces the ' + state.debts.length + ' ' + currentNoun +
-          ' currently stored in this browser.',
+          ' and ' + (state.journal ? state.journal.length : 0) + ' journal entries currently stored in this browser.',
         confirmLabel: 'Replace',
         danger: true
       }).then(function (ok) {
@@ -933,6 +942,589 @@
     });
   }
 
+  function snapshotNow() {
+    var t = DebtCalc.totals(state.debts);
+    return {
+      paid: t.paid,
+      remaining: t.remaining,
+      percent: Math.round(t.percent * 10) / 10
+    };
+  }
+
+  function collectTimeline(debts, journal) {
+    var milestones = DebtCalc.buildMilestones(debts, todayISO());
+    var entries = (journal || []).map(function (entry) {
+      return {
+        kind: 'entry',
+        date: entry.date,
+        id: entry.id,
+        title: entry.title,
+        note: entry.note || '',
+        snapshot: entry.snapshot || null
+      };
+    });
+    return entries.concat(milestones).sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      if (a.kind !== b.kind) return a.kind === 'entry' ? -1 : 1;
+      return 0;
+    });
+  }
+
+  function timelineItemHtml(item) {
+    if (item.kind === 'milestone') {
+      return '<li class="tl-item milestone"><div><p class="tl-kicker">Milestone</p><p class="tl-title">' +
+        esc(item.label) + '</p><p class="fine">' + esc(formatIso(item.date)) + '</p></div></li>';
+    }
+    var snap = item.snapshot;
+    var snapText = 'Snapshot not recorded';
+    if (snap && snap.percent != null) {
+      snapText = percentText(snap.percent) + ' paid';
+      if (snap.remaining != null) snapText += ' · ' + money(snap.remaining) + ' left';
+      if (snap.paid != null) snapText += ' · ' + money(snap.paid) + ' paid';
+    }
+    return '<li class="tl-item entry"><div><p class="tl-kicker">' + esc(formatIso(item.date)) + '</p>' +
+      '<p class="tl-title">' + esc(item.title) + '</p>' +
+      (item.note ? '<p class="tl-note">' + esc(item.note) + '</p>' : '') +
+      '<p class="fine">' + esc(snapText) + '</p>' +
+      '<div class="card-actions editor-only">' +
+      '<button type="button" class="btn btn-ghost btn-small" data-journal-action="edit" data-journal-id="' + esc(item.id) + '">Edit</button>' +
+      '<button type="button" class="btn btn-danger btn-small" data-journal-action="delete" data-journal-id="' + esc(item.id) + '">Delete</button>' +
+      '</div></div></li>';
+  }
+
+  function renderJournal() {
+    var host = document.getElementById('journal-list');
+    if (!host) return;
+    var items = collectTimeline(state.debts, state.journal);
+    if (!items.length) {
+      host.innerHTML = '<p class="empty-note">No notes yet. Milestones appear when payoff passes 25%, 50%, 75%, or 100%, or when a balance hits zero.</p>';
+      return;
+    }
+    host.innerHTML = '<ol class="timeline">' + items.map(timelineItemHtml).join('') + '</ol>';
+  }
+
+  function resetJournalForm() {
+    editingJournalId = null;
+    var form = document.getElementById('journal-form');
+    if (!form) return;
+    form.reset();
+    document.getElementById('journal-date').value = todayISO();
+    document.getElementById('journal-save').textContent = 'Add entry';
+    document.getElementById('journal-cancel').hidden = true;
+  }
+
+  function saveJournal(event) {
+    event.preventDefault();
+    if (sharedMode) return;
+    var date = document.getElementById('journal-date').value;
+    var title = document.getElementById('journal-title').value.trim();
+    var note = document.getElementById('journal-note').value.trim();
+    if (!DebtCalc.validDate(date)) {
+      setStatus('Choose a valid date for the note.', 'error');
+      return;
+    }
+    if (!title) {
+      setStatus('Give the note a short title.', 'error');
+      return;
+    }
+    if (title.length > 80) {
+      setStatus('The title must be 80 characters or fewer.', 'error');
+      return;
+    }
+    if (note.length > 4000) {
+      setStatus('The note must be 4,000 characters or fewer.', 'error');
+      return;
+    }
+    state.journal = state.journal || [];
+    if (editingJournalId) {
+      var existing = null;
+      for (var i = 0; i < state.journal.length; i++) {
+        if (state.journal[i].id === editingJournalId) existing = state.journal[i];
+      }
+      if (!existing) return;
+      existing.date = date;
+      existing.title = title;
+      existing.note = note;
+      setStatus('Updated “' + title + '”. The progress snapshot stays as it was when you first saved it.', 'ok');
+    } else {
+      state.journal.push({
+        id: DebtCalc.newId('note'),
+        date: date,
+        title: title,
+        note: note,
+        snapshot: snapshotNow()
+      });
+      setStatus('Saved “' + title + '” with the progress at this moment.', 'ok');
+    }
+    saveState();
+    resetJournalForm();
+    renderJournal();
+  }
+
+  function editJournal(id) {
+    var entry = null;
+    for (var i = 0; i < (state.journal || []).length; i++) {
+      if (state.journal[i].id === id) entry = state.journal[i];
+    }
+    if (!entry) return;
+    editingJournalId = id;
+    document.getElementById('journal-date').value = entry.date;
+    document.getElementById('journal-title').value = entry.title;
+    document.getElementById('journal-note').value = entry.note || '';
+    document.getElementById('journal-save').textContent = 'Save changes';
+    document.getElementById('journal-cancel').hidden = false;
+    document.getElementById('journal-title').focus();
+  }
+
+  function deleteJournal(id) {
+    var entry = null;
+    for (var i = 0; i < state.journal.length; i++) {
+      if (state.journal[i].id === id) entry = state.journal[i];
+    }
+    if (!entry) return;
+    confirmAction({
+      title: 'Delete this note?',
+      body: '“' + entry.title + '” will be removed from this browser, including the progress snapshot stored with it.',
+      confirmLabel: 'Delete note',
+      danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      state.journal = state.journal.filter(function (item) { return item.id !== id; });
+      if (editingJournalId === id) resetJournalForm();
+      saveState();
+      renderJournal();
+      setStatus('Deleted “' + entry.title + '”.', 'ok');
+    });
+  }
+
+  function bytesToB64url(bytes) {
+    var bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+
+  function b64urlToBytes(text) {
+    var padLen = (4 - (text.length % 4)) % 4;
+    var b64 = text.replace(/-/g, '+').replace(/_/g, '/') + '===='.slice(0, padLen);
+    var bin = atob(b64);
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  function gzipBytes(bytes) {
+    if (typeof CompressionStream === 'undefined') return Promise.resolve(null);
+    var stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+    return new Response(stream).arrayBuffer().then(function (buf) { return new Uint8Array(buf); });
+  }
+
+  function gunzipBytes(bytes) {
+    var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(stream).arrayBuffer().then(function (buf) { return new Uint8Array(buf); });
+  }
+
+  function shareNameChoices() {
+    var rows = document.querySelectorAll('#share-names .share-name');
+    var choices = [];
+    rows.forEach(function (row) {
+      choices.push({
+        show: row.querySelector('.share-show').checked,
+        name: row.querySelector('.share-rename').value.trim()
+      });
+    });
+    return choices;
+  }
+
+  function debtShareLabel(debt, index, choice) {
+    if (choice && choice.show) {
+      var name = (choice.name || debt.name || '').trim();
+      if (name) return name.slice(0, 80);
+    }
+    return 'Debt ' + (index + 1);
+  }
+
+  function downsample(values, maxPoints) {
+    if (!values || values.length <= maxPoints) return (values || []).slice();
+    var out = [];
+    var last = values.length - 1;
+    for (var i = 0; i < maxPoints; i++) out.push(values[Math.round((i * last) / (maxPoints - 1))]);
+    return out;
+  }
+
+  function planDateText(plan) {
+    if (!plan || plan.never) return null;
+    if (!plan.months) return 'Already paid off';
+    return formatMonth(plan.payoffDate);
+  }
+
+  function dollarFreeNote(model) {
+    var a = model.avalanche;
+    var s = model.snowball;
+    if (a.never && s.never) return 'Neither plan pays off within 50 years.';
+    if (a.never) return 'Only snowball reaches zero.';
+    if (s.never) return 'Only avalanche reaches zero.';
+    if (model.winner === 'tie') return 'Both plans reach zero together.';
+    var name = model.winner === 'avalanche' ? 'Avalanche' : 'Snowball';
+    var mine = model[model.winner];
+    var other = model.winner === 'avalanche' ? s : a;
+    if (mine.months != null && other.months != null && mine.months < other.months) return name + ' reaches zero first.';
+    return name + ' is the lower-interest plan.';
+  }
+
+  function buildSharePayload(mode) {
+    var choices = shareNameChoices();
+    var totals = DebtCalc.totals(state.debts);
+    var model = DebtCalc.buildChart(modelDebts(), state.extraMonthlyPayment, { asOf: new Date() });
+    var milestones = DebtCalc.buildMilestones(state.debts, todayISO()).map(function (item) {
+      var label = item.label;
+      if (item.debtIndex != null) {
+        var choice = choices[item.debtIndex];
+        var shown = choice && choice.show && (choice.name || state.debts[item.debtIndex].name);
+        label = shown ? (String(choice.name || state.debts[item.debtIndex].name).trim() + ' paid off') : 'A debt paid off';
+      }
+      return { date: item.date, label: label };
+    });
+    if (mode === 'percent') {
+      var start = totals.starting;
+      function toPercent(line) {
+        return downsample(line, 36).map(function (value) {
+          if (!(start > 0)) return 0;
+          return Math.round(Math.max(0, Math.min(100, (value / start) * 100)) * 10) / 10;
+        });
+      }
+      return {
+        v: 1,
+        mode: 'percent',
+        asOf: todayISO(),
+        percent: Math.round(totals.percent * 10) / 10,
+        debts: state.debts.map(function (debt, index) {
+          var startBal = Math.max(0, Number(debt.startingBalance) || 0);
+          var current = Math.max(0, Number(debt.currentBalance) || 0);
+          var pct = startBal > 0 ? Math.max(0, Math.min(100, ((startBal - current) / startBal) * 100)) : 0;
+          return { label: debtShareLabel(debt, index, choices[index]), percent: Math.round(pct * 10) / 10 };
+        }),
+        plan: {
+          avalanche: { months: model.avalanche.months, date: planDateText(model.avalanche), never: !!model.avalanche.never },
+          snowball: { months: model.snowball.months, date: planDateText(model.snowball), never: !!model.snowball.never },
+          note: dollarFreeNote(model)
+        },
+        chart: {
+          months: downsample(model.avalancheLine.map(function (_, i) { return i; }), 36),
+          avalanche: toPercent(model.avalancheLine),
+          snowball: toPercent(model.snowballLine)
+        },
+        milestones: milestones,
+        journal: (state.journal || []).map(function (entry) {
+          var item = { date: entry.date, title: entry.title, note: entry.note || '' };
+          if (entry.snapshot && entry.snapshot.percent != null) item.percent = entry.snapshot.percent;
+          return item;
+        })
+      };
+    }
+    return {
+      v: 1,
+      mode: 'full',
+      asOf: todayISO(),
+      extra: state.extraMonthlyPayment || 0,
+      debts: state.debts.map(function (debt, index) {
+        return {
+          name: debtShareLabel(debt, index, choices[index]),
+          startingBalance: debt.startingBalance,
+          currentBalance: debt.currentBalance,
+          apr: debt.apr,
+          minimumPayment: debt.minimumPayment,
+          payments: (debt.payments || []).map(function (payment) {
+            return { date: payment.date, amount: payment.amount };
+          })
+        };
+      }),
+      journal: (state.journal || []).map(function (entry) {
+        return {
+          date: entry.date,
+          title: entry.title,
+          note: entry.note || '',
+          snapshot: entry.snapshot || null
+        };
+      })
+    };
+  }
+
+  function encodeShare(payload) {
+    var bytes = new TextEncoder().encode(JSON.stringify(payload));
+    return gzipBytes(bytes).then(function (gz) {
+      var flag = '0';
+      var data = bytes;
+      if (gz && gz.length < bytes.length) {
+        flag = '1';
+        data = gz;
+      }
+      return location.origin + location.pathname + location.search + '#s' + flag + '.' + bytesToB64url(data);
+    });
+  }
+
+  function decodeShareHash() {
+    var match = /^s([01])\.(.+)$/.exec(location.hash.replace(/^#/, ''));
+    if (!match) return Promise.resolve(null);
+    var bytes;
+    try { bytes = b64urlToBytes(match[2]); } catch (err) { return Promise.reject(err); }
+    var decoded = match[1] === '1'
+      ? gunzipBytes(bytes).then(function (plain) { return new TextDecoder().decode(plain); })
+      : Promise.resolve(new TextDecoder().decode(bytes));
+    return decoded.then(function (text) {
+      var obj = JSON.parse(text);
+      if (!obj || obj.v !== 1 || (obj.mode !== 'full' && obj.mode !== 'percent')) throw new Error('bad share');
+      return obj;
+    });
+  }
+
+  function fillShareNames() {
+    var host = document.getElementById('share-names');
+    if (!state.debts.length) {
+      host.innerHTML = '<p class="fine">No debts to name. The link can still share the journal and the overall percent.</p>';
+      return;
+    }
+    var percentMode = document.querySelector('input[name="share-mode"]:checked').value === 'percent';
+    host.innerHTML = '<p class="fine">Show a name, type a different one, or leave it hidden.</p>' +
+      state.debts.map(function (debt) {
+        return '<div class="share-name"><label class="choice"><input type="checkbox" class="share-show"' +
+          (percentMode ? '' : ' checked') + '> Show name</label>' +
+          '<input type="text" class="share-rename" maxlength="80" value="' + esc(debt.name) + '" autocomplete="off"></div>';
+      }).join('');
+  }
+
+  function openShareDialog() {
+    if (sharedMode) return;
+    document.getElementById('share-result').hidden = true;
+    document.getElementById('share-warn').hidden = true;
+    lastShareUrl = '';
+    document.querySelector('input[name="share-mode"][value="percent"]').checked = true;
+    fillShareNames();
+    document.getElementById('share-native').hidden = typeof navigator.share !== 'function';
+    document.getElementById('share-dialog').showModal();
+  }
+
+  function createShareLink(event) {
+    event.preventDefault();
+    var mode = document.querySelector('input[name="share-mode"]:checked').value;
+    encodeShare(buildSharePayload(mode)).then(function (url) {
+      lastShareUrl = url;
+      document.getElementById('share-url').value = url;
+      document.getElementById('share-result').hidden = false;
+      document.getElementById('share-length').textContent = url.length + ' characters.';
+      var warn = document.getElementById('share-warn');
+      if (url.length > 8000) {
+        warn.hidden = false;
+        warn.textContent = 'This link is very long (' + url.length + ' characters). Some browsers and chat apps will refuse to open it. Shorten the journal, or share percentages only.';
+      } else if (url.length > 3500) {
+        warn.hidden = false;
+        warn.textContent = 'This link is long (' + url.length + ' characters). It still opens in current browsers, but some apps trim long links.';
+      } else {
+        warn.hidden = true;
+      }
+      setStatus(mode === 'percent' ? 'Percent-only link is ready to copy.' : 'Full link is ready to copy.', 'ok');
+    }).catch(function () {
+      setStatus('Could not build the share link in this browser.', 'error');
+    });
+  }
+
+  function copyShareLink() {
+    if (!lastShareUrl) return;
+    var done = function () { setStatus('Copied the share link.', 'ok'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lastShareUrl).then(done).catch(function () {
+        document.getElementById('share-url').focus();
+        document.getElementById('share-url').select();
+        setStatus('Select the link and copy it.', 'error');
+      });
+      return;
+    }
+    document.getElementById('share-url').focus();
+    document.getElementById('share-url').select();
+    setStatus('Select the link and copy it.', 'ok');
+  }
+
+  function nativeShare() {
+    if (!lastShareUrl || !navigator.share) return;
+    navigator.share({ title: 'Payoff progress', url: lastShareUrl }).catch(function () {});
+  }
+
+  function renderPercentSummary(shared) {
+    var pct = Math.max(0, Math.min(100, Number(shared.percent) || 0));
+    document.getElementById('summary').innerHTML =
+      '<div class="stat-grid"><div class="stat-card" style="grid-column:1 / -1"><div class="stat-value">' +
+      esc(percentText(pct)) + '</div><div class="stat-label">Paid off</div>' +
+      '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' +
+      esc(pct.toFixed(1)) + '" aria-label="Percent paid off"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
+      '<p class="fine">Dollar amounts were left out of this link.</p></div></div>';
+  }
+
+  function renderPercentChart(shared) {
+    var host = document.getElementById('chart');
+    var chart = shared.chart || { months: [0], avalanche: [100], snowball: [100] };
+    var width = Math.max(280, host.clientWidth || 640);
+    var height = width < 520 ? 220 : 280;
+    var pad = { top: 16, right: 12, bottom: 32, left: width < 420 ? 42 : 48 };
+    var innerW = width - pad.left - pad.right;
+    var innerH = height - pad.top - pad.bottom;
+    var maxMonth = Math.max.apply(null, (chart.months || [1]).concat([1]));
+    function xOf(month) { return pad.left + (innerW * month) / maxMonth; }
+    function yOf(pct) {
+      return pad.top + innerH - (innerH * Math.max(0, Math.min(100, pct))) / 100;
+    }
+    function path(values) {
+      var d = '';
+      for (var i = 0; i < values.length; i++) {
+        var month = chart.months && chart.months[i] != null ? chart.months[i] : i;
+        d += (i === 0 ? 'M' : 'L') + xOf(month).toFixed(2) + ' ' + yOf(values[i]).toFixed(2) + ' ';
+      }
+      return d.trim();
+    }
+    var svg = svgEl('svg', {
+      viewBox: '0 0 ' + width + ' ' + height,
+      width: '100%',
+      height: String(height),
+      role: 'img'
+    });
+    svg.setAttribute('aria-label', 'Projected percent remaining. Dollar amounts are not included.');
+    [0, 25, 50, 75, 100].forEach(function (tick) {
+      var y = yOf(tick);
+      svg.appendChild(svgEl('line', {
+        x1: String(pad.left), x2: String(width - pad.right),
+        y1: y.toFixed(2), y2: y.toFixed(2), stroke: '#EDEBE8', 'stroke-width': '1'
+      }));
+      var label = svgEl('text', {
+        x: String(pad.left - 6), y: (y + 4).toFixed(2), 'text-anchor': 'end',
+        fill: '#9298A0', 'font-size': '11', 'font-family': 'Inter, system-ui, sans-serif'
+      });
+      label.textContent = tick + '%';
+      svg.appendChild(label);
+    });
+    var plot = svgEl('g');
+    plot.appendChild(svgEl('path', {
+      d: path(chart.avalanche || []), fill: 'none', stroke: '#1B3664', 'stroke-width': '2.5',
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round'
+    }));
+    plot.appendChild(svgEl('path', {
+      d: path(chart.snowball || []), fill: 'none', stroke: '#9C4A32', 'stroke-width': '2.5',
+      'stroke-dasharray': '7 5', 'stroke-linejoin': 'round', 'stroke-linecap': 'round'
+    }));
+    svg.appendChild(plot);
+    host.innerHTML = '';
+    host.appendChild(svg);
+    document.getElementById('chart-legend').hidden = false;
+    document.getElementById('chart-legend').innerHTML = '<span><i class="swatch ava"></i> Avalanche</span><span><i class="swatch snow"></i> Snowball</span>';
+    document.getElementById('chart-note').textContent = 'Percent of the original balances still left. Solid navy is avalanche. Dashed copper is snowball.';
+    document.getElementById('chart-details').hidden = true;
+  }
+
+  function planCardHtml(title, plan, winner) {
+    var dateText = plan && plan.never ? 'Does not pay off' : ((plan && plan.date) || '—');
+    var timeText = !plan || plan.never || plan.months == null ? '—' : formatDuration(plan.months);
+    return '<article class="plan' + (winner ? ' is-winner' : '') + '"><div class="plan-kicker"><h3 class="plan-name">' +
+      title + '</h3></div><dl><div><dt>Debt-free</dt><dd>' + esc(dateText) +
+      '</dd></div><div><dt>Time</dt><dd>' + esc(timeText) + '</dd></div></dl></article>';
+  }
+
+  function renderPercentPlans(shared) {
+    var plan = shared.plan || {};
+    document.getElementById('cashflow').textContent = '';
+    document.getElementById('plans').innerHTML =
+      planCardHtml('Avalanche', plan.avalanche, plan.note && plan.note.indexOf('Avalanche') === 0) +
+      planCardHtml('Snowball', plan.snowball, plan.note && plan.note.indexOf('Snowball') === 0);
+    document.getElementById('plan-note').textContent = plan.note || '';
+  }
+
+  function renderPercentDebts(shared) {
+    var debts = shared.debts || [];
+    if (!debts.length) {
+      document.getElementById('debt-list').innerHTML = '<p class="empty-note">No debts were included.</p>';
+      return;
+    }
+    document.getElementById('debt-list').innerHTML = debts.map(function (debt) {
+      var pct = Math.max(0, Math.min(100, Number(debt.percent) || 0));
+      return '<article class="debt"><h3 class="debt-name">' + esc(debt.label || 'Debt') + '</h3>' +
+        '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' +
+        pct.toFixed(1) + '"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
+        '<p class="progress-caption">' + esc(percentText(pct)) + ' paid off</p></article>';
+    }).join('');
+  }
+
+  function renderSharedJournal(shared) {
+    var entries = (shared.journal || []).map(function (entry) {
+      var snap = shared.mode === 'full' ? (entry.snapshot || null) : { percent: entry.percent };
+      return { kind: 'entry', date: entry.date, title: entry.title, note: entry.note || '', snapshot: snap };
+    });
+    var milestones = (shared.mode === 'percent' ? (shared.milestones || []) : DebtCalc.buildMilestones(state.debts, shared.asOf || todayISO()))
+      .map(function (item) { return { kind: 'milestone', date: item.date, label: item.label }; });
+    var items = entries.concat(milestones).filter(function (item) { return DebtCalc.validDate(item.date); })
+      .sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    document.getElementById('journal-list').innerHTML = items.length
+      ? '<ol class="timeline">' + items.map(timelineItemHtml).join('') + '</ol>'
+      : '<p class="empty-note">No notes were included.</p>';
+  }
+
+  function showSharedChrome(shared) {
+    sharedMode = true;
+    activeShare = shared;
+    document.body.classList.add('is-shared');
+    document.getElementById('shared-banner').hidden = false;
+    document.querySelector('.page-title').textContent = 'Shared progress';
+    document.querySelector('.section-eyebrow').textContent = 'Read only';
+    var when = shared.asOf && DebtCalc.validDate(shared.asOf) ? formatIso(shared.asOf) : 'an unknown date';
+    document.querySelector('.lede').textContent = 'A read-only snapshot from ' + when + '. ' +
+      (shared.mode === 'percent' ? 'Dollar amounts were left out.' : 'Dollar amounts are included.');
+  }
+
+  function applyFullShare(shared) {
+    showSharedChrome(shared);
+    var imported = DebtCalc.validateImport({
+      app: 'jb-debt-tracker',
+      version: 1,
+      extraMonthlyPayment: shared.extra || 0,
+      debts: shared.debts || [],
+      journal: (shared.journal || []).map(function (entry) {
+        return { date: entry.date, title: entry.title, note: entry.note || '', snapshot: entry.snapshot || null };
+      })
+    });
+    if (!imported.ok) throw new Error(imported.errors.join(' '));
+    state = imported.data;
+    renderAll();
+  }
+
+  function applyPercentShare(shared) {
+    showSharedChrome(shared);
+    renderPercentSummary(shared);
+    renderPercentChart(shared);
+    renderPercentPlans(shared);
+    renderPercentDebts(shared);
+    renderSharedJournal(shared);
+  }
+
+  function boot() {
+    var hash = location.hash.replace(/^#/, '');
+    if (!/^s[01]\./.test(hash)) {
+      loadState();
+      resetJournalForm();
+      renderAll();
+      return;
+    }
+    decodeShareHash().then(function (shared) {
+      if (!shared) {
+        loadState();
+        resetJournalForm();
+        renderAll();
+        return;
+      }
+      if (shared.mode === 'percent') applyPercentShare(shared);
+      else applyFullShare(shared);
+    }).catch(function () {
+      sharedMode = true;
+      document.body.classList.add('is-shared');
+      document.getElementById('shared-banner').hidden = false;
+      setStatus('This share link could not be read. Your saved tracker was left untouched.', 'error');
+    });
+  }
+
   document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 20);
   window.addEventListener('scroll', function () {
     document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 20);
@@ -1031,11 +1623,40 @@
     new ResizeObserver(function () {
       cancelAnimationFrame(chartFrame);
       chartFrame = requestAnimationFrame(function () {
-        if (state.debts.some(function (d) { return d.currentBalance > 0; })) renderChart();
+        if (activeShare && activeShare.mode === 'percent') renderPercentChart(activeShare);
+        else if (state.debts.some(function (d) { return d.currentBalance > 0; })) renderChart();
       });
     }).observe(document.getElementById('chart'));
   }
 
-  loadState();
-  renderAll();
+  document.getElementById('journal-form').addEventListener('submit', saveJournal);
+  document.getElementById('journal-cancel').addEventListener('click', resetJournalForm);
+  document.getElementById('journal-list').addEventListener('click', function (event) {
+    var btn = event.target.closest('[data-journal-action]');
+    if (!btn) return;
+    var id = btn.getAttribute('data-journal-id');
+    if (btn.getAttribute('data-journal-action') === 'edit') editJournal(id);
+    else deleteJournal(id);
+  });
+  document.getElementById('share-btn').addEventListener('click', openShareDialog);
+  document.getElementById('share-form').addEventListener('submit', createShareLink);
+  document.getElementById('share-close').addEventListener('click', function () { document.getElementById('share-dialog').close(); });
+  document.getElementById('share-copy').addEventListener('click', copyShareLink);
+  document.getElementById('share-native').addEventListener('click', nativeShare);
+  document.getElementById('share-dialog').addEventListener('click', function (event) {
+    if (event.target === document.getElementById('share-dialog')) document.getElementById('share-dialog').close();
+  });
+  document.querySelectorAll('input[name="share-mode"]').forEach(function (input) {
+    input.addEventListener('change', function () {
+      var percentMode = document.querySelector('input[name="share-mode"]:checked').value === 'percent';
+      document.querySelectorAll('.share-show').forEach(function (box) { box.checked = !percentMode; });
+    });
+  });
+  document.querySelector('#shared-banner a').addEventListener('click', function (event) {
+    event.preventDefault();
+    history.replaceState(null, '', location.pathname + location.search);
+    location.reload();
+  });
+
+  boot();
 })();

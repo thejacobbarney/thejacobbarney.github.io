@@ -21,15 +21,21 @@
   <main id="content" class="page">
     <p class="section-eyebrow">Jake Barney</p>
     <h1 class="page-title">Your payoff</h1>
-    <p class="lede">Your ledger, not a sample. Add each balance you still owe. Payments and the extra amount stay in this browser, and nothing is uploaded. Export a JSON file when you want a backup or a copy on another device.</p>
+    <p class="lede">Your ledger, not a sample. Add each balance you still owe. Payments, notes, and the extra amount stay in this browser, and nothing is uploaded. A share link keeps a read-only copy in the address bar.</p>
 
-    <div class="toolbar">
+    <div id="shared-banner" class="banner" hidden>
+      <p>Shared progress, read only. Opening this link does not read or change what is saved in this browser.</p>
+      <a class="btn btn-navy" href="./">Open my own tracker</a>
+    </div>
+
+    <div class="toolbar editor-only">
+      <button type="button" class="btn btn-ghost" id="share-btn">Share progress</button>
       <button type="button" class="btn btn-ghost" id="export-btn">Export</button>
       <button type="button" class="btn btn-ghost" id="import-btn">Import</button>
       <button type="button" class="btn btn-danger" id="erase-btn">Erase saved data</button>
       <input id="import-file" type="file" accept="application/json,.json" hidden>
     </div>
-    <p class="fine">Nothing is filled in for you. Import asks before it replaces what is already saved in this browser.</p>
+    <p class="fine editor-only" id="editor-note">Nothing is filled in for you. Import asks before it replaces what is already saved in this browser.</p>
 
     <p id="status" class="status" role="status" aria-live="polite" hidden></p>
 
@@ -55,7 +61,7 @@
     <section class="card" aria-labelledby="plan-heading">
       <p class="section-eyebrow">Payoff plan</p>
       <h2 id="plan-heading" class="card-title">Snowball and avalanche</h2>
-      <div class="field extra-field">
+      <div class="field extra-field editor-only">
         <label for="extra">Extra monthly payment</label>
         <div class="affix">
           <span aria-hidden="true">$</span>
@@ -75,9 +81,36 @@
           <p class="section-eyebrow">Balances</p>
           <h2 id="debts-heading" class="card-title">Debts</h2>
         </div>
-        <button type="button" class="btn btn-navy" id="add-btn">Add a debt</button>
+        <button type="button" class="btn btn-navy editor-only" id="add-btn">Add a debt</button>
       </div>
       <div id="debt-list"></div>
+    </section>
+
+    <section class="card" id="journal-card" aria-labelledby="journal-heading">
+      <p class="section-eyebrow">Journal</p>
+      <h2 id="journal-heading" class="card-title">Progress journal</h2>
+      <p class="muted">Each note stores the paid, remaining, and percent figures from the moment you save it. Milestones for 25%, 50%, 75%, 100%, and a balance hitting zero show up on the same timeline.</p>
+      <form id="journal-form" class="editor-only" autocomplete="off">
+        <div class="form-grid">
+          <div class="field">
+            <label for="journal-date">Date</label>
+            <input id="journal-date" name="date" type="date" required>
+          </div>
+          <div class="field">
+            <label for="journal-title">Title</label>
+            <input id="journal-title" name="title" maxlength="80" required autocomplete="off" placeholder="Short note">
+          </div>
+          <div class="field span-2">
+            <label for="journal-note">Note <span class="optional">(optional)</span></label>
+            <textarea id="journal-note" name="note" maxlength="4000" rows="3" placeholder="What changed, or what you want to remember"></textarea>
+          </div>
+        </div>
+        <div class="dialog-actions journal-actions">
+          <button type="button" class="btn btn-ghost" id="journal-cancel" hidden>Cancel edit</button>
+          <button type="submit" class="btn btn-navy" id="journal-save">Add entry</button>
+        </div>
+      </form>
+      <div id="journal-list"></div>
     </section>
   </main>
 
@@ -136,6 +169,35 @@
       <div class="dialog-actions">
         <button type="button" class="btn btn-ghost" id="debt-cancel">Cancel</button>
         <button type="submit" class="btn btn-navy" id="debt-save">Save debt</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="share-dialog" aria-labelledby="share-title">
+    <form class="dialog-card" id="share-form">
+      <div class="dialog-head">
+        <h2 id="share-title" class="card-title">Share progress</h2>
+        <button type="button" class="icon-x" id="share-close" aria-label="Close">×</button>
+      </div>
+      <p class="field-help">The link holds a read-only snapshot in the address bar. Nothing is uploaded, and opening it does not change the other person’s saved tracker.</p>
+      <fieldset class="share-mode">
+        <legend>What to include</legend>
+        <label class="choice"><input type="radio" name="share-mode" value="percent" checked> Percentages only. Balances, payments, and APRs stay off the link.</label>
+        <label class="choice"><input type="radio" name="share-mode" value="full"> Dollar amounts, including balances and APRs.</label>
+      </fieldset>
+      <div id="share-names" class="share-names"></div>
+      <div class="dialog-actions">
+        <button type="submit" class="btn btn-navy" id="share-create">Create link</button>
+      </div>
+      <div id="share-result" hidden>
+        <label for="share-url">Link</label>
+        <textarea id="share-url" class="share-url" readonly rows="4"></textarea>
+        <p id="share-length" class="fine"></p>
+        <p id="share-warn" class="callout" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-navy" id="share-copy">Copy link</button>
+          <button type="button" class="btn btn-ghost" id="share-native" hidden>Share</button>
+        </div>
       </div>
     </form>
   </dialog>

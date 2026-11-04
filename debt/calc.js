@@ -266,7 +266,7 @@
   }
 
   function emptyState() {
-    return { version: 1, extraMonthlyPayment: 0, example: false, debts: [] };
+    return { version: 1, extraMonthlyPayment: 0, example: false, debts: [], journal: [] };
   }
 
   function isPlainObject(value) {
@@ -405,6 +405,74 @@
       }
     }
 
+    const journal = [];
+    if (input.journal != null && !Array.isArray(input.journal)) {
+      errors.push('Journal must be a list.');
+    } else if (Array.isArray(input.journal)) {
+      for (let j = 0; j < input.journal.length; j++) {
+        const raw = input.journal[j];
+        const label = 'Journal entry ' + (j + 1);
+        if (!isPlainObject(raw)) {
+          errors.push(label + ' is not an object.');
+          continue;
+        }
+        const title = typeof raw.title === 'string' ? raw.title.trim() : '';
+        let entryOk = true;
+        if (!title) {
+          errors.push(label + ' needs a title.');
+          entryOk = false;
+        } else if (title.length > 80) {
+          errors.push(label + ' title must be 80 characters or fewer.');
+          entryOk = false;
+        }
+        if (!validDate(raw.date)) {
+          errors.push(label + ' needs a date as YYYY-MM-DD.');
+          entryOk = false;
+        }
+        const note = typeof raw.note === 'string' ? raw.note.trim() : '';
+        if (note.length > 4000) {
+          errors.push(label + ' note must be 4,000 characters or fewer.');
+          entryOk = false;
+        }
+        let snapshot = null;
+        if (raw.snapshot != null) {
+          if (!isPlainObject(raw.snapshot)) {
+            errors.push(label + ' snapshot must be an object.');
+            entryOk = false;
+          } else {
+            snapshot = {};
+            if (raw.snapshot.paid != null) {
+              const paid = readMoneyField(raw.snapshot.paid, label + ' snapshot paid', errors);
+              if (paid == null) entryOk = false;
+              else snapshot.paid = paid;
+            }
+            if (raw.snapshot.remaining != null) {
+              const remaining = readMoneyField(raw.snapshot.remaining, label + ' snapshot remaining', errors);
+              if (remaining == null) entryOk = false;
+              else snapshot.remaining = remaining;
+            }
+            if (raw.snapshot.percent != null) {
+              const pct = Number(raw.snapshot.percent);
+              if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+                errors.push(label + ' snapshot percent must be between 0 and 100.');
+                entryOk = false;
+              } else {
+                snapshot.percent = Math.round(pct * 10) / 10;
+              }
+            }
+          }
+        }
+        let id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : '';
+        if (!id || seen[id]) id = newId('note');
+        seen[id] = true;
+        if (entryOk) {
+          const entry = { id: id, date: raw.date, title: title, note: note };
+          if (snapshot) entry.snapshot = snapshot;
+          journal.push(entry);
+        }
+      }
+    }
+
     if (errors.length) return { ok: false, errors: errors };
 
     return {
@@ -415,8 +483,96 @@
         extraMonthlyPayment: extra,
         example: input.example === true,
         debts: debts,
+        journal: journal,
       },
     };
+  }
+
+  /**
+   * Dated milestones from logged payments, then from balances as of today.
+   * 25/50/75/100% use the same paid-off definition as totals().
+   * A debt at a zero current balance is "paid off".
+   */
+  function buildMilestones(debts, today) {
+    const todayStr = validDate(today) ? today : isoDate(new Date());
+    const list = Array.isArray(debts) ? debts : [];
+    const totalStart = list.reduce(function (sum, debt) {
+      return sum + Math.max(0, toCents(debt.startingBalance));
+    }, 0);
+    const milestones = [];
+    if (totalStart <= 0) return milestones;
+
+    const replay = list.map(function (debt) {
+      const start = Math.max(0, toCents(debt.startingBalance));
+      return { start: start, balance: start };
+    });
+    const events = [];
+    list.forEach(function (debt, index) {
+      (debt.payments || []).forEach(function (payment) {
+        if (!payment || !validDate(payment.date)) return;
+        const amount = Math.max(0, toCents(payment.amount));
+        if (amount > 0) events.push({ date: payment.date, index: index, amount: amount });
+      });
+    });
+    events.sort(function (a, b) {
+      if (a.date < b.date) return -1;
+      if (a.date > b.date) return 1;
+      return 0;
+    });
+
+    let paid = 0;
+    const crossed = { 25: '', 50: '', 75: '', 100: '' };
+    const paidOffAt = {};
+
+    function consider(date) {
+      const pct = (paid / totalStart) * 100;
+      [25, 50, 75, 100].forEach(function (mark) {
+        if (!crossed[mark] && pct >= mark - 1e-6) crossed[mark] = date;
+      });
+    }
+
+    events.forEach(function (event) {
+      const debt = replay[event.index];
+      if (!debt) return;
+      const pay = Math.min(debt.balance, event.amount);
+      debt.balance -= pay;
+      paid += pay;
+      if (debt.start > 0 && debt.balance <= 0 && !paidOffAt[event.index]) paidOffAt[event.index] = event.date;
+      consider(event.date);
+    });
+
+    list.forEach(function (debt, index) {
+      const current = Math.max(0, toCents(debt.currentBalance));
+      if (current < replay[index].balance) {
+        paid += replay[index].balance - current;
+        replay[index].balance = current;
+      }
+      if (replay[index].start > 0 && current <= 0 && !paidOffAt[index]) paidOffAt[index] = todayStr;
+    });
+    consider(todayStr);
+
+    const actual = totals(list).percent;
+    [25, 50, 75, 100].forEach(function (mark) {
+      if (crossed[mark] && actual + 1e-6 >= mark) {
+        milestones.push({ date: crossed[mark], kind: 'milestone', label: mark + '% paid off' });
+      }
+    });
+    list.forEach(function (debt, index) {
+      if (replay[index].start > 0 && Math.max(0, toCents(debt.currentBalance)) <= 0) {
+        milestones.push({
+          date: paidOffAt[index] || todayStr,
+          kind: 'milestone',
+          label: (debt.name || 'A debt') + ' paid off',
+          debtIndex: index,
+        });
+      }
+    });
+    return milestones;
+  }
+
+  function isoDate(date) {
+    const z = function (n) { return String(n).padStart(2, '0'); };
+    return date.getFullYear() + '-' + z(date.getMonth() + 1) + '-' + z(date.getDate());
   }
 
   function totals(debts) {
@@ -466,5 +622,7 @@
     totals: totals,
     addMonths: addMonths,
     newId: newId,
+    buildMilestones: buildMilestones,
+    validDate: validDate,
   };
 });
